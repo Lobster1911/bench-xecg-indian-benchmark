@@ -81,7 +81,7 @@ def get_sample_row(start, end, signal, label, r_p, r_peaks, annotation_positions
         window_size = 10 * 360
         start_window, end_window = get_centered_window(signal, r_p, window_size, start, end)
         extra_annotations = get_extra_annotation(start_window, end_window, annotation_positions, extra_labels)
-        r_peaks_in_window = np.array([ r for r in r_peaks if start_window <= r <= end_window])
+        # r_peaks_in_window = np.array([ r for r in r_peaks if start_window <= r <= end_window])
 
         row_data = {
             'patient': patient,
@@ -97,8 +97,8 @@ def get_sample_row(start, end, signal, label, r_p, r_peaks, annotation_positions
             'age': age,
             'is_male': is_male,
             'extra_annotations': extra_annotations,
-            'r_peak_interval_mean': np.mean((r_peaks_in_window[1:] - r_peaks_in_window[:-1]) / 360),
-            'r_peak_variance': np.std((r_peaks_in_window[1:] - r_peaks_in_window[:-1]) / 360),
+            # 'r_peak_interval_mean': np.mean((r_peaks_in_window[1:] - r_peaks_in_window[:-1]) / 360),
+            # 'r_peak_variance': np.std((r_peaks_in_window[1:] - r_peaks_in_window[:-1]) / 360),
         }
         return row_data
 
@@ -116,9 +116,30 @@ def split_between_hb(signal, r_peaks, patient, labels, annotation_positions, ext
         else:
             start = r_peaks[i - 1]
 
+        # bound to a lenght of 800
+        start = max(start, r_p - 400)
+        end = min(end, r_p + 400)
+
         row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
         all_data.append(row_data)
     return all_data
+
+def split_static(signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male):
+     all_data = []
+     start, end = 0, 0
+     for i, r_p in enumerate(r_peaks):
+         if i == len(r_peaks) - 1:
+             end = len(signal)
+         else:
+             end = r_peaks[i] + 300
+ 
+         if i == 0:
+             start = 0
+         else:
+             start = r_peaks[i] - 300
+ 
+         row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
+         all_data.append(row_data)
         
 
 def split_t_wave(signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male):
@@ -161,7 +182,7 @@ def split_t_wave(signal, r_peaks, patient, labels, annotation_positions, extra_l
         all_data.append(row_data)
 
 
-def process_patient(patient, data_folder, split, hb_split_type, name, nk_clean):
+def process_patient(patient, data_folder, name, nk_clean):
     """
     Process a single patient's data.  This function is designed for parallel execution.
     """
@@ -208,24 +229,25 @@ def process_patient(patient, data_folder, split, hb_split_type, name, nk_clean):
             nk_clean=nk_clean
         )
 
-    if hb_split_type == 't_wave':
+    if name == 't_wave_split':
         return split_t_wave(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
-    elif hb_split_type == 'between_hb':
-        
+    elif name == 'between_hb':
+        return split_between_hb(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
+    elif name == 'static':
+        return split_static(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
+    else:
+        raise ValueError(f"Unknown split type: {name}")
 
-    
-
-    return all_data
 
 
-def create_csv_mapping(patient_ids, data_folder, split='train', hb_split_type='t_wave', name='t_wave_split', nk_clean=True):
+def create_csv_mapping(patient_ids, data_folder, split='train', name='t_wave_split', nk_clean=True):
     """
     Create CSV mapping with parallel processing.
     """
 
     # Use joblib.Parallel to process patients in parallel
     results = Parallel(n_jobs=get_max_n_jobs())(
-        delayed(process_patient)(patient, data_folder, split, hb_split_type, name, nk_clean)
+        delayed(process_patient)(patient, data_folder, name, nk_clean)
         for patient in tqdm(patient_ids, desc=f"Processing {split} data")
     )
 

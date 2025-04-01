@@ -12,7 +12,7 @@ conversion = {
 }
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
-    def __init__(self, config, subset='train', name='t_wave_split', use_labels_in_tab_data=True, random_shift=False):
+    def __init__(self, config, subset='train', use_labels_in_tab_data=True):
         """
         Args:
             config: configuration object
@@ -24,16 +24,17 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_mit
         self.subset = subset
         self.samples = []
-        self.random_shift = random_shift
+        self.random_shift = config.random_shift
         self.nkclean = config.nk_clean
         self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
+        self.name = config.name
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
         self.use_labels_in_tab_data = use_labels_in_tab_data
 
-        self.samples = pd.read_csv(os.path.join(self.data_folder, name, f'labels_{subset}.csv'))
+        self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
         # ensure no Nan values
         self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
 
@@ -49,11 +50,10 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.signals = {}
         for patient in self.patients:
             if self.nkclean:
-                signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, name, f'{patient}'))
+                signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.name, f'{patient}'))
             else:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
-            # normalize the signal
             self.signals[patient] = signal
             self.headers[patient] = header
 
@@ -70,20 +70,15 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         sample = self.samples.iloc[idx]
         patient = sample['patient']
-        signal = self.signals[patient]
-        signal = torch.tensor(signal, dtype=torch.float32)
+        signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
         heartbeat_signal = signal[sample['hb_start']:sample['hb_end']]
 
-        if self.random_shift:
-            window_start = sample['win_start']
-            window_end = sample['win_end']
+
+        if self.random_shift and self.subset == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-            window_start += shift
-            window_end += shift
-            # ensure that the window is inside the signal
-            window_start = max(0, window_start)
-            window_end = min(window_end, len(signal))
+            window_start =  max(0, sample['win_start'] + shift)
+            window_end = min(sample['win_end'] + shift, len(signal))
         else:
             window_start = sample['win_start']
             window_end = sample['win_end']
@@ -99,8 +94,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             std[std == 0] = 1
             heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
-        # print('window_signal', window_signal.shape)
-
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
         heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
 
@@ -108,18 +101,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             'heartbeat': heartbeat_signal,
             'signal': window_signal,
             'label': self.get_label_int(sample['label']),
-            'r_peak_interval_mean': torch.tensor(sample['r_peak_interval_mean']),
-            'r_peak_variance' : torch.tensor(sample['r_peak_variance']),
             'patient_id': patient,
         }
-
-        tortn = check_mean_var_r_peaks(tortn)
-
-        # ensure no nan
-        if torch.isnan(tortn['r_peak_interval_mean']):
-            tortn['r_peak_interval_mean'] = torch.tensor(0)
-        if torch.isnan(tortn['r_peak_variance']):
-            tortn['r_peak_variance'] = torch.tensor(0)  
 
         if self.use_tab_data:
             comment = header.__dict__['comments'][0].split(' ')
@@ -219,9 +202,6 @@ def collate_fn(batch):
     hb = [item['heartbeat'] for item in batch]
     patients = [item['patient_id'] for item in batch]
 
-    r_peak_interval_mean = torch.tensor([item['r_peak_interval_mean'] for item in batch])
-    r_peak_variance = torch.tensor([item['r_peak_variance'] for item in batch])
-
     # pad to same length and pad to match the patch size module
     heartbeat_signals = torch.nn.utils.rnn.pad_sequence(hb, batch_first=True)
 
@@ -232,8 +212,8 @@ def collate_fn(batch):
         'heartbeat': heartbeat_signals,
         'signal': window_signals,
         'label': labels,
-        'r_peak_interval_mean': r_peak_interval_mean,
-        'r_peak_variance': r_peak_variance,
+        # 'r_peak_interval_mean': r_peak_interval_mean,
+        # 'r_peak_variance': r_peak_variance,
         'patient_ids': torch.tensor(patients),
     }
 

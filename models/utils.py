@@ -5,7 +5,7 @@ from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, UNetPatchEmbedding, HeadModule, EmbedPatching, UNetEmbedPatching
+from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, UNetPatchEmbedding, HeadModule, EmbedPatching, UNetEmbedPatching, EnrichedLinearPatchEmbedding
 import os
 
 def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
@@ -21,6 +21,11 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'unet':
         print('using UNet patch embedding')
         return UNetPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
+    if type == 'enriched':
+        print('using enriched patch embedding')
+        return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
+    else:
+        raise ValueError(f"Patch embedding {type} not supported")
 
 def get_reconstruction_head(type, patch_size, embedding_size, num_channels, activation_fn):
     if type == 'linear':
@@ -70,7 +75,7 @@ def get_xlstm(
                 conv1d_kernel_size=4, 
                 qkv_proj_blocksize=num_heads, 
                 num_heads=num_heads,
-                proj_factor=1
+                proj_factor=2
             )
         ),
         slstm_block=sLSTMBlockConfig(

@@ -142,6 +142,9 @@ class myxLSTM(nn.Module):
         ctx, _ = self.embed_data(ctx, tab_data)
         x, _ = self.embed_data(x, None)
 
+        # print('ctx', ctx.shape)
+        # print('x', x.shape)
+
         # add the separation token between the context and the input
         sep_token = self.sep_token.repeat(x.shape[0], 1, 1)
         cls_token = self.cls_token.repeat(x.shape[0], 1, 1)
