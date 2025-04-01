@@ -253,7 +253,7 @@ class HeadModule(nn.Module):
         super().__init__()
         self.head = nn.Sequential(
             nn.Linear(inp_size, hidden_size),
-            nn.ReLU(activation_fn),
+            nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size, out_size),
         )

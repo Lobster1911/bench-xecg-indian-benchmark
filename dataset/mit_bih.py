@@ -72,18 +72,22 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
-        heartbeat_signal = signal[sample['hb_start']:sample['hb_end']]
-
 
         if self.random_shift and self.subset == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start =  max(0, sample['win_start'] + shift)
             window_end = min(sample['win_end'] + shift, len(signal))
+            shift_hb = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
+            hb_start = max(0, sample['hb_start'] + shift_hb)
+            hb_end = min(sample['hb_end'] + shift_hb, len(signal))
         else:
             window_start = sample['win_start']
             window_end = sample['win_end']
+            hb_start = sample['hb_start']
+            hb_end = sample['hb_end']
 
         window_signal = signal[window_start:window_end]
+        heartbeat_signal = signal[hb_start:hb_end]
 
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
@@ -91,7 +95,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             window_signal = (window_signal - window_signal.mean(axis=(0, -1))) / std
 
             std = heartbeat_signal.std(axis=(0, -1))
-            std[std == 0] = 1
+            std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
