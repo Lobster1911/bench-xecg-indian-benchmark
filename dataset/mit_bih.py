@@ -4,7 +4,6 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
-from dataset.generic_utils import check_mean_var_r_peaks
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
@@ -29,16 +28,21 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
+        self.num_classes = config.num_classes
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
         self.use_labels_in_tab_data = use_labels_in_tab_data
 
         self.samples = pd.read_csv(os.path.join(self.data_folder, name, f'labels_{subset}.csv'))
+
+        # keep only the samples within the number of classes
+        if self.num_classes == 5:
+            self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V', 'F', 'Q'])]
+        elif self.num_classes == 3:
+            self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
+
         # ensure no Nan values
         self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
-
-        if not config.oversample:
-            self.samples = self.samples[self.samples['is_oversampled'] == False]
         
         print(self.samples.head())  
         # get all the different values for column patient
@@ -53,7 +57,9 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             else:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
-            # normalize the signal
+
+            signal = torch.tensor(signal, dtype=torch.float32)
+            signal = self.filter_leads(signal, header.__dict__['sig_name'])
             self.signals[patient] = signal
             self.headers[patient] = header
 
@@ -71,24 +77,27 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         sample = self.samples.iloc[idx]
         patient = sample['patient']
         signal = self.signals[patient]
-        signal = torch.tensor(signal, dtype=torch.float32)
         header = self.headers[patient]
-        heartbeat_signal = signal[sample['hb_start']:sample['hb_end']]
 
         if self.random_shift:
-            window_start = sample['win_start']
-            window_end = sample['win_end']
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-            window_start += shift
-            window_end += shift
+
             # ensure that the window is inside the signal
-            window_start = max(0, window_start)
-            window_end = min(window_end, len(signal))
+            window_start = max(0, sample['win_start'] + shift)
+            window_end = min(sample['win_end'] + shift, len(signal))
+
+            hb_start = max(0, sample['hb_start'] + shift)
+            hb_end = min(len(signal), sample['hb_end'] + shift)
+
         else:
             window_start = sample['win_start']
             window_end = sample['win_end']
+            hb_start = sample['hb_start']
+            hb_end = sample['hb_end']
 
-        window_signal = signal[window_start:window_end]
+
+        heartbeat_signal = signal[sample['hb_start'] : sample['hb_end']]
+        window_signal = signal[window_start : window_end]
 
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
@@ -99,27 +108,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             std[std == 0] = 1
             heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
-        # print('window_signal', window_signal.shape)
-
-        window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
-        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
-
         tortn = {
             'heartbeat': heartbeat_signal,
             'signal': window_signal,
             'label': self.get_label_int(sample['label']),
-            'r_peak_interval_mean': torch.tensor(sample['r_peak_interval_mean']),
-            'r_peak_variance' : torch.tensor(sample['r_peak_variance']),
+            'hb_start': hb_start - window_start,
+            'hb_end': hb_end - window_start,
             'patient_id': patient,
         }
-
-        tortn = check_mean_var_r_peaks(tortn)
-
-        # ensure no nan
-        if torch.isnan(tortn['r_peak_interval_mean']):
-            tortn['r_peak_interval_mean'] = torch.tensor(0)
-        if torch.isnan(tortn['r_peak_variance']):
-            tortn['r_peak_variance'] = torch.tensor(0)  
 
         if self.use_tab_data:
             comment = header.__dict__['comments'][0].split(' ')
@@ -219,9 +215,6 @@ def collate_fn(batch):
     hb = [item['heartbeat'] for item in batch]
     patients = [item['patient_id'] for item in batch]
 
-    r_peak_interval_mean = torch.tensor([item['r_peak_interval_mean'] for item in batch])
-    r_peak_variance = torch.tensor([item['r_peak_variance'] for item in batch])
-
     # pad to same length and pad to match the patch size module
     heartbeat_signals = torch.nn.utils.rnn.pad_sequence(hb, batch_first=True)
 
@@ -232,9 +225,9 @@ def collate_fn(batch):
         'heartbeat': heartbeat_signals,
         'signal': window_signals,
         'label': labels,
-        'r_peak_interval_mean': r_peak_interval_mean,
-        'r_peak_variance': r_peak_variance,
         'patient_ids': torch.tensor(patients),
+        'hb_start': torch.tensor([item['hb_start'] for item in batch]),
+        'hb_end': torch.tensor([item['hb_end'] for item in batch]),
     }
 
     if 'tab_data' in batch[0].keys():

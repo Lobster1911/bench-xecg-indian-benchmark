@@ -23,7 +23,7 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name):
         if len(signal.shape) == 2:
             signal = signal.unsqueeze(-1)
 
-        reconstruct = model.reconstruct(signal, tab_data)
+        reconstruct = model.reconstruct(signal, tab_data)[0]
             
         # if reconstruct is a tuple, get the first element
         if isinstance(reconstruct, tuple):

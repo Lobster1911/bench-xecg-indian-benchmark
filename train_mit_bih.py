@@ -11,6 +11,10 @@ import torch
 from utils.utils import get_training_class_weights
 import argparse
 import os
+from torch.utils.data import WeightedRandomSampler
+import numpy as np
+from tqdm import tqdm
+
 os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 # train.py --epochs 30 --dropout 0.4 --activation_fn relu --batch_size 128 --patch_size 64 --embedding_size 784 --use_scheduler --wd 0.01 --deterministic --xlstm_config m s m m m m m s m m m m --num_workers 32 --nk_clean --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_shift --lr_head 0.001 --lr_xlstm 0.000001 --checkpoint pretrained_models/jg7je6hh/checkpoints/epoch=38-step=174330.ckpt --wandb_log --deterministic --num_epochs_warm_restart 15 --split_by_patient --use_class_weights --xlstm_type small
@@ -27,18 +31,19 @@ parser.add_argument('--dropout', type=float, default=0.4, help='Dropout')
 parser.add_argument('--embedding_size', type=int, default=64, help='Embedding size')
 parser.add_argument('--deterministic', action='store_true', help='Deterministic training')
 parser.add_argument('--use_tab_data', action='store_true', help='Use tabular data')
-parser.add_argument('--patience', type=int, default=5, help='Patience for the early stopping')
+parser.add_argument('--patience', type=int, default=15, help='Patience for the early stopping')
 parser.add_argument('--is_sweep', action='store_true', help='Is a sweep')
 parser.add_argument('--grad_clip', type=float, default=0.5, help='Gradient clipping value')
 parser.add_argument('--weight_tying', action='store_true', help='Weight tying')
 parser.add_argument('--use_class_weights', action='store_true', help='Use class weights for the loss function')
 parser.add_argument('--label_smoothing', type=float, default=0., help='Label smoothing')
+parser.add_argument('--num_classes', type=int, default=5, help='Number of classes, 5 for N, S, V, F, Q: 3 for N, S, V')
 
 # optimize and scheduler
 parser.add_argument('--optimizer', type=str, default='adamw', help='Optimizer')
 parser.add_argument('--use_scheduler', action='store_true', help='Use the scheduler for the optimizer')
 parser.add_argument('--num_epochs_warmup',  type=int, default=1, help='Number of warmup epoch for the scheduler')
-parser.add_argument('--num_epochs_warm_restart',  type=int, default=3, help='Number of epoch before restarting the scheduler')
+parser.add_argument('--num_epochs_warm_restart',  type=int, default=15, help='Number of epoch before restarting the scheduler')
 parser.add_argument('--sched_decay_factor', type=float, default=0.8, help='Decay factor for the scheduler')
 parser.add_argument('--contrastive_loss_lambda', type=float, default=0., help='Lambda for the contrastive loss')
 parser.add_argument('--random_surrogate_prob', type=float, default=0., help='Probability of using a surrogate')
@@ -55,6 +60,9 @@ parser.add_argument('--xlstm_type', type=str, default='small', help='Type of xLS
 parser.add_argument('--patch_embedding', default='linear', help='Patch embedding type')
 parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstruction head type')
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
+parser.add_argument('--multi_token_prediction', action='store_true', help='Multi token prediction')
+parser.add_argument('--use_revin_norm', action='store_true', help='Use revin norm')
+parser.add_argument('--head_type', type=str, default='linear', help='Head type, linear or kan')
 
 # data and augmentations hyperparameters
 parser.add_argument('--normalize', action='store_true', help='Normalize the data')
@@ -66,30 +74,44 @@ parser.add_argument('--leads', type=str, nargs='*', default=['II'], help='Leads 
 
 # data folders and paths
 parser.add_argument('--data_folder_mit', type=str, default='/media/Volume/data/MIT-BHI/data/', help='Data folder for MIT-BHI dataset')
+parser.add_argument('--name', type=str, default='t_wave_split', help='Name of the dataset')
 parser.add_argument('--checkpoint', type=str, help='Checkpoint name')
 
 
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', use_labels_in_tab_data=False, random_shift=config.random_shift)
+    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', use_labels_in_tab_data=False, random_shift=config.random_shift, name=config.name)
     train_dataset, val_dataset = dataset.split_validation_training(val_size=0.1, split_by_patient=config.split_by_patient)
 
     if config.use_class_weights:
         # weights = get_training_class_weights(train_dataset).to('cuda')
         # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
         # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
-        weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
+        if config.num_classes == 5:
+            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
+        else:
+            weights = torch.tensor([0.2781, 13.5098,  3.3668]).to('cuda')
     else:
         weights = None
 
-    train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
+    # define a weighted class sampler
+    if config.oversample:
+        # set higher number for the Q class because it is basically impossible to classify
+        weight = 1. / torch.tensor([41517, 3301, 930, 410, 40000], dtype=torch.float)
+        samples_weight = np.array([weight[t['label']] for t in train_dataset])
+        samples_weight = torch.from_numpy(samples_weight)
+        sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight), replacement=True)
+        train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn, sampler=sampler)
+    else:
+        train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
+    
     val_dataloader = utils.data.DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=config.random_shift)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=config.random_shift, name=config.name)
     test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
 
-    xlstm = myxLSTM(config=config, num_classes=5, num_channels=len(config.leads))
+    xlstm = myxLSTM(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
     def format_keys(key):
         if key.startswith('model.'):
@@ -106,10 +128,10 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset), num_classes=5, weights=weights)
+    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset), num_classes=config.num_classes, weights=weights)
 
     # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
-    early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
 

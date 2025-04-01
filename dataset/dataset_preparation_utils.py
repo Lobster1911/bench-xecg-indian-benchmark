@@ -152,7 +152,7 @@ def process_sample(signal, output_file_path, record_name, fs, desired_fs, nk_cle
     signal = unpad_signal(signal)
     if signal is None:
         print(f"Record {record_name} has only zeros - skipping")
-        return None
+        return record_name
 
     for i in range(signal.shape[1]):
         signal[:, i] = nk.signal_fillmissing(signal[:, i], method='both')
@@ -165,15 +165,15 @@ def process_sample(signal, output_file_path, record_name, fs, desired_fs, nk_cle
 
     if len(signal) < 360:
         print(f"Record {record_name} has less than 360 samples - skipping")
-        return None
+        return record_name
 
     # skip record with too big variance and high values
     if np.var(signal) > 10 and (np.max(signal[:, i]) >= 15 or np.min(signal[:, i]) < -15):
         print(f"Record {record_name} has too high variance - skipping")
-        return None
+        return record_name
     if np.var(signal) < 0.0001:
         print(f"Record {record_name} has too low variance - skipping")
-        return None
+        return record_name
     
     return signal
 
@@ -182,24 +182,30 @@ def resample_and_save_record_wfdb(record_path, desired_fs, output_file_path, nk_
 
     signal = process_sample(record.p_signal, output_file_path, record.record_name, record.fs, desired_fs, nk_clean)
         
-    if signal is None:
-        return
+    if isinstance(signal, str):
+        return signal
 
-    wfdb.wrsamp(
-        record.record_name,
-        fs=desired_fs,
-        units=record.units, 
-        sig_name=record.sig_name, 
-        samps_per_frame=record.samps_per_frame,
-        p_signal=signal, 
-        fmt=record.fmt, 
-        adc_gain=record.adc_gain, 
-        baseline=record.baseline, 
-        comments=record.comments,
-        base_date=record.base_date,
-        base_time=record.base_time,
-        write_dir=output_file_path, # output here
-    )
+    try:
+        wfdb.wrsamp(
+            record.record_name,
+            fs=desired_fs,
+            units=record.units, 
+            sig_name=record.sig_name, 
+            samps_per_frame=record.samps_per_frame,
+            p_signal=signal, 
+            fmt=record.fmt, 
+            adc_gain=record.adc_gain, 
+            baseline=record.baseline, 
+            comments=record.comments,
+            base_date=record.base_date,
+            base_time=record.base_time,
+            write_dir=output_file_path, # output here
+        )
+    except Exception as e:
+        print(f"Error in record {record.record_name}: {e}")
+        return record.record_name
+
+    return None
 
 def resample_and_save_record_hdf5(record_path, exam_id, desired_fs, output_file_path, nk_clean=False):
     with h5py.File(record_path, 'r') as f:
@@ -209,8 +215,8 @@ def resample_and_save_record_hdf5(record_path, exam_id, desired_fs, output_file_
 
         signal = process_sample(signal, output_file_path, exam_id, 500, desired_fs, nk_clean)
 
-        if signal is None:
-            return
+        if isinstance(signal, str) or isinstance(signal, int):
+            return str(signal)
         
         try:
             wfdb.wrsamp(
@@ -226,6 +232,9 @@ def resample_and_save_record_hdf5(record_path, exam_id, desired_fs, output_file_
             )
         except Exception as e:
             print(f"Error in record {exam_id}: {e}")
+            return str(exam_id)
+        
+        return None
 
 def clean_and_create_directory(directory):
     if not os.path.exists(directory):

@@ -123,8 +123,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def reconstruct_batch(self, batch, step):
         x = batch["signal"]
-        mean_target = batch["r_peak_interval_mean"]
-        var_target = batch["r_peak_variance"]
 
         # print('x shape', x.shape)
 
@@ -136,64 +134,54 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
 
         reconstruction = self.model.reconstruct(x, tab_data)
-        #print('reconstruction shape', reconstruction.shape)
+
         nrmse = np.inf
 
-        shift_x = x[:, self.patch_size:].squeeze()
-        shift_reconstruct = reconstruction[:, :-self.patch_size]
-        #print('shift_reconstruct shape', shift_reconstruct.shape)
+        min_max, mae, grad, mse = [], [], [], []
 
-        # compute the loss and use the gradients only when it is needed
-        if 'min_max' in self.loss_type:
-            min_max = masked_min_max_loss(shift_reconstruct, shift_x, patch_size=self.patch_size)
-       
-        if 'ccc' in self.loss_type:
-            ccc = ccc_loss(shift_reconstruct, shift_x)
+        for i, r in enumerate(reconstruction):
+            shift_x = x[:, self.patch_size * (i + 1):].squeeze()
+            shift_reconstruct = r[:, :-self.patch_size * (i + 1)]
 
-        if 'ac' in self.loss_type:
-            ac = auto_correlation_loss(shift_reconstruct, shift_x, convolution=self.model.patch_embedding)
+            # compute the loss and use the gradients only when it is needed
+            if 'min_max' in self.loss_type:
+                min_max.append(masked_min_max_loss(shift_reconstruct, shift_x, patch_size=self.patch_size))
 
-        if 'mae' in self.loss_type:
-            mae = (shift_reconstruct, shift_x)
-        else:
-            with torch.no_grad(): mae = masked_mae_loss(shift_reconstruct, shift_x)
+            if 'mae' in self.loss_type:
+                mae.append(masked_mae_loss(shift_reconstruct, shift_x))
+            else:
+                with torch.no_grad(): mae.append(masked_mae_loss(shift_reconstruct, shift_x))
 
-        if 'grad' in self.loss_type:
-            grad = gradient_loss(shift_reconstruct, shift_x)
-        else:
-            with torch.no_grad(): grad = gradient_loss(shift_reconstruct, shift_x)
-        
-        if 'mse' in self.loss_type:
-            mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
-        else:
-            with torch.no_grad(): mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
-
-        
+            if 'grad' in self.loss_type:
+                grad.append(gradient_loss(shift_reconstruct, shift_x))
+            else:
+                with torch.no_grad(): grad.append(gradient_loss(shift_reconstruct, shift_x))
+            
+            if 'mse' in self.loss_type:
+                mse.append(masked_mse_loss(shift_reconstruct, shift_x, reduction='mean'))
+            else:
+                with torch.no_grad(): mse.append(masked_mse_loss(shift_reconstruct, shift_x, reduction='mean'))
    
         # calculate the normalized root squared error only for the first token prediction
         with torch.no_grad():
-            nrmse = torch.sqrt(mse) / (shift_x.max() - shift_x.min())
-
-
-        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=self.batch_size)
-        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=self.batch_size)
-        if 'ccc' in self.loss_type: self.log(f"{step}_ccc", ccc.item(), prog_bar=True, batch_size=self.batch_size)
-        if 'ac' in self.loss_type: self.log(f"{step}_ac", ac.item(), prog_bar=True, batch_size=self.batch_size)
-
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
+            nrmse = torch.sqrt(mse[0]) / (x.max() - x.min())
         
         loss = torch.tensor(0.0, device=self.device)
-        if 'mae' in self.loss_type: loss += mae
-        elif 'mse' in self.loss_type: loss += mse
+        if 'mae' in self.loss_type: loss += sum(mae) / len(mae)
+        elif 'mse' in self.loss_type: loss += sum(mse) / len(mse)
 
-        if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
-        if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
-        if 'ccc' in self.loss_type: loss += ccc * self.ccc_loss_lambda
-        if 'ac' in self.loss_type: loss += ac * self.auto_correlation_loss_lambda
+        if 'grad' in self.loss_type: loss += (sum(grad) / len(grad)) * self.grad_loss_lambda
+        if 'min_max' in self.loss_type: loss += (sum(min_max) / len(min_max)) * self.min_max_loss_lambda
 
         self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=self.batch_size)
+
+        self.log(f"{step}_mse", mse[0].item(), prog_bar=False, batch_size=self.batch_size)
+        self.log(f"{step}_mae", mae[0].item(), prog_bar=False, batch_size=self.batch_size)
+        self.log(f"{step}_grad", grad[0].item(), prog_bar=False, batch_size=self.batch_size)
+        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max[0].item(), prog_bar=False, batch_size=self.batch_size)
+        
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
+
         return loss
 
     def configure_optimizers(self):

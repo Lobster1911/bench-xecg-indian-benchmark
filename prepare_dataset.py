@@ -15,19 +15,35 @@ from pandarallel import pandarallel
 from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
-
+# MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic
+# CODE:  python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/CODE15/nkclean_360_12l/ --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
+# PTB-XL: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/PTB-XL/nkclean_360_12l/ --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
 parser = argparse.ArgumentParser(description='Create dataset for MIT-BIH')
 parser.add_argument('--data_folder', type=str, default='/media/Volume/data/MIMIC_IV/', help='Path to raw data folder')
 parser.add_argument('--label_file', type=str, default='/media/Volume/data/MIMIC_IV/records_w_diag_icd10.csv', help='Path to the label file')
 parser.add_argument('--nk_clean', action='store_true', help='Use NeuroKit2 to clean the data')
 parser.add_argument('--output_folder', type=str, required=True, help='the name of the output directory')
-parser.add_argument('--dataset', type=str, required=True, help='the name of the dataset: mimic or code 15')
+parser.add_argument('--dataset', type=str, required=True, help='the name of the dataset: mimic, code 15 or ptbxl')
 args = parser.parse_args()
 
 def process_sample_mimic(sample):
     record_path = os.path.join(args.data_folder, 'files', 'p' + str(sample['subject_id'])[:4], 'p' + str(sample['subject_id']), 's' + str(sample['study_id']), str(sample['study_id']))
     out_path = os.path.join(args.output_folder, str(sample['study_id']))
-    resample_and_save_record_wfdb(record_path, 360, out_path, nk_clean=args.nk_clean)
+    return resample_and_save_record_wfdb(record_path, 360, out_path, nk_clean=args.nk_clean)
+
+def process_sample_code15(exam):
+    record_path = os.path.join(args.data_folder, str(exam[1]['trace_file']))
+    exam_id = exam[1]['exam_id']
+    out_path = os.path.join(args.output_folder, str(exam[1]['exam_id']))
+    return resample_and_save_record_hdf5(record_path, exam_id, 360, out_path, nk_clean=args.nk_clean)
+
+def process_sample_ptbxl(sample):
+    record_path = os.path.join(args.data_folder, sample['filename_hr'])
+    out_path = os.path.join(args.output_folder, sample['filename_hr'].split('/')[1])
+    # print(out_path)
+    # out_path = os.path.join(args.output_folder, str(sample['ecg_id']))
+    return resample_and_save_record_wfdb(record_path, 360, out_path, nk_clean=args.nk_clean)
+
 
 def add_labels_mimic(exams):
     exams['is_male'] = exams.parallel_apply(lambda x: x['gender'] == 'M', axis=1)
@@ -58,36 +74,7 @@ def add_labels_mimic(exams):
     exams['Rheumatic disease'] = exams.parallel_apply(lambda row: 'Rheumatic disease' in get_array(row), axis=1)
     return exams
 
-def analyze_ecg(path):
-    """
-    Analyze the ecg signal
-
-    :param row: the row of the dataframe
-    :return: the peaks
-    """
-    # check path
-    if not os.path.exists(path + '.dat'):
-        print(f'Path {path} does not exist')
-        return None
-    
-    record = wfdb.rdrecord(path)
-    peaks = wp.xqrs_detect(record.p_signal[:, 1], record.fs, verbose=False)
-    return peaks
-
-def add_signal_informations(exams, identifier_key='study_id'):
-    """
-    Add some signal informations to the exams dataframe like r peak frequency and variance
-
-    :param exams: the exams dataframe
-    :return: the exams dataframe with the peaks informations
-    """
-    exams['r_peaks'] = exams.parallel_apply(lambda row: analyze_ecg(os.path.join(args.output_folder, str(row[identifier_key]))), axis=1)
-    exams['r_peak_interval_mean'] = exams.parallel_apply(lambda row: np.mean((row['r_peaks'][1:] - row['r_peaks'][:-1]) / 360) if row['r_peaks'] is not None else None, axis=1)
-    exams['r_peak_variance'] = exams.parallel_apply(lambda row: np.std((row['r_peaks'][1:] - row['r_peaks'][:-1]) / 360) if row['r_peaks'] is not None else None, axis=1)
-    return exams
-
-
-def process_csv_file_mimic(csv_file, out_csv_file):
+def process_csv_file_mimic(csv_file, out_csv_file, records_to_remove=None):
     """
     Transform the icd10 codes into a ready to use format aligned with common classes
     Add r peak informations to the csv file
@@ -97,18 +84,45 @@ def process_csv_file_mimic(csv_file, out_csv_file):
     :return:
     """
     exams = pd.read_csv(csv_file)
+
+    records_to_remove = [int(r) for r in records_to_remove]
+
+    print(f'Removing {len(records_to_remove)} records ({records_to_remove[0]}, ...)')
+    print(f'Original length: {len(exams)}')
+    exams = exams.drop(exams[exams['study_id'].isin(records_to_remove)].index)
+    print(f'New length: {len(exams)}')
+
+    print('some study ids:', exams['study_id'].head())
+
     # drop useless columns
     exams.drop(columns=['ecg_no_within_stay', 'ecg_no_within_stay', 'ecg_taken_in_hosp', 'ecg_taken_in_ed_or_hosp', 'anchor_year', 'anchor_age'], inplace=True)
     
-    exams = add_labels_mimic(exams)
-    exams = add_signal_informations(exams, identifier_key='study_id')
+    # exams = add_labels_mimic(exams)
 
     # ensure correct format of the identifier column
     exams.parallel_apply(lambda row: str(row['study_id']).split('/')[0], axis=1)
 
     exams.to_csv(out_csv_file)
 
-def process_csv_file_code15(csv_file, out_csv_file):
+def process_csv_file_code15(csv_file, out_csv_file, records_to_remove=None):
+    """
+    Add r peaks informations to the csv file
+
+    :param csv_file: the path to the csv file
+    :param out_csv_file: the path to the output csv file
+    :return:
+    """
+    exams = pd.read_csv(csv_file)
+    records_to_remove = [int(r) for r in records_to_remove]
+
+    print(f'Removing {len(records_to_remove)} records ({records_to_remove[0]}, ...)')
+    print(f'Original length: {len(exams)}')
+    exams = exams[~exams['exam_id'].isin(records_to_remove)]
+    print(f'New length: {len(exams)}')
+
+    exams.to_csv(out_csv_file)      
+
+def process_csv_file_ptbxl(csv_file, out_csv_file, records_to_remove=None):
     """
     Add r peaks informations to the csv file
 
@@ -118,15 +132,14 @@ def process_csv_file_code15(csv_file, out_csv_file):
     """
     exams = pd.read_csv(csv_file)
 
-    exams = add_signal_informations(exams, identifier_key='exam_id')
-    exams.to_csv(out_csv_file)      
+    records_to_remove = [int(r.split('_')[0]) for r in records_to_remove]
 
+    print(f'Removing {len(records_to_remove)} records ({records_to_remove[0]}, ...)')
+    print(f'Original length: {len(exams)}')
+    exams = exams[~exams['ecg_id'].isin(records_to_remove)]
+    print(f'New length: {len(exams)}')
 
-def process_sample_code15(exam):
-    record_path = os.path.join(args.data_folder, str(exam[1]['trace_file']))
-    exam_id = exam[1]['exam_id']
-    out_path = os.path.join(args.output_folder, str(exam[1]['exam_id']))
-    resample_and_save_record_hdf5(record_path, exam_id, 360, out_path, nk_clean=args.nk_clean)
+    exams.to_csv(out_csv_file)
 
 
 if __name__ == '__main__':
@@ -135,12 +148,21 @@ if __name__ == '__main__':
 
     if args.dataset == 'mimic':
         records = pd.read_csv(os.path.join(args.data_folder, 'machine_measurements.csv'))
-        Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_mimic)(sample) for i, sample in tqdm(records.iterrows()))
-        process_csv_file_mimic(args.label_file, os.path.join(args.output_folder, 'records_w_diag_icd10_labelled.csv'))
+        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_mimic)(sample) for i, sample in tqdm(records.iterrows()))
+        res = [r for r in res if r is not None]
+        process_csv_file_mimic(args.label_file, os.path.join(args.output_folder, 'records_w_diag_icd10_labelled.csv'), records_to_remove=res)
 
     if args.dataset == 'code15':
         exams = pd.read_csv(args.label_file)
-        Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_code15)(exam) for exam in tqdm(exams.iterrows()))
-        process_csv_file_code15(args.label_file, os.path.join(args.output_folder, 'exams_labelled.csv'))
+        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_code15)(exam) for exam in tqdm(exams.iterrows()))
+        res = [r for r in res if r is not None]
+        process_csv_file_code15(args.label_file, os.path.join(args.output_folder, 'exams_labelled.csv'), records_to_remove=res)
+
+    if args.dataset == 'ptbxl':
+        exams = pd.read_csv(args.label_file)
+        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_ptbxl)(sample) for i, sample in tqdm(exams.iterrows()))
+        res = [r for r in res if r is not None]
+        process_csv_file_ptbxl(args.label_file, os.path.join(args.output_folder, 'ptbxl_database.csv'), records_to_remove=res)
+
 
 

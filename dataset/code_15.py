@@ -4,7 +4,7 @@ import numpy as np
 import wfdb
 import os
 import pandas as pd
-from dataset.generic_utils import random_shift, find_records, check_mean_var_r_peaks
+from dataset.generic_utils import random_shift
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
@@ -14,8 +14,6 @@ class ECGCODE15Dataset(Dataset):
         Args:
             records (list): List of records of ECG traces
         """
-        self.records = find_records(config.data_folder_code15)
-        print(f'loaded {len(self.records)} records')
         self.data_folder = config.data_folder_code15
         self.labels_file = config.labels_file_code15
         self.normalize = config.normalize 
@@ -23,8 +21,12 @@ class ECGCODE15Dataset(Dataset):
         self.random_shift = config.random_shift
         self.patch_size = config.patch_size
         self.use_tab_data = config.use_tab_data
-        
         self.load_tabular_data()
+        self.load_records()
+
+    def load_records(self):
+        self.records = self.tab_data.index.tolist()
+        print(f'loaded {len(self.records)} records')
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
@@ -45,9 +47,9 @@ class ECGCODE15Dataset(Dataset):
         return len(self.records)
 
     def __getitem__(self, idx):
-        record = self.records[idx]
+        record = str(self.records[idx])
 
-        signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, record))
+        signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, record, record))
 
         # remove a random number of datapoints from the signal from 0 to patch size 
         if self.random_shift: signal = random_shift(signal, self.patch_size)
@@ -68,11 +70,7 @@ class ECGCODE15Dataset(Dataset):
 
         tortn = {
             'signal':signal,
-            'r_peak_interval_mean': torch.tensor(tab_data['r_peak_interval_mean']),
-            'r_peak_variance': torch.tensor(tab_data['r_peak_variance']),
         }
-
-        tortn = check_mean_var_r_peaks(tortn)
 
         if self.use_tab_data:
             tab_data = pd.DataFrame(tab_data)
@@ -81,32 +79,16 @@ class ECGCODE15Dataset(Dataset):
         return tortn
         
     
-    def split_validation_training(self, val_size_pct = 0.1):
-        """
-        Split the dataset into training and validation sets.
-        
-        Args:
-            val_size_pct (float): Percentage of the dataset to include in the validation set
-        """
-        dataset_size = len(self)
-        train_size = int(dataset_size * (1 - val_size_pct))
-        val_size = dataset_size - train_size
-        train_dataset, val_dataset = random_split(self, [train_size, val_size])
-        return train_dataset, val_dataset
-    
 def collate_fn(batch):
     signals = [item['signal'] for item in batch]
     padded_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-    r_peak_interval_mean = torch.tensor([item['r_peak_interval_mean'] for item in batch]) 
-    r_peak_variance = torch.tensor([item['r_peak_variance'] for item in batch])
-        
+
     tortn =  {
         'signal': padded_signals,
-        'r_peak_interval_mean': r_peak_interval_mean,
-        'r_peak_variance': r_peak_variance,
     }
 
     if 'tab_data' in batch[0].keys():
         tab_data = pd.concat([item['tab_data'] for item in batch], axis=0)
+        tortn['tab_data'] = tab_data
 
     return tortn

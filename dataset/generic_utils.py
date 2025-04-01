@@ -32,10 +32,3 @@ def find_records(folder, header_extension='.dat'):
     records.update(filter(None, results))
     records = sorted(records)
     return records
-
-def check_mean_var_r_peaks(sample):
-    if torch.isnan(sample['r_peak_interval_mean']):
-        sample['r_peak_interval_mean'] = torch.tensor(0)
-    if torch.isnan(sample['r_peak_variance']):
-        sample['r_peak_variance'] = torch.tensor(0)  
-    return sample

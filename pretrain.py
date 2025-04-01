@@ -6,11 +6,12 @@ from models.xLSTM import myxLSTM
 import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 import dataset.mimic_iv as mimic
+import dataset.ptb_xl as ptb_xl
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import sys
 import torch
-
+# pretrain.py --epochs 100 --dropout 0.3 --activation_fn relu --batch_size 256 --patch_size 64 --embedding_size 1024 --use_scheduler --lr 0.001 --wd 0.1 --deterministic --xlstm_config m s m s m s m s m s m s m --loss_type mse_grad_min_max --num_workers 32 --nk_clean --pretrain_datasets code15 mimic ptbxl --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_drop_leads 0.4 --xlstm_type small --patch_embedding enriched --wandb_log
 # for debug:
 # python3 pretrain.py --epochs 100 --dropout 0.2 --activation_fn relu --batch_size 64 --patch_size 64 --embedding_size 128 --use_scheduler --lr 0.0001 --wd 0.01 --deterministic --xlstm_config m --loss_type mse_grad_min_max --num_workers 32 --nk_clean --pretrain_datasets code15 --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_drop_leads 0.2
 
@@ -39,6 +40,7 @@ parser.add_argument('--grad_loss_lambda', type=float, default=1., help='Lambda f
 parser.add_argument('--min_max_loss_lambda', type=float, default=1., help='Lambda for the contrastive loss')
 parser.add_argument('--ccc_loss_lambda', type=float, default=1., help='Lambda for the correlation loss')
 parser.add_argument('--auto_correlation_loss_lambda', type=float, default=1., help='Lambda for the masked mae loss')
+parser.add_argument('--multi_token_prediction', action='store_true', help='Multi token prediction')
 
 # optimize and scheduler
 parser.add_argument('--optimizer', type=str, default='adamw', help='Optimizer')
@@ -57,11 +59,12 @@ parser.add_argument('--weight_tying', action='store_true', help='Weight tying')
 parser.add_argument('--patch_embedding', default='linear', help='Patch embedding type')
 parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstruction head type')
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
+parser.add_argument('--use_revin_norm', action='store_true', help='Use revin norm')
+parser.add_argument('--head_type', type=str, default='linear', help='Head type, linear or kan')
 
 
 # data and augmentations hyperparameters
 parser.add_argument('--normalize', action='store_true', help='Normalize the data')
-parser.add_argument('--oversample', action='store_true', help='Oversample the data for the training set')
 parser.add_argument('--random_shift', action='store_true', help='Random shift the data on the training set')
 parser.add_argument('--random_drop_leads', type=float, default=0, help='Randomly drop leads')
 parser.add_argument('--random_surrogate_prob', type=float, default=0, help='Random noise')
@@ -74,9 +77,11 @@ parser.add_argument('--debug', action='store_true', help='Debug mode, uses only 
 # dataset folders
 parser.add_argument('--data_folder_mit', type=str, default='/media/Volume/data/MIT-BHI/data', help='Data folder for MIT-BHI dataset')
 parser.add_argument('--data_folder_code15', type=str, default='/media/Volume/data/CODE15/nkclean_360_12l', help='Data folder for code15 dataset')
-parser.add_argument('--labels_file_code15', type=str, default='/media/Volume/data/CODE15/exams.csv', help='Labels file for code15 dataset')
+parser.add_argument('--labels_file_code15', type=str, default='/media/Volume/data/CODE15/nkclean_360_12l/exams_labelled.csv', help='Labels file for code15 dataset')
 parser.add_argument('--data_folder_mimic', type=str, default='/media/Volume/data/MIMIC_IV/nkclean_360_12l', help='Data folder for MIMIC dataset')
-parser.add_argument('--labels_file_mimic', type=str, default='/media/Volume/data/MIMIC_IV/records_w_diag_icd10_labelled.csv', help='Labels file for MIMIC dataset')
+parser.add_argument('--labels_file_mimic', type=str, default='/media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_icd10_labelled.csv', help='Labels file for MIMIC dataset')
+parser.add_argument('--data_folder_ptbxl', type=str, default='/media/Volume/data/PTB-XL/nkclean_360_12l', help='Data folder for PTB-XL dataset')
+parser.add_argument('--labels_file_ptbxl', type=str, default='/media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv', help='Labels file for PTB-XL dataset')
 parser.add_argument('--checkpoint', type=str, default=None, help='Path to save the checkpoints')
 
 def pretrain(config, run=None, wandb=False):
@@ -90,9 +95,13 @@ def pretrain(config, run=None, wandb=False):
 
     for dataset in config.pretrain_datasets:
         if dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads))
+            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='train'))
         elif dataset == 'code15':
             datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads))
+        elif dataset == 'mit':
+            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, subset='train', random_shift=False))       
+        elif dataset == 'ptbxl':
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train'))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
@@ -113,7 +122,7 @@ def pretrain(config, run=None, wandb=False):
     
     xlstm = myxLSTM(config=config, num_classes=5, num_channels=len(config.leads))
     if config.checkpoint != None:
-        model = PretrainedxLSTMNetwork.load_from_checkpoint(checkpoint_path=config.checkpointg)
+        model = PretrainedxLSTMNetwork.load_from_checkpoint(checkpoint_path=config.checkpoint, model=xlstm, len_train_dataset=len_train_dataset, config=config)
     else:
         model = PretrainedxLSTMNetwork(model=xlstm, len_train_dataset=len_train_dataset, config=config)
         
