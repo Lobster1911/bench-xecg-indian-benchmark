@@ -1,9 +1,9 @@
 program: sweep.py
 method: random
-name: train-xLSTM
+name: train-xLSTM-3
 metric:
   goal: maximize
-  name: test_f1
+  name: test_f1/mean
 parameters:
   pretrain:
     value: False
@@ -69,7 +69,7 @@ parameters:
   num_heads:
     value: 4
   checkpoint:
-    value: 'pretrain-xLSTM/jg7je6hh/checkpoints/epoch=38-step=174330.ckpt'
+    value: 'pretrained_models/medium_512/checkpoints/epoch=38-step=174330.ckpt'
   oversample:
     value: False
   random_drop_leads:

@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from models.utils import get_activation_fn, get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head
-from models.modules import TabularEmbeddings, FeatureSpec, EmbedPatching, HeadModule
+from models.modules import HeadModule
 from models.SeriesDecomposition import SeriesDecomposition 
 from augmentations import RandomDropLeads, FTSurrogate, Jitter
 import numpy as np

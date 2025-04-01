@@ -28,24 +28,25 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.contrastive_loss_lambda = config.contrastive_loss_lambda
         self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
-        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=num_classes, top_k=1, average='micro')
-        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=num_classes, top_k=1, average='micro')
-        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=num_classes, top_k=1, average='micro')
-        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=num_classes, top_k=1, average=None)
-        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=num_classes, top_k=1, average='macro')
-        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=num_classes, top_k=1, average='macro')
-        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=num_classes, top_k=1, average=None)
-        self.train_auroc = torchmetrics.classification.AUROC(num_classes=num_classes, compute_on_step=False)
-        self.valid_auroc = torchmetrics.classification.AUROC(num_classes=num_classes, compute_on_step=False)
-        self.test_auroc = torchmetrics.classification.AUROC(num_classes=num_classes, compute_on_step=False)
+        self.num_classes = config.num_classes
+        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro')
+        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro')
+        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro')
+        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average=None)
+        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro')
+        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro')
+        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average=None)
+        self.train_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False)
+        self.valid_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False)
+        self.test_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False)
 
         # add sensitivity and specificity for the first class
-        self.val_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=num_classes, average=None)
-        self.test_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=num_classes, average=None)
-        self.val_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=num_classes, average=None)
-        self.test_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=num_classes, average=None)
-        self.val_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=num_classes, average=None)
-        self.test_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=num_classes, average=None)
+        self.val_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None)
+        self.test_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None)
+        self.val_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None)
+        self.test_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None)
+        self.val_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None)
+        self.test_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None)
         if not config.is_sweep:
             self.save_hyperparameters()
 
@@ -82,8 +83,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log('val_specificity/N', self.val_spec[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
         self.log('val_specificity/S', self.val_spec[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
         self.log('val_specificity/V', self.val_spec[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/F', self.val_spec[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/Q', self.val_spec[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
+        if self.num_classes == 5:
+            self.log('val_specificity/F', self.val_spec[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
+            self.log('val_specificity/Q', self.val_spec[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
 
         # sensitivity
         self.val_recall = self.val_recall.to(preds.device)
@@ -91,8 +93,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log('val_sensitivity/N', self.val_recall[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
         self.log('val_sensitivity/S', self.val_recall[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
         self.log('val_sensitivity/V', self.val_recall[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/F', self.val_recall[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/Q', self.val_recall[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
+        if self.num_classes == 5:
+            self.log('val_sensitivity/F', self.val_recall[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
+            self.log('val_sensitivity/Q', self.val_recall[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
 
         # ppv
         self.val_precision = self.val_precision.to(preds.device)
@@ -100,8 +103,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log('val_ppv/N', self.val_precision[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
         self.log('val_ppv/S', self.val_precision[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
         self.log('val_ppv/V', self.val_precision[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/F', self.val_precision[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/Q', self.val_precision[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
+        if self.num_classes == 5:
+            self.log('val_ppv/F', self.val_precision[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
+            self.log('val_ppv/Q', self.val_precision[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
 
         # auroc
         self.valid_auroc = self.valid_auroc.to(out.device)
@@ -133,16 +137,20 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log("test_acc/N", self.test_acc_no_avg[0], batch_size=self.batch_size, metric_attribute='test_acc')
         self.log("test_acc/S", self.test_acc_no_avg[1], batch_size=self.batch_size, metric_attribute='test_acc')
         self.log("test_acc/V", self.test_acc_no_avg[2], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/F", self.test_acc_no_avg[3], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/Q", self.test_acc_no_avg[4], batch_size=self.batch_size, metric_attribute='test_acc')
+        if self.num_classes == 5:
+            self.log("test_acc/F", self.test_acc_no_avg[3], batch_size=self.batch_size, metric_attribute='test_acc')
+            self.log("test_acc/Q", self.test_acc_no_avg[4], batch_size=self.batch_size, metric_attribute='test_acc')
 
         # f1
         self.log("test_f1/N", self.test_f1[0], batch_size=self.batch_size, metric_attribute='test_f1')
         self.log("test_f1/S", self.test_f1[1], batch_size=self.batch_size, metric_attribute='test_f1')
         self.log("test_f1/V", self.test_f1[2], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/F", self.test_f1[3], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/Q", self.test_f1[4], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2] + self.test_f1[3] + self.test_f1[4]) / 5, batch_size=self.batch_size, metric_attribute='test_f1')
+        if self.num_classes == 5:
+            self.log("test_f1/F", self.test_f1[3], batch_size=self.batch_size, metric_attribute='test_f1')
+            self.log("test_f1/Q", self.test_f1[4], batch_size=self.batch_size, metric_attribute='test_f1')
+            self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2] + self.test_f1[3] + self.test_f1[4]) / 5, batch_size=self.batch_size, metric_attribute='test_f1')
+        else:
+            self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2]) / 3, batch_size=self.batch_size, metric_attribute='test_f1')
 
         # sensitivity
         self.test_spec = self.test_spec.to(preds.device)
@@ -150,8 +158,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log("test_specificity/N", self.test_spec[0], batch_size=self.batch_size, metric_attribute='test_spec')
         self.log("test_specificity/S", self.test_spec[1], batch_size=self.batch_size, metric_attribute='test_spec')
         self.log("test_specificity/V", self.test_spec[2], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/F", self.test_spec[3], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/Q", self.test_spec[4], batch_size=self.batch_size, metric_attribute='test_spec')
+        if self.num_classes == 5:
+            self.log("test_specificity/F", self.test_spec[3], batch_size=self.batch_size, metric_attribute='test_spec')
+            self.log("test_specificity/Q", self.test_spec[4], batch_size=self.batch_size, metric_attribute='test_spec')
 
         # sensitivity
         self.test_recall = self.test_recall.to(preds.device)
@@ -159,8 +168,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log("test_sensitivity/N", self.test_recall[0], batch_size=self.batch_size, metric_attribute='test_recall')
         self.log("test_sensitivity/S", self.test_recall[1], batch_size=self.batch_size, metric_attribute='test_recall')
         self.log("test_sensitivity/V", self.test_recall[2], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/F", self.test_recall[3], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/Q", self.test_recall[4], batch_size=self.batch_size, metric_attribute='test_recall')
+        if self.num_classes == 5:
+            self.log("test_sensitivity/F", self.test_recall[3], batch_size=self.batch_size, metric_attribute='test_recall')
+            self.log("test_sensitivity/Q", self.test_recall[4], batch_size=self.batch_size, metric_attribute='test_recall')
 
         # ppv
         self.test_precision = self.test_precision.to(preds.device)
@@ -168,8 +178,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
         self.log("test_ppv/N", self.test_precision[0], batch_size=self.batch_size, metric_attribute='test_precision')
         self.log("test_ppv/S", self.test_precision[1], batch_size=self.batch_size, metric_attribute='test_precision')
         self.log("test_ppv/V", self.test_precision[2], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/F", self.test_precision[3], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/Q", self.test_precision[4], batch_size=self.batch_size, metric_attribute='test_precision')
+        if self.num_classes == 5:
+            self.log("test_ppv/F", self.test_precision[3], batch_size=self.batch_size, metric_attribute='test_precision')
+            self.log("test_ppv/Q", self.test_precision[4], batch_size=self.batch_size, metric_attribute='test_precision')
 
         # auroc  
         self.test_auroc = self.test_auroc.to(out.device)

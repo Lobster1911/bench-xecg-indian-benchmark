@@ -46,6 +46,7 @@ parser.add_argument('--random_jitter_prob', type=float, default=0., help='Probab
 parser.add_argument('--loss_type', type=str, default='')
 parser.add_argument('--split_by_patient', action='store_true', help='Split the dataset in val and train by patient')
 parser.add_argument('--name', type=str, default='static', help='Name of the dataset to use')
+parser.add_argument('--num_classes', type=int, default=5, help='Number of classes for the dataset')
 
 # model hyperparameters
 parser.add_argument('--activation_fn', type=str, default='relu', help='Activation function')
@@ -80,7 +81,10 @@ def train(config, run=None, wandb=False):
         # weights = get_training_class_weights(train_dataset).to('cuda')
         # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
         # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
-        weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
+        if config.num_classes == 5:
+            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
+        elif config.num_classes == 3: 
+            weights = torch.tensor([0.2781, 13.5098,  3.3668]).to('cuda')
     else:
         weights = None
 
@@ -90,7 +94,7 @@ def train(config, run=None, wandb=False):
     test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False)
     test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
 
-    xlstm = myxLSTM(config=config, num_classes=5, num_channels=len(config.leads))
+    xlstm = myxLSTM(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
     def format_keys(key):
         if key.startswith('model.'):
@@ -104,18 +108,20 @@ def train(config, run=None, wandb=False):
     if config.checkpoint is not None and config.checkpoint != '':   
         checkpoint = torch.load(config.checkpoint)
         new_state_dict = {format_keys(k): v for k, v in checkpoint['state_dict'].items()}
+        # remove the fc layer
+        new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset), num_classes=5, weights=weights)
+    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset), num_classes=config.num_classes, weights=weights)
 
     # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
-    early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
 
     if wandb:
-        wand_logger = WandbLogger(project="train-xLSTM", experiment=run)
+        wand_logger = WandbLogger(project=f"train-xLSTM-{config.num_classes}", experiment=run)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip)
     else:
