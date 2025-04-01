@@ -62,7 +62,6 @@ parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstru
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
 parser.add_argument('--multi_token_prediction', action='store_true', help='Multi token prediction')
 parser.add_argument('--use_revin_norm', action='store_true', help='Use revin norm')
-parser.add_argument('--head_type', type=str, default='linear', help='Head type, linear or kan')
 
 # data and augmentations hyperparameters
 parser.add_argument('--normalize', action='store_true', help='Normalize the data')
@@ -89,26 +88,18 @@ def train(config, run=None, wandb=False):
         # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
         # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
         if config.num_classes == 5:
+            print('Using class weights for 5 classes')
             weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
         else:
+            print('Using class weights for 3 classes')
             weights = torch.tensor([0.2781, 13.5098,  3.3668]).to('cuda')
     else:
         weights = None
 
-    # define a weighted class sampler
-    if config.oversample:
-        # set higher number for the Q class because it is basically impossible to classify
-        weight = 1. / torch.tensor([41517, 3301, 930, 410, 40000], dtype=torch.float)
-        samples_weight = np.array([weight[t['label']] for t in train_dataset])
-        samples_weight = torch.from_numpy(samples_weight)
-        sampler = WeightedRandomSampler(samples_weight.type('torch.DoubleTensor'), len(samples_weight), replacement=True)
-        train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn, sampler=sampler)
-    else:
-        train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
-    
+    train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
     val_dataloader = utils.data.DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=config.random_shift, name=config.name)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=False, name=config.name)
     test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
 
     xlstm = myxLSTM(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
@@ -133,7 +124,6 @@ def train(config, run=None, wandb=False):
     # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     lr_monitor = LearningRateMonitor(logging_interval='step')
-
 
     if wandb:
         wand_logger = WandbLogger(project="train-xLSTM", experiment=run)

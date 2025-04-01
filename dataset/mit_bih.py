@@ -35,11 +35,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         self.samples = pd.read_csv(os.path.join(self.data_folder, name, f'labels_{subset}.csv'))
 
+        if not config.oversample:
+            self.samples = self.samples[self.samples['is_oversampled'] == False]
+
         # keep only the samples within the number of classes
-        if self.num_classes == 5:
-            self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V', 'F', 'Q'])]
-        elif self.num_classes == 3:
-            self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
+        # if self.num_classes == 5:
+        #    self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V', 'F', 'Q'])]
+        # elif self.num_classes == 3:
+        #    self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
 
         # ensure no Nan values
         self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
@@ -58,8 +61,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
 
-            signal = torch.tensor(signal, dtype=torch.float32)
-            signal = self.filter_leads(signal, header.__dict__['sig_name'])
+            # signal = torch.tensor(signal, dtype=torch.float32)
+            # signal = self.filter_leads(signal, header.__dict__['sig_name'])
             self.signals[patient] = signal
             self.headers[patient] = header
 
@@ -77,27 +80,27 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         sample = self.samples.iloc[idx]
         patient = sample['patient']
         signal = self.signals[patient]
+        signal = torch.tensor(signal, dtype=torch.float32)
         header = self.headers[patient]
+        heartbeat_signal = signal[sample['hb_start']:sample['hb_end']]
 
         if self.random_shift:
+            window_start = sample['win_start']
+            window_end = sample['win_end']
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-
+            window_start += shift
+            window_end += shift
             # ensure that the window is inside the signal
-            window_start = max(0, sample['win_start'] + shift)
-            window_end = min(sample['win_end'] + shift, len(signal))
-
-            hb_start = max(0, sample['hb_start'] + shift)
-            hb_end = min(len(signal), sample['hb_end'] + shift)
-
+            window_start = max(0, window_start)
+            window_end = min(window_end, len(signal))
         else:
             window_start = sample['win_start']
             window_end = sample['win_end']
-            hb_start = sample['hb_start']
-            hb_end = sample['hb_end']
 
+        window_signal = signal[window_start:window_end]
 
-        heartbeat_signal = signal[sample['hb_start'] : sample['hb_end']]
-        window_signal = signal[window_start : window_end]
+        window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
+        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
 
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
@@ -112,8 +115,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             'heartbeat': heartbeat_signal,
             'signal': window_signal,
             'label': self.get_label_int(sample['label']),
-            'hb_start': hb_start - window_start,
-            'hb_end': hb_end - window_start,
+            #'hb_start': hb_start - window_start,
+            #'hb_end': hb_end - window_start,
             'patient_id': patient,
         }
 
@@ -157,8 +160,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 signal_to_return[:, i] = signal[:, leads.index(lead)]
         return signal_to_return
 
-
-    
     def split_validation_training(self, val_size=0.2, split_by_patient=False):
         train = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
         val = [203, 114]
@@ -226,8 +227,8 @@ def collate_fn(batch):
         'signal': window_signals,
         'label': labels,
         'patient_ids': torch.tensor(patients),
-        'hb_start': torch.tensor([item['hb_start'] for item in batch]),
-        'hb_end': torch.tensor([item['hb_end'] for item in batch]),
+        #'hb_start': torch.tensor([item['hb_start'] for item in batch]),
+        #'hb_end': torch.tensor([item['hb_end'] for item in batch]),
     }
 
     if 'tab_data' in batch[0].keys():

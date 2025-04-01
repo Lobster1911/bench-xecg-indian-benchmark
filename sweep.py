@@ -1,6 +1,6 @@
 
 from pretrain import pretrain
-from train_mit_bih import train
+from train import train
 import lightning as L
 import wandb
 

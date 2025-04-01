@@ -29,7 +29,7 @@ class myxLSTM(nn.Module):
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
         self.sep_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
         self.cls_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        self.start_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+        # self.start_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
 
         xlstm_emb_size = config.embedding_size
         if config.xlstm_type == 'large':
@@ -48,11 +48,11 @@ class myxLSTM(nn.Module):
         self.random_jitter = Jitter(sigma=0.1, prob=config.random_jitter_prob)
 
         emb_size = config.embedding_size if not self.bidirectional else config.embedding_size * 2
-        self.fc = get_fc_head(
-            config.head_type,
-            num_classes=num_classes,
-            embedding_size=emb_size,
-            dropout=config.dropout,
+        self.fc = HeadModule(
+            inp_size=emb_size,
+            hidden_size=emb_size // 2, 
+            out_size=num_classes, 
+            dropout=config.dropout, 
             activation_fn=config.activation_fn
         )
 
@@ -180,9 +180,9 @@ class myxLSTM(nn.Module):
         x, _ = self.embed_data(x, None)
 
         # add the separation token between the context and the input
-        # start_token = self.start_token.expand(x.shape[0], -1, -1)
-        sep_token = self.sep_token.expand(x.shape[0], -1, -1)
-        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+        # start_token = self.start_token.repeat(x.shape[0], -1, -1)
+        sep_token = self.sep_token.repeat(x.shape[0], 1, 1)
+        cls_token = self.cls_token.repeat(x.shape[0], 1, 1)
 
         x = torch.cat((ctx, sep_token, x, cls_token), dim=1)
         # get the last hidden state and apply the head

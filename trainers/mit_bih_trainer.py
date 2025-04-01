@@ -210,7 +210,7 @@ class TrainingxLSTMNetwork(L.LightningModule):
         loss = nn.functional.cross_entropy(out, targets, weight=self.weights, label_smoothing=self.label_smoothing)
         if self.contrastive_loss_lambda > 0:
             contrastive_loss = contrastive_coupled_loss(cls_token, targets, batch['patient_ids'], class_weights=self.weights) * 0.1
-            return loss, contrastive_loss, out, preds
+            return loss, contrastive_loss, out.clone().detach().cpu(), preds.clone().detach().cpu()
         else:
             return loss, 0, out.clone().detach().cpu(), preds.clone().detach().cpu()
 
@@ -220,7 +220,7 @@ class TrainingxLSTMNetwork(L.LightningModule):
             {'params': self.model.fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.sep_token, 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.cls_token, 'lr': self.lr_head, 'weight_decay': self.wd},
-            {'params': self.model.start_token, 'lr': self.lr_head, 'weight_decay': self.wd},
+            # {'params': self.model.start_token, 'lr': self.lr_head, 'weight_decay': self.wd},
 
             # xlstm and patch embedding with lower lr
             {'params': self.model.xlstm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd},

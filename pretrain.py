@@ -60,7 +60,6 @@ parser.add_argument('--patch_embedding', default='linear', help='Patch embedding
 parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstruction head type')
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
 parser.add_argument('--use_revin_norm', action='store_true', help='Use revin norm')
-parser.add_argument('--head_type', type=str, default='linear', help='Head type, linear or kan')
 
 
 # data and augmentations hyperparameters
