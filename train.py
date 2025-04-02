@@ -74,7 +74,7 @@ parser.add_argument('--checkpoint', type=str, help='Checkpoint name')
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', use_labels_in_tab_data=False)
+    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', use_labels_in_tab_data=False, random_shift=config.random_shift)
     train_dataset, val_dataset = dataset.split_validation_training(val_size=0.1, split_by_patient=config.split_by_patient)
 
     if config.use_class_weights:
@@ -91,7 +91,7 @@ def train(config, run=None, wandb=False):
     train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
     val_dataloader = utils.data.DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=False)
     test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
 
     xlstm = myxLSTM(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
