@@ -27,13 +27,12 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 
-def get_reconstruction_head(type, patch_size, embedding_size, num_channels, activation_fn):
+def get_reconstruction_head(type, patch_size, embedding_size, num_channels):
     if type == 'linear':
         return EmbedPatching(
             patch_size=patch_size, 
             num_hiddens=embedding_size, 
             num_channels=num_channels, 
-            activation_fn=activation_fn, 
             use_pre_head=True
         )
     if type == 'unet':

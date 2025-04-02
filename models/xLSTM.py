@@ -51,14 +51,13 @@ class myxLSTM(nn.Module):
             hidden_size=emb_size // 2, 
             out_size=num_classes, 
             dropout=config.dropout, 
-            activation_fn=config.activation_fn
         )
 
-        self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, emb_size, num_channels, config.activation_fn)
-
+        self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, emb_size, num_channels)
 
         if self.weight_tying and config.patch_embedding == 'linear' and config.reconstruct_embedding == 'linear': 
             self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
+
 
     def embed_data(self, x, tab_data, augment=True):
         if augment:
@@ -79,10 +78,9 @@ class myxLSTM(nn.Module):
                 x = torch.cat([tab_emb, x], dim=1)
                 return x, num_embeddings
         
-        
         return x, 0
 
-    def reconstruct(self, x, tab_data):
+    def reconstruct(self, x, tab_data=None):
         x, tab_embeddings = self.embed_data(x, tab_data)
 
         out = self.xlstm(x)
@@ -93,7 +91,6 @@ class myxLSTM(nn.Module):
 
         if self.bidirectional:
             out = self.get_bidirectional_emb(x, out, tab_embeddings)
-
 
         out = self.reconstruction(out)
 
@@ -109,9 +106,9 @@ class myxLSTM(nn.Module):
         out = torch.cat([out, out_bi], dim=-1)
         return out
     
-    def generate(self, x, tab_data, length=10):
+    def generate(self, x, tab_data=None, length=10):
         # i do not need to drop the leads here
-        x, num_emb = self.embed_data(x, tab_data, augment=False)
+        x, _ = self.embed_data(x, tab_data, augment=False)
 
 
         state = None

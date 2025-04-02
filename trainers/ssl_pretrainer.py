@@ -46,6 +46,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.ccc_loss_lambda = config.ccc_loss_lambda
         self.auto_correlation_loss_lambda = config.auto_correlation_loss_lambda
+        self.multi_token_prediction = config.multi_token_prediction
         if not config.is_sweep:
             self.save_hyperparameters()
 
@@ -123,25 +124,34 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def reconstruct_batch(self, batch, step):
         x = batch["signal"]
-        mean_target = batch["r_peak_interval_mean"]
-        var_target = batch["r_peak_variance"]
 
-        # print('x shape', x.shape)
-
-        if len(x.shape) == 2:
-            x = x.unsqueeze(-1)
-
-        tab_data = batch["tab_data"] if "tab_data" in batch.keys() else None
+        if len(x.shape) == 2: x = x.unsqueeze(-1)
 
         x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
 
-        reconstruction = self.model.reconstruct(x, tab_data)
+        if not self.multi_token_prediction:
+            reconstruction = self.model.reconstruct(x)
+        else:
+            token_to_predict = 5
+            reconstruction = self.model.reconstruct(x[:, :self.patch_size*token_to_predict])
+            for i in range(0, x.shape[1], self.patch_size * token_to_predict):
+                x_part = x[:, :i + self.patch_size * token_to_predict]
+                x_len = x.shape[1] - x_part.shape[1]
+                predict_len = min(token_to_predict, x_len // self.patch_size - 1)
+                rec_part = self.model.generate(x_part, None, length=predict_len)
+                reconstruction = torch.cat([reconstruction, rec_part], dim=1)
+
+        # print('reconstruction shape', reconstruction.shape)
+        # print('x shape', x.shape)
+        
+        
         #print('reconstruction shape', reconstruction.shape)
         nrmse = np.inf
 
         shift_x = x[:, self.patch_size:].squeeze()
         shift_reconstruct = reconstruction[:, :-self.patch_size]
-        #print('shift_reconstruct shape', shift_reconstruct.shape)
+        # print('shift_reconstruct shape', shift_reconstruct.shape)
+        # print('shift_x shape', shift_x.shape)
 
         # compute the loss and use the gradients only when it is needed
         if 'min_max' in self.loss_type:

@@ -12,7 +12,7 @@ conversion = {
 }
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
-    def __init__(self, config, subset='train', use_labels_in_tab_data=True):
+    def __init__(self, config, subset='train', use_labels_in_tab_data=True, random_shift=False):
         """
         Args:
             config: configuration object
@@ -24,7 +24,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_mit
         self.subset = subset
         self.samples = []
-        self.random_shift = config.random_shift
+        self.random_shift = random_shift
         self.nkclean = config.nk_clean
         self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
@@ -92,21 +92,19 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             hb_end = sample['hb_end']
 
         window_signal = signal[window_start:window_end]
-        # heartbeat_signal = signal[hb_start:hb_end]
+        heartbeat_signal = signal[hb_start:hb_end]
 
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             window_signal = (window_signal - window_signal.mean(axis=(0, -1))) / std
 
-            # std = heartbeat_signal.std(axis=(0, -1))
-            # std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-            # heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
-
+            std = heartbeat_signal.std(axis=(0, -1))
+            std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
+            heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
-        heartbeat_signal = signal[hb_start - window_start : hb_end - window_start]
-        # heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
+        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
 
         tortn = {
             'heartbeat': heartbeat_signal,

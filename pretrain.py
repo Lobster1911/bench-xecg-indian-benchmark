@@ -6,6 +6,7 @@ from models.xLSTM import myxLSTM
 import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 import dataset.mimic_iv as mimic
+import dataset.ptbxl as ptb_xl
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import sys
@@ -57,7 +58,9 @@ parser.add_argument('--weight_tying', action='store_true', help='Weight tying')
 parser.add_argument('--patch_embedding', default='linear', help='Patch embedding type')
 parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstruction head type')
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
-
+parser.add_argument('--multi_token_prediction', action='store_true', help='Use multi token prediction')
+parser.add_argument('--name', type=str, default='static', help='Name of the mit-bih splitting type to use')
+parser.add_argument('--num_classes', type=int, default=5, help='Number of classes for the dataset, not needed for pretraining')
 
 # data and augmentations hyperparameters
 parser.add_argument('--normalize', action='store_true', help='Normalize the data')
@@ -66,7 +69,7 @@ parser.add_argument('--random_shift', action='store_true', help='Random shift th
 parser.add_argument('--random_drop_leads', type=float, default=0, help='Randomly drop leads')
 parser.add_argument('--random_surrogate_prob', type=float, default=0, help='Random noise')
 parser.add_argument('--random_jitter_prob', type=float, default=0, help='Random jitter')
-parser.add_argument('--pretrain_datasets', type=str, nargs='*', default=['mimic', 'code15'], help='Datasets to use for pretraining')
+parser.add_argument('--pretrain_datasets', type=str, nargs='*', default=['mimic', 'code15', 'ptbxl'], help='Datasets to use for pretraining')
 parser.add_argument('--nk_clean', action='store_true', help='Use nk_clean for the code15 dataset')
 parser.add_argument('--leads', type=str, nargs='*', default=['II'], help='Leads to use for the dataset')
 parser.add_argument('--debug', action='store_true', help='Debug mode, uses only a fraction of data for epoch')
@@ -74,9 +77,11 @@ parser.add_argument('--debug', action='store_true', help='Debug mode, uses only 
 # dataset folders
 parser.add_argument('--data_folder_mit', type=str, default='/media/Volume/data/MIT-BHI/data', help='Data folder for MIT-BHI dataset')
 parser.add_argument('--data_folder_code15', type=str, default='/media/Volume/data/CODE15/nkclean_360_12l', help='Data folder for code15 dataset')
-parser.add_argument('--labels_file_code15', type=str, default='/media/Volume/data/CODE15/exams.csv', help='Labels file for code15 dataset')
+parser.add_argument('--labels_file_code15', type=str, default='/media/Volume/data/CODE15/nkclean_360_12l/exams_labelled.csv', help='Labels file for code15 dataset')
 parser.add_argument('--data_folder_mimic', type=str, default='/media/Volume/data/MIMIC_IV/nkclean_360_12l', help='Data folder for MIMIC dataset')
-parser.add_argument('--labels_file_mimic', type=str, default='/media/Volume/data/MIMIC_IV/records_w_diag_icd10_labelled.csv', help='Labels file for MIMIC dataset')
+parser.add_argument('--labels_file_mimic', type=str, default='/media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_icd10_labelled.csv', help='Labels file for MIMIC dataset')
+parser.add_argument('--data_folder_ptbxl', type=str, default='/media/Volume/data/PTB-XL/nkclean_360_12l', help='Data folder for PTB-XL dataset')
+parser.add_argument('--labels_file_ptbxl', type=str, default='/media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv', help='Labels file for PTB-XL dataset')
 parser.add_argument('--checkpoint', type=str, default=None, help='Path to save the checkpoints')
 
 def pretrain(config, run=None, wandb=False):
@@ -90,13 +95,18 @@ def pretrain(config, run=None, wandb=False):
 
     for dataset in config.pretrain_datasets:
         if dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads))
+            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='train', random_shift=config.random_shift))
         elif dataset == 'code15':
             datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads))
+        elif dataset == 'ptbxl':
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train'))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
-    val_dataset = mit_bih.ECGMITBIHDataset(config, subset='train', random_shift=False)
+    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
+    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
+
+    val_dataset = utils.data.ConcatDataset([val_dataset_1, val_dataset_2])
 
     train_dataset = utils.data.ConcatDataset(datasets_pretrain)
     # keep only 10% of the dataset

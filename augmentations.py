@@ -22,11 +22,24 @@ class RandomDropLeads(nn.Module):
         self.probability = probability
 
     def forward(self, signal):
-        if self.training:
-            leads_to_remove = np.random.random(signal.shape[-1]) < self.probability
-            leads_to_remove[1] = False  # never remove lead II
-            signal[..., leads_to_remove] = 0
-        return signal
+        if self.training and self.probability > 0: # Also check if probability is non-zero
+            # Create a copy to avoid modifying the original tensor inplace
+            signal_out = signal.clone()
+            
+            # Determine leads to remove (ensure consistent device if signal is on GPU)
+            leads_to_remove_np = np.random.random(signal.shape[-1]) < self.probability
+            leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
+
+            # Ensure lead II (index 1 assuming standard 12-lead) is never removed
+            if signal.shape[-1] > 1: # Check if there's more than one lead
+                 leads_to_remove[1] = False
+
+            # Apply modification to the copy
+            signal_out[..., leads_to_remove] = 0
+            return signal_out
+        else:
+            # If not training or probability is 0, return the original signal
+            return signal
     
 class Jitter(object):
     """
@@ -39,7 +52,7 @@ class Jitter(object):
 
     def __call__(self, sample) -> Any:
         # 0. If the probability is 0, return the original sample.
-        if self.prob == 0: return sample
+        if self.prob == 0.: return sample
         
         # 1. Generate a mask for applying jitter based on probability. This creates a boolean tensor where True indicates jitter should be applied.
         mask = (torch.rand(sample.shape[0], device=sample.device) < self.prob).float()  # [batch_size]
@@ -130,7 +143,7 @@ class FTSurrogate(object):
         ], dim=-1)
 
     def __call__(self, sample) -> Any:
-        if self.prob == 0: return sample    
+        if self.prob == 0.: return sample    
 
         mask = torch.rand(sample.shape[0], device=sample.device) < self.prob  # [batch_size]
 

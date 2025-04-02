@@ -4,23 +4,23 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
-from dataset.generic_utils import random_shift, find_records, check_mean_var_r_peaks
+from dataset.generic_utils import random_shift
 from torch.utils.data import random_split
 import json
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
-class ECGMIMICDataset(torch.utils.data.Dataset):
+class ECGPTBXLDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
-        self.data_folder = config.data_folder_mimic
-        self.random_shift = random_shift
+    def __init__(self, config, leads_to_use=leads, split='train'):
+        self.data_folder = config.data_folder_ptbxl
+        self.random_shift = config.random_shift
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
-        self.labels_file = config.labels_file_mimic
+        self.labels_file = config.labels_file_ptbxl
         self.split = split
         self.load_tabular_data()
         self.load_records(split)
@@ -29,33 +29,33 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
         # fold 19 is for testing, while fold 18 is for validation
         if split == 'train':
             # get all the tab data index where the fold is not 18 or 19
-            self.records = self.tab_data[self.tab_data['fold'] != 18][self.tab_data['fold'] != 19].index.tolist()
+            self.records = self.tab_data[self.tab_data['strat_fold'] != 9][self.tab_data['strat_fold'] != 10]['filename_hr'].values.tolist()
         elif split == 'val':
             # get all the tab data index where the fold is 18
-            self.records = self.tab_data[self.tab_data['fold'] == 18].index.tolist()
+            self.records = self.tab_data[self.tab_data['strat_fold'] == 9]['filename_hr'].values.tolist()
         elif split == 'test':
             # get all the tab data index where the fold is 19
-            self.records = self.tab_data[self.tab_data['fold'] == 19].index.tolist()
+            self.records = self.tab_data[self.tab_data['strat_fold'] == 10]['filename_hr'].values.tolist()
+
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)
         # set exam_id as index
-        self.tab_data.set_index('study_id', inplace=True)
+        self.tab_data.set_index('ecg_id', inplace=True)
         # change type of age columns from float to int
         self.tab_data['age'] = self.tab_data['age'].fillna(0)
         self.tab_data['age'] = self.tab_data['age'].astype(int)
         # remove some unised columns
-        self.tab_data.drop(columns=['file_name', 'subject_id', 'hosp_diag_hosp', 'ecg_taken_in_ed', 'gender'], inplace=True)
-        print("tabular data fields for  MIMIC-IV: ", self.tab_data.head())
+        print("Tabular data fields for  PTB-XL: ", self.tab_data.head())
 
     def __len__(self):
         return len(self.records)
 
     def __getitem__(self, idx):
-        record = str(self.records[idx])
+        record = self.records[idx]
 
-        signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, record, record))
+        signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.records[idx].split('/')[1], self.records[idx].split('/')[2]))
         
         if self.random_shift: signal = random_shift(signal, self.patch_size)
 
@@ -71,14 +71,12 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
 
-        if '/' in str(record): record = record.split('/')[0]
-        tab_data = self.tab_data.loc[int(record)]
-
         tortn = {
             'signal':signal,
         }
          
         if self.use_tab_data:
+            tab_data = self.tab_data.loc[self.tab_data['filename_hr'] == record]
             tab_data = pd.DataFrame(tab_data)
             # reset the index to get the column name
             tortn['tab_data'] = tab_data.T

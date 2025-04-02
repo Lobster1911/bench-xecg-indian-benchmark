@@ -15,10 +15,10 @@ class LinearPatchEmbedding(nn.Module):
         return x
       
 class EmbedPatching(nn.Module):
-    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, activation_fn='relu', use_pre_head=False):
+    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, use_pre_head=False):
         super().__init__()
         self.use_pre_head = use_pre_head  
-        if use_pre_head: self.pre_head = HeadModule(num_hiddens, num_hiddens // 2, num_hiddens, activation_fn=activation_fn)
+        if use_pre_head: self.pre_head = HeadModule(num_hiddens, num_hiddens // 2, num_hiddens)
         self.deconv = nn.ConvTranspose1d(num_hiddens, num_channels, kernel_size=patch_size, stride=patch_size, bias=False)
 
     def forward(self, x):
@@ -249,7 +249,7 @@ class FeatureDropout(nn.Module):
 
 class HeadModule(nn.Module):
     
-    def __init__(self, inp_size, hidden_size, out_size, activation_fn='relu', dropout=0.1):
+    def __init__(self, inp_size, hidden_size, out_size, dropout=0.1):
         super().__init__()
         self.head = nn.Sequential(
             nn.Linear(inp_size, hidden_size),
