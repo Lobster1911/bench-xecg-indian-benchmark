@@ -13,7 +13,6 @@ from dataset.dataset_preparation_utils import resample_and_save_record_wfdb
 
 parser = argparse.ArgumentParser(description='Create dataset for MIT-BIH')
 parser.add_argument('--data_folder', type=str, default='/media/Volume/data/MIT-BHI/data/', help='Path to raw data folder')
-parser.add_argument('--hb_split_type', type=str, default='t_wave', help='How to split the heartbeats, either t_wave or static')
 parser.add_argument('--nk_clean', action='store_true', help='Use NeuroKit2 to clean the data')
 parser.add_argument('--name', type=str, default='t_wave_split', help='Name of the split')
 args = parser.parse_args()
@@ -116,10 +115,35 @@ def split_between_hb(signal, r_peaks, patient, labels, annotation_positions, ext
         else:
             start = r_peaks[i - 1]
 
+<<<<<<< HEAD
         # bound to a lenght of 800
         start = max(start, r_p - 400)
         end = min(end, r_p + 400)
 
+=======
+        # add maximum 400 samples before and after the r-peak
+        start = max(start, r_p - 400)
+        end = min(end, r_p + 400)
+
+        row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
+        all_data.append(row_data)
+    return all_data
+
+def split_static(signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male):
+    all_data = []
+    start, end = 0, 0
+    for i, r_p in enumerate(r_peaks):
+        if i == len(r_peaks) - 1:
+            end = len(signal)
+        else:
+            end = r_peaks[i] + 300
+
+        if i == 0:
+            start = 0
+        else:
+            start = r_peaks[i] - 300
+
+>>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb
         row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
         all_data.append(row_data)
     return all_data
@@ -217,7 +241,6 @@ def process_patient(patient, data_folder, name, nk_clean):
                     for label in annotation.aux_note if label.startswith('(')]
 
     # T-wave delineation (only if needed)
-    t_offsets = [np.nan] * len(r_peaks)  # Initialize with NaNs
     cleaned_signal = nk.ecg_clean(signal, sampling_rate=360)
 
     if nk_clean:
@@ -235,11 +258,18 @@ def process_patient(patient, data_folder, name, nk_clean):
         return split_between_hb(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
     elif name == 'static':
         return split_static(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
+<<<<<<< HEAD
     else:
         raise ValueError(f"Unknown split type: {name}")
 
 
 
+=======
+    
+    return all_data
+
+
+>>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb
 def create_csv_mapping(patient_ids, data_folder, split='train', name='t_wave_split', nk_clean=True):
     """
     Create CSV mapping with parallel processing.

@@ -12,9 +12,9 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 
 class ECGPTBXLDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
+    def __init__(self, config, leads_to_use=leads, split='train'):
         self.data_folder = config.data_folder_ptbxl
-        self.random_shift = random_shift
+        self.random_shift = config.random_shift
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.use_tab_data = config.use_tab_data

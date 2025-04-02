@@ -4,7 +4,7 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
-from dataset.generic_utils import random_shift, find_records, check_mean_var_r_peaks
+from dataset.generic_utils import random_shift
 from torch.utils.data import random_split
 import json
 
@@ -36,7 +36,7 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
         elif split == 'test':
             # get all the tab data index where the fold is 19
             self.records = self.tab_data[self.tab_data['fold'] == 19].index.tolist()
-
+            
     def load_tabular_data(self):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)

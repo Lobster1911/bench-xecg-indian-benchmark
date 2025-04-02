@@ -92,8 +92,12 @@ def process_csv_file_mimic(csv_file, out_csv_file, records_to_remove=None):
     print(f'Original length: {len(exams)}')
     exams = exams.drop(exams[exams['study_id'].isin(records_to_remove)].index)
     print(f'New length: {len(exams)}')
+
     print('some study ids:', exams['study_id'].head())
+
+    # drop useless columns
     exams.drop(columns=['ecg_no_within_stay', 'ecg_no_within_stay', 'ecg_taken_in_hosp', 'ecg_taken_in_ed_or_hosp', 'anchor_year', 'anchor_age'], inplace=True)
+    # exams = add_labels_mimic(exams)
 
     # ensure correct format of the identifier column
     exams.parallel_apply(lambda row: str(row['study_id']).split('/')[0], axis=1)
@@ -135,14 +139,7 @@ def process_csv_file_ptbxl(csv_file, out_csv_file, records_to_remove=None):
     print(f'Original length: {len(exams)}')
     exams = exams[~exams['ecg_id'].isin(records_to_remove)]
     print(f'New length: {len(exams)}')
-
     exams.to_csv(out_csv_file)
-
-def process_sample_code15(exam):
-    record_path = os.path.join(args.data_folder, str(exam[1]['trace_file']))
-    exam_id = exam[1]['exam_id']
-    out_path = os.path.join(args.output_folder, str(exam[1]['exam_id']))
-    resample_and_save_record_hdf5(record_path, exam_id, 360, out_path, nk_clean=args.nk_clean)
 
 
 if __name__ == '__main__':
@@ -166,5 +163,3 @@ if __name__ == '__main__':
         res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_ptbxl)(sample) for i, sample in tqdm(exams.iterrows()))
         res = [r for r in res if r is not None]
         process_csv_file_ptbxl(args.label_file, os.path.join(args.output_folder, 'ptbxl_database.csv'), records_to_remove=res)
-
-

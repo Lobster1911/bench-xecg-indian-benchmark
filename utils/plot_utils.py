@@ -15,8 +15,6 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name):
         tab_data = sample['tab_data'].reset_index(drop=True) if 'tab_data' in sample.keys() else None
 
         signal = sample['signal'].to(device).unsqueeze(0)
-
-        # print('signal shape', signal.shape)
         # print(tab_data)
 
         orig_signal = signal.clone()
@@ -24,10 +22,6 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name):
             signal = signal.unsqueeze(-1)
 
         reconstruct = model.reconstruct(signal, tab_data)
-            
-        # if reconstruct is a tuple, get the first element
-        if isinstance(reconstruct, tuple):
-            reconstruct = reconstruct[0]
 
         shift_x = signal[:, :reconstruct.shape[1]]
         orig_signal = orig_signal[:, :reconstruct.shape[1]]
@@ -47,6 +41,7 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name):
         for i in range(signal.shape[-1]):
             ax = plt.subplot(gs[i % 6, i // 6])
             ax.plot(orig_signal[..., i].cpu().squeeze().numpy(), color=color_1)
+            # print('shift_reconstruct shape', shift_reconstruct.shape)
             ax.plot(shift_reconstruct[..., i].cpu().squeeze().numpy(), color=color_2)
 
             # sometimes the signal is zeroed out by the random drop leads

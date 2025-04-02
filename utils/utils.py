@@ -65,6 +65,7 @@ def get_training_class_weights(train_dataset, do_not_consider_classes = []):
   weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
   print(f"Class Weights: {weights}")
   return weights
+
    
 
 def get_model(args):

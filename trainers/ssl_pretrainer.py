@@ -46,7 +46,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.ccc_loss_lambda = config.ccc_loss_lambda
         self.auto_correlation_loss_lambda = config.auto_correlation_loss_lambda
-        self.multi_token_prediction = config.multi_token_prediction
         if not config.is_sweep:
             self.save_hyperparameters()
 
@@ -100,9 +99,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
         # save the plots of the reconstruction for some samples
-        sample_s = self.trainer.val_dataloaders.dataset[420]
-        sample_v = self.trainer.val_dataloaders.dataset[1967]
-        sample_t = self.trainer.val_dataloaders.dataset[4362]
+        sample_s = self.trainer.val_dataloaders.dataset[115]
+        sample_v = self.trainer.val_dataloaders.dataset[91]
+        sample_t = self.trainer.val_dataloaders.dataset[23]
         sample_n = self.trainer.val_dataloaders.dataset[0]
 
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
@@ -129,23 +128,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
 
-        if not self.multi_token_prediction:
-            reconstruction = self.model.reconstruct(x)
-        else:
-            token_to_predict = 5
-            reconstruction = self.model.reconstruct(x[:, :self.patch_size*token_to_predict])
-            for i in range(0, x.shape[1], self.patch_size * token_to_predict):
-                x_part = x[:, :i + self.patch_size * token_to_predict]
-                x_len = x.shape[1] - x_part.shape[1]
-                predict_len = min(token_to_predict, x_len // self.patch_size - 1)
-                rec_part = self.model.generate(x_part, None, length=predict_len)
-                reconstruction = torch.cat([reconstruction, rec_part], dim=1)
+        reconstruction = self.model.reconstruct(x)
 
-        # print('reconstruction shape', reconstruction.shape)
-        # print('x shape', x.shape)
-        
-        
-        #print('reconstruction shape', reconstruction.shape)
+
         nrmse = np.inf
 
         shift_x = x[:, self.patch_size:].squeeze()
@@ -153,18 +138,15 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # print('shift_reconstruct shape', shift_reconstruct.shape)
         # print('shift_x shape', shift_x.shape)
 
+        shift_x = x[:, self.patch_size:].squeeze()
+        shift_reconstruct = reconstruction[:, :-self.patch_size]
+
         # compute the loss and use the gradients only when it is needed
         if 'min_max' in self.loss_type:
             min_max = masked_min_max_loss(shift_reconstruct, shift_x, patch_size=self.patch_size)
-       
-        if 'ccc' in self.loss_type:
-            ccc = ccc_loss(shift_reconstruct, shift_x)
-
-        if 'ac' in self.loss_type:
-            ac = auto_correlation_loss(shift_reconstruct, shift_x, convolution=self.model.patch_embedding)
 
         if 'mae' in self.loss_type:
-            mae = (shift_reconstruct, shift_x)
+            mae = masked_mae_loss(shift_reconstruct, shift_x)
         else:
             with torch.no_grad(): mae = masked_mae_loss(shift_reconstruct, shift_x)
 
@@ -177,22 +159,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
         else:
             with torch.no_grad(): mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
-
-        
    
         # calculate the normalized root squared error only for the first token prediction
         with torch.no_grad():
-            nrmse = torch.sqrt(mse) / (shift_x.max() - shift_x.min())
-
-
-        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=self.batch_size)
-        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=self.batch_size)
-        if 'ccc' in self.loss_type: self.log(f"{step}_ccc", ccc.item(), prog_bar=True, batch_size=self.batch_size)
-        if 'ac' in self.loss_type: self.log(f"{step}_ac", ac.item(), prog_bar=True, batch_size=self.batch_size)
-
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
+            nrmse = torch.sqrt(mse) / (x.max() - x.min())
         
         loss = torch.tensor(0.0, device=self.device)
         if 'mae' in self.loss_type: loss += mae
@@ -200,10 +170,16 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
         if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
-        if 'ccc' in self.loss_type: loss += ccc * self.ccc_loss_lambda
-        if 'ac' in self.loss_type: loss += ac * self.auto_correlation_loss_lambda
 
         self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=self.batch_size)
+
+        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=self.batch_size)
+        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=self.batch_size)
+        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=self.batch_size)
+        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=self.batch_size)
+        
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
+
         return loss
 
     def configure_optimizers(self):

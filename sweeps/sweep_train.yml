@@ -4,8 +4,10 @@ name: train-xLSTM-3
 metric:
   goal: maximize
   name: test_f1/mean
+<<<<<<<< HEAD:sweep_train_mit-bih_3.yml
+========
 
-
+>>>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb:sweeps/sweep_train.yml
 parameters:
   pretrain:
     value: False
@@ -79,6 +81,7 @@ parameters:
   checkpoint:
     value: 'pretrained_models/medium_512/checkpoints/epoch=38-step=174330.ckpt'
   oversample:
+    value: False
   xlstm_type:
     value: 'small'
   patch_embedding:

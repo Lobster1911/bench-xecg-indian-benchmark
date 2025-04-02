@@ -7,6 +7,7 @@ from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
 from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, UNetPatchEmbedding, HeadModule, EmbedPatching, UNetEmbedPatching, EnrichedLinearPatchEmbedding
 import os
+from models.kan import KAN
 
 def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':
@@ -26,6 +27,30 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
         return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
+    
+def get_fc_head(
+        type,
+        num_classes,
+        embedding_size,
+        dropout=0.2,
+        activation_fn='relu', 
+    ):
+    if type == 'linear':
+        return HeadModule(
+            inp_size=embedding_size,
+            hidden_size=embedding_size // 2, 
+            out_size=num_classes, 
+            dropout=dropout, 
+            activation_fn=activation_fn
+        )
+    elif type == 'kan':
+        return KAN(
+            [embedding_size, embedding_size // 2, num_classes],
+
+        )
+    else:
+        raise ValueError(f"Head type {type} not supported")
+
 
 def get_reconstruction_head(type, patch_size, embedding_size, num_channels):
     if type == 'linear':

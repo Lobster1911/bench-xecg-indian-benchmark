@@ -81,6 +81,7 @@ class myxLSTM(nn.Module):
         return x, 0
 
     def reconstruct(self, x, tab_data=None):
+
         x, tab_embeddings = self.embed_data(x, tab_data)
 
         out = self.xlstm(x)
@@ -107,6 +108,7 @@ class myxLSTM(nn.Module):
         return out
     
     def generate(self, x, tab_data=None, length=10):
+
         # i do not need to drop the leads here
         x, _ = self.embed_data(x, tab_data, augment=False)
 
@@ -119,6 +121,7 @@ class myxLSTM(nn.Module):
             new_x = torch.cat([new_x, torch.zeros_like(new_x)], dim=-1)
 
         r = self.reconstruction(new_x)
+
         reconstructed = [r]
 
         for i in range(length - 1):
@@ -143,21 +146,22 @@ class myxLSTM(nn.Module):
         # print('x', x.shape)
 
         # add the separation token between the context and the input
+        # start_token = self.start_token.repeat(x.shape[0], -1, -1)
         sep_token = self.sep_token.repeat(x.shape[0], 1, 1)
         cls_token = self.cls_token.repeat(x.shape[0], 1, 1)
 
-        x = torch.cat([ctx, sep_token, x, cls_token], dim=1)
+        x = torch.cat((ctx, sep_token, x, cls_token), dim=1)
         # get the last hidden state and apply the head
         out = self.xlstm(x) # [batch_size, embedding_dim]
 
-        cls_token = out[:, -1, :]
+        cls = out[:, -1, :]
 
         if self.bidirectional:
             out_bi = self.xlstm_bi(x.flip(1))
-            cls_token = torch.cat([cls_token, out_bi[:, -1, :]], dim=-1)
+            cls = torch.cat([cls, out_bi[:, -1, :]], dim=-1)
 
-        x = self.fc(cls_token)
-        return x, cls_token 
+        x = self.fc(cls)
+        return x, cls 
 
     def trainable_parameters(self):
         return self.parameters()

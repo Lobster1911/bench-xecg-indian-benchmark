@@ -4,7 +4,6 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
-from dataset.generic_utils import check_mean_var_r_peaks
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
@@ -39,9 +38,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # ensure no Nan values
         self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
 
-        if not config.oversample:
-            self.samples = self.samples[self.samples['is_oversampled'] == False]
-
         if config.num_classes == 3:
             # keep only the classes N, S and V
             self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
@@ -59,6 +55,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             else:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
+
             self.signals[patient] = signal
             self.headers[patient] = header
 
@@ -94,6 +91,9 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         window_signal = signal[window_start:window_end]
         heartbeat_signal = signal[hb_start:hb_end]
 
+        window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
+        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
+
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
@@ -103,8 +103,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
-        window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
-        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
 
         tortn = {
             'heartbeat': heartbeat_signal,
@@ -153,8 +151,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 signal_to_return[:, i] = signal[:, leads.index(lead)]
         return signal_to_return
 
-
-    
     def split_validation_training(self, val_size=0.2, split_by_patient=False):
         train = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
         val = [203, 114]
@@ -221,9 +217,9 @@ def collate_fn(batch):
         'heartbeat': heartbeat_signals,
         'signal': window_signals,
         'label': labels,
-        # 'r_peak_interval_mean': r_peak_interval_mean,
-        # 'r_peak_variance': r_peak_variance,
         'patient_ids': torch.tensor(patients),
+        #'hb_start': torch.tensor([item['hb_start'] for item in batch]),
+        #'hb_end': torch.tensor([item['hb_end'] for item in batch]),
     }
 
     if 'tab_data' in batch[0].keys():

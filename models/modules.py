@@ -13,6 +13,26 @@ class LinearPatchEmbedding(nn.Module):
     def forward(self, x):
         x = self.conv(x).flatten(2).transpose(1, 2)
         return x
+    
+class EnrichedLinearPatchEmbedding(nn.Module):
+    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, enrich_dim=64, kernel_size=16):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.erich_conv1 = nn.Conv1d(num_channels, enrich_dim, kernel_size=kernel_size, padding=0)
+        self.erich_conv2 = nn.Conv1d(enrich_dim, enrich_dim, kernel_size=kernel_size, padding=0)
+        self.conv = nn.Conv1d(num_channels + enrich_dim * 2, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
+
+    def forward(self, x):
+        # x [bs, num_channels, num_samples]
+        # apply padding of kernel_size - 1 on the left side
+        x_padded = F.pad(x, (self.kernel_size - 1, 0))
+        enriched_x1 = self.erich_conv1(x_padded) # [bs, enrich_dim, num_samples]
+        enriched_x1_padded = F.pad(enriched_x1, (self.kernel_size - 1, 0))
+        enriched_x2 = self.erich_conv2(enriched_x1_padded)
+
+        x = torch.cat([x, enriched_x1, enriched_x2], dim=1) # [bs, num_channels + enrich_dim, num_samples]
+        x = self.conv(x).flatten(2).transpose(1, 2)
+        return x
       
 class EmbedPatching(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, use_pre_head=False):
@@ -181,8 +201,6 @@ class FeatureSpec(object):
         self.dtype = dtype
         self.category_size = category_size
     
-
- 
 
 class TabularEmbeddings(nn.Module):
     def __init__(self, feature_specs, num_hiddens=256, dropout=0.1):
