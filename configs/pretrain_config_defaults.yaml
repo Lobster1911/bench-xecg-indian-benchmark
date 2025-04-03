@@ -1,0 +1,59 @@
+# training hyperparameters
+epochs: 100
+lr: 0.0001
+wd: 0.0001
+dropout: 0.3
+grad_clip: 0.5
+patience: 10
+
+# dataloaders
+batch_size: 128
+num_workers: 32
+deterministic: true
+
+# pretrain losses params
+loss_type: mse
+grad_loss_lambda: 1.0
+min_max_loss_lambda: 1.0
+
+# optimize and scheduler
+optimizer: adamw
+use_scheduler: false
+num_epochs_warmup: 2
+num_epochs_warm_restart: 10
+sched_decay_factor: 0.8
+
+# model hyperparameters
+patch_size: 64
+embedding_size: 512
+activation_fn: relu
+xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
+wandb_log: false
+num_heads: 4
+xlstm_type: original
+weight_tying: false
+patch_embedding: linear
+reconstruct_embedding: linear
+bidirectional: false
+
+# data and augmentations hyperparameters
+normalize: true
+random_shift: true
+random_drop_leads: 0
+random_surrogate_prob: 0
+random_jitter_prob: 0
+pretrain_datasets: ['code15', 'mimic', 'ptbxl']
+nk_clean: true
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+
+# dataset folders
+data_folder_mit: /media/Volume/data/MIT-BHI/data
+data_folder_code15: /media/Volume/data/CODE15/nkclean_360_12l
+labels_file_code15: /media/Volume/data/CODE15/nkclean_360_12l/exams_labelled.csv
+data_folder_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l
+labels_file_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_icd10_labelled.csv
+data_folder_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l
+labels_file_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv
+
+# other
+debug: false

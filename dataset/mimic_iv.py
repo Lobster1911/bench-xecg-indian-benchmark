@@ -17,7 +17,6 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
         self.random_shift = random_shift
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
-        self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
         self.labels_file = config.labels_file_mimic
@@ -36,7 +35,7 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
         elif split == 'test':
             # get all the tab data index where the fold is 19
             self.records = self.tab_data[self.tab_data['fold'] == 19].index.tolist()
-            
+
     def load_tabular_data(self):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)
@@ -72,14 +71,8 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
             signal = (signal - signal.mean(axis=(0, -1))) / std
 
         if '/' in str(record): record = record.split('/')[0]
-        tab_data = self.tab_data.loc[int(record)]
 
-        tortn = {
+        return {
             'signal':signal,
         }
          
-        if self.use_tab_data:
-            tab_data = pd.DataFrame(tab_data)
-            # reset the index to get the column name
-            tortn['tab_data'] = tab_data.T
-        return tortn

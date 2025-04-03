@@ -44,8 +44,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.sched_decay_factor = config.sched_decay_factor
         self.grad_loss_lambda = config.grad_loss_lambda
         self.min_max_loss_lambda = config.min_max_loss_lambda
-        self.ccc_loss_lambda = config.ccc_loss_lambda
-        self.auto_correlation_loss_lambda = config.auto_correlation_loss_lambda
         if not config.is_sweep:
             self.save_hyperparameters()
 
@@ -128,7 +126,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
 
-        reconstruction = self.model.reconstruct(x)
+        reconstruction = self.model(x)
 
 
         nrmse = np.inf

@@ -2,7 +2,7 @@ import os
 from torch import utils
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
-from models.xLSTM import myxLSTM
+from models.xLSTM import myxLSTM, xLSTMClassification
 import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
@@ -30,7 +30,6 @@ parser.add_argument('--patch_size', type=int, default=128, help='Patch size')
 parser.add_argument('--dropout', type=float, default=0.4, help='Dropout')
 parser.add_argument('--embedding_size', type=int, default=64, help='Embedding size')
 parser.add_argument('--deterministic', action='store_true', help='Deterministic training')
-parser.add_argument('--use_tab_data', action='store_true', help='Use tabular data')
 parser.add_argument('--patience', type=int, default=15, help='Patience for the early stopping')
 parser.add_argument('--is_sweep', action='store_true', help='Is a sweep')
 parser.add_argument('--grad_clip', type=float, default=0.5, help='Gradient clipping value')
@@ -78,7 +77,7 @@ parser.add_argument('--checkpoint', type=str, help='Checkpoint name')
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', use_labels_in_tab_data=False, random_shift=config.random_shift)
+    dataset =  mit_bih.ECGMITBIHDataset(config, subset='train', random_shift=config.random_shift)
     train_dataset, val_dataset = dataset.split_validation_training(val_size=0.1, split_by_patient=config.split_by_patient)
 
     if config.use_class_weights:
@@ -96,10 +95,10 @@ def train(config, run=None, wandb=False):
     train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
     val_dataloader = utils.data.DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', use_labels_in_tab_data=False, random_shift=False)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', random_shift=False)
     test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
 
-    xlstm = myxLSTM(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+    xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
     def format_keys(key):
         if key.startswith('model.'):

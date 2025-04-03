@@ -17,7 +17,6 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         self.random_shift = random_shift
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
-        self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
         self.labels_file = config.labels_file_ptbxl
@@ -71,13 +70,7 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
 
-        tortn = {
+        return {
             'signal':signal,
         }
-         
-        if self.use_tab_data:
-            tab_data = self.tab_data.loc[self.tab_data['filename_hr'] == record]
-            tab_data = pd.DataFrame(tab_data)
-            # reset the index to get the column name
-            tortn['tab_data'] = tab_data.T
-        return tortn
+        

@@ -20,7 +20,6 @@ class ECGCODE15Dataset(Dataset):
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.random_shift = config.random_shift
         self.patch_size = config.patch_size
-        self.use_tab_data = config.use_tab_data
         self.load_tabular_data()
         self.load_records()
 
@@ -66,29 +65,15 @@ class ECGCODE15Dataset(Dataset):
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
 
-        tab_data = self.tab_data.loc[int(record.split('/')[0])]
-
-        tortn = {
+        return {
             'signal':signal,
         }
-
-        if self.use_tab_data:
-            tab_data = pd.DataFrame(tab_data)
-            tortn['tab_data'] = tab_data.T
-        
-        return tortn
         
     
 def collate_fn(batch):
     signals = [item['signal'] for item in batch]
     padded_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-    tortn =  {
+    return {
         'signal': padded_signals,
     }
-
-    if 'tab_data' in batch[0].keys():
-        tab_data = pd.concat([item['tab_data'] for item in batch], axis=0)
-        tortn['tab_data'] = tab_data
-
-    return tortn

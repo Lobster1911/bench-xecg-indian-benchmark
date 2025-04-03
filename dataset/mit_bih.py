@@ -11,13 +11,12 @@ conversion = {
 }
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
-    def __init__(self, config, subset='train', use_labels_in_tab_data=True, random_shift=False):
+    def __init__(self, config, subset='train', random_shift=False):
         """
         Args:
             config: configuration object
             subset: 'train' or 'test'
             name: name of the labels folder, default is 't_wave_split' so here the in the labels csv file the heartbeats will be divided by the t wave
-            use_labels_in_tab_data: if True the labels are used in the tabular data (like the rbbb, lbbb, etc)
         """
         
         self.data_folder = config.data_folder_mit
@@ -25,14 +24,12 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.samples = []
         self.random_shift = random_shift
         self.nkclean = config.nk_clean
-        self.use_tab_data = config.use_tab_data
         self.patch_size = config.patch_size
         self.normalize = config.normalize
         self.name = config.name
         self.num_classes = config.num_classes 
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
-        self.use_labels_in_tab_data = use_labels_in_tab_data
 
         self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
         # ensure no Nan values
@@ -74,6 +71,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
+        r_peak = sample['r_peak']
 
         if self.random_shift and self.subset == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
@@ -104,33 +102,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
 
 
-        tortn = {
+        return {
             'heartbeat': heartbeat_signal,
             'signal': window_signal,
             'label': self.get_label_int(sample['label']),
             'patient_id': patient,
+            'r_peak': r_peak - window_start,
         }
 
-        if self.use_tab_data:
-            comment = header.__dict__['comments'][0].split(' ')
-            age = max(0, int(comment[0]))
-            is_male = comment[1] == 'M'
-
-            # create pandas row with the tabular data
-            tab_data = {
-                'age': [age],
-                'is_male': [is_male]
-            }
-            if self.use_labels_in_tab_data:
-                tab_data['RBBB'] = sample['orig_label'] == 'R'
-                tab_data['LBBB'] = sample['orig_label'] == 'L'
-                tab_data['SB'] = 'SBR' in sample['extra_annotations'] # sinus bradycardia
-                tab_data['ST'] = False
-                tab_data['AF'] = 'AFIB' in sample['extra_annotations'] # atrial fibrillation
-
-            tortn['tab_data'] = pd.DataFrame(tab_data)
-
-        return tortn
     
     def filter_leads(self, signal, leads):
         # convert leads if needed 
@@ -213,17 +192,12 @@ def collate_fn(batch):
     window_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
     labels = torch.tensor([item['label'] for item in batch])
 
-    tortn = {
+    return {
         'heartbeat': heartbeat_signals,
         'signal': window_signals,
         'label': labels,
         'patient_ids': torch.tensor(patients),
+        'r_peak': torch.tensor([item['r_peak'] for item in batch]),
         #'hb_start': torch.tensor([item['hb_start'] for item in batch]),
         #'hb_end': torch.tensor([item['hb_end'] for item in batch]),
     }
-
-    if 'tab_data' in batch[0].keys():
-        tab_data = pd.concat([item['tab_data'] for item in batch], axis=0)
-        tortn['tab_data'] = tab_data
-
-    return tortn

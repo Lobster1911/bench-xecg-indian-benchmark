@@ -11,23 +11,18 @@ class myxLSTM(nn.Module):
 
     def __init__(
             self, 
-            num_classes,
             num_channels,
             config
         ): 
         super(myxLSTM, self).__init__()
         self.dropout = nn.Dropout(config.dropout)
         self.patch_size = config.patch_size
-        self.use_tab_data = config.use_tab_data
         self.weight_tying = config.weight_tying
         self.bidirectional = config.bidirectional
 
         self.activation = get_activation_fn(config.activation_fn)
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
-        self.sep_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        self.cls_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        # self.start_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
 
         xlstm_emb_size = config.embedding_size
         if config.xlstm_type == 'large':
@@ -46,12 +41,6 @@ class myxLSTM(nn.Module):
         self.random_jitter = Jitter(sigma=0.1, prob=config.random_jitter_prob)
 
         emb_size = config.embedding_size if not self.bidirectional else config.embedding_size * 2
-        self.fc = HeadModule(
-            inp_size=emb_size,
-            hidden_size=emb_size // 2, 
-            out_size=num_classes, 
-            dropout=config.dropout, 
-        )
 
         self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, emb_size, num_channels)
 
@@ -59,7 +48,7 @@ class myxLSTM(nn.Module):
             self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
 
 
-    def embed_data(self, x, tab_data, augment=True):
+    def embed_data(self, x, augment=True):
         if augment:
             x = self.random_drop_leads(x)
             x = self.random_surrogate(x)
@@ -67,51 +56,32 @@ class myxLSTM(nn.Module):
 
         x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.patch_embedding(x)
-
-
-        if self.use_tab_data and tab_data is not None:
-            # eventually add the tabular data
-            batch_size = x.shape[0]
-            tab_emb = self.tab_embeddings(tab_data, batch_size)
-            if tab_emb is not None:
-                _, num_embeddings, _ = tab_emb.shape
-                x = torch.cat([tab_emb, x], dim=1)
-                return x, num_embeddings
         
-        return x, 0
+        return x
 
-    def reconstruct(self, x, tab_data=None):
-
-        x, tab_embeddings = self.embed_data(x, tab_data)
+    def forward(self, x):
+        x = self.embed_data(x)
 
         out = self.xlstm(x)
 
-        if self.use_tab_data:
-            # remove the tabular data
-            out = out[:, tab_embeddings:, :]
-
         if self.bidirectional:
-            out = self.get_bidirectional_emb(x, out, tab_embeddings)
+            out = self.get_bidirectional_emb(x, out)
 
         out = self.reconstruction(out)
 
         return out
     
-    def get_bidirectional_emb(self, x, out, tab_embeddings):
-        if self.use_tab_data:
-            x = x[:, tab_embeddings:, :]
-
+    def get_bidirectional_emb(self, x, out):
         out_bi = self.xlstm_bi(x.flip(1))
 
         out_bi = torch.cat([out_bi.flip(1)[:, 2:, :], torch.zeros(out_bi.shape[0], 2, out_bi.shape[2]).to(out_bi.device)], dim=1)
         out = torch.cat([out, out_bi], dim=-1)
         return out
     
-    def generate(self, x, tab_data=None, length=10):
+    def generate(self, x, length=10):
 
         # i do not need to drop the leads here
-        x, _ = self.embed_data(x, tab_data, augment=False)
-
+        x = self.embed_data(x, augment=False)
 
         state = None
         for i in range(x.shape[1]):
@@ -125,7 +95,7 @@ class myxLSTM(nn.Module):
         reconstructed = [r]
 
         for i in range(length - 1):
-            x, _ = self.embed_data(r, None, augment=False)
+            x = self.embed_data(r, augment=False)
             x, state = self.xlstm.step(x, state=state)
 
             if self.bidirectional:
@@ -138,15 +108,60 @@ class myxLSTM(nn.Module):
         return torch.cat(reconstructed, dim=1)
 
 
-    def forward(self, ctx, x, tab_data):
-        ctx, _ = self.embed_data(ctx, tab_data)
-        x, _ = self.embed_data(x, None)
+    def trainable_parameters(self):
+        return self.parameters()
+    
+    def head_parameters(self):
+        return self.fc.parameters() 
+    
+
+class xLSTMClassification(myxLSTM):
+    def __init__(
+            self, 
+            config,
+            num_classes,
+            num_channels
+        ): 
+
+        super(xLSTMClassification, self).__init__(num_channels, config)
+
+        self.sep_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+        self.highlight_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+        self.start_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+
+        self.fc = HeadModule(
+            inp_size=config.embedding_size if not self.bidirectional else config.embedding_size * 2,
+            hidden_size=config.embedding_size // 2,
+            out_size=num_classes,
+            dropout=config.dropout
+        )
+
+    def forward(self, ctx, x, r_peaks_pos=None):
+        ctx = self.embed_data(ctx)
+
+        if r_peaks_pos is not None and False:
+            # get the r peaks positions
+            mask = torch.zeros_like(ctx)
+            mask[:, r_peaks_pos // self.patch_size, :] = 1
+
+            r_peak_before = torch.clamp(r_peaks_pos // self.patch_size - 1, min=0)
+            r_peak_after = torch.clamp(r_peaks_pos // self.patch_size + 1, max=ctx.shape[1] - 1)
+
+            mask[:, r_peak_before, :] = 1
+            mask[:, r_peak_after, :] = 1
+            mask = mask * self.highlight_token
+            ctx = ctx + mask
+        
+
+        x = self.embed_data(x)
 
         # print('ctx', ctx.shape)
         # print('x', x.shape)
 
         # add the separation token between the context and the input
         # start_token = self.start_token.repeat(x.shape[0], -1, -1)
+        # start_token = self.start_token.repeat(x.shape[0], 1, 1)
         sep_token = self.sep_token.repeat(x.shape[0], 1, 1)
         cls_token = self.cls_token.repeat(x.shape[0], 1, 1)
 
@@ -163,9 +178,3 @@ class myxLSTM(nn.Module):
         x = self.fc(cls)
         return x, cls 
 
-    def trainable_parameters(self):
-        return self.parameters()
-    
-    def head_parameters(self):
-        return self.fc.parameters() 
-    

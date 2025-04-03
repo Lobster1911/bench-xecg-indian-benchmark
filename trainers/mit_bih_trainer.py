@@ -205,9 +205,9 @@ class TrainingxLSTMNetwork(L.LightningModule):
     def predict_batch(self, batch):
         ctx = batch["signal"]
         x = batch['heartbeat']
-        tab_data = batch['tab_data'] if 'tab_data' in batch.keys() else None 
         targets = batch['label']
-        out, cls_token = self.model(ctx, x, tab_data)
+        r_peaks = batch['r_peak']
+        out, cls_token = self.model(ctx, x, r_peaks)
         preds = torch.argmax(out, dim=1)
         loss = nn.functional.cross_entropy(out, targets, weight=self.weights, label_smoothing=self.label_smoothing)
         if self.contrastive_loss_lambda > 0:
@@ -222,7 +222,7 @@ class TrainingxLSTMNetwork(L.LightningModule):
             {'params': self.model.fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.sep_token, 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.cls_token, 'lr': self.lr_head, 'weight_decay': self.wd},
-            # {'params': self.model.start_token, 'lr': self.lr_head, 'weight_decay': self.wd},
+            {'params': self.model.highlight_token, 'lr': self.lr_head, 'weight_decay': self.wd},
 
             # xlstm and patch embedding with lower lr
             {'params': self.model.xlstm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd},

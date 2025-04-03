@@ -5,7 +5,7 @@ from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, UNetPatchEmbedding, HeadModule, EmbedPatching, UNetEmbedPatching, EnrichedLinearPatchEmbedding
+from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, HeadModule, EmbedPatching, EnrichedLinearPatchEmbedding
 import os
 from models.kan import KAN
 
@@ -19,37 +19,11 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'onn':
         print('using ONN patch embedding')
         return ONNConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
-    if type == 'unet':
-        print('using UNet patch embedding')
-        return UNetPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     if type == 'enriched':
         print('using enriched patch embedding')
         return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
-    
-def get_fc_head(
-        type,
-        num_classes,
-        embedding_size,
-        dropout=0.2,
-        activation_fn='relu', 
-    ):
-    if type == 'linear':
-        return HeadModule(
-            inp_size=embedding_size,
-            hidden_size=embedding_size // 2, 
-            out_size=num_classes, 
-            dropout=dropout, 
-            activation_fn=activation_fn
-        )
-    elif type == 'kan':
-        return KAN(
-            [embedding_size, embedding_size // 2, num_classes],
-
-        )
-    else:
-        raise ValueError(f"Head type {type} not supported")
 
 
 def get_reconstruction_head(type, patch_size, embedding_size, num_channels):
@@ -59,12 +33,6 @@ def get_reconstruction_head(type, patch_size, embedding_size, num_channels):
             num_hiddens=embedding_size, 
             num_channels=num_channels, 
             use_pre_head=True
-        )
-    if type == 'unet':
-        return UNetEmbedPatching(
-            patch_size=patch_size, 
-            num_hiddens=embedding_size, 
-            num_channels=num_channels
         )
 
 def get_activation_fn(activation_fn):
