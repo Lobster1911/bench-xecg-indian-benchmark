@@ -115,35 +115,10 @@ def split_between_hb(signal, r_peaks, patient, labels, annotation_positions, ext
         else:
             start = r_peaks[i - 1]
 
-<<<<<<< HEAD
-        # bound to a lenght of 800
-        start = max(start, r_p - 400)
-        end = min(end, r_p + 400)
-
-=======
         # add maximum 400 samples before and after the r-peak
         start = max(start, r_p - 400)
         end = min(end, r_p + 400)
 
-        row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
-        all_data.append(row_data)
-    return all_data
-
-def split_static(signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male):
-    all_data = []
-    start, end = 0, 0
-    for i, r_p in enumerate(r_peaks):
-        if i == len(r_peaks) - 1:
-            end = len(signal)
-        else:
-            end = r_peaks[i] + 300
-
-        if i == 0:
-            start = 0
-        else:
-            start = r_peaks[i] - 300
-
->>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb
         row_data = get_sample_row(start, end, signal, labels[i], r_p, r_peaks, annotation_positions, extra_labels, patient, i, age, is_male)
         all_data.append(row_data)
     return all_data
@@ -211,8 +186,7 @@ def process_patient(patient, data_folder, name, nk_clean):
     Process a single patient's data.  This function is designed for parallel execution.
     """
     all_data = []
-    valid_annotations = set(
-        ['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F', '/', 'f', 'Q'])
+    valid_annotations = set(['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F', '/', 'f', 'Q'])
 
     signal, info = wfdb.rdsamp(os.path.join(data_folder + 'raw', f'{patient}'))
     signal = signal[:, 0]
@@ -231,12 +205,11 @@ def process_patient(patient, data_folder, name, nk_clean):
     labels_orig = annotation.symbol
 
     # Filter annotations
-    r_peaks = [r_peak for i, r_peak in enumerate(
-        r_peaks) if labels_orig[i] in valid_annotations]
+    r_peaks = [r_peak for i, r_peak in enumerate(r_peaks) if labels_orig[i] in valid_annotations]
+
     labels = [label for label in labels_orig if label in valid_annotations]
 
-    annotation_positions = [i for i, label in enumerate(
-        labels_orig) if label == '+']
+    annotation_positions = [i for i, label in enumerate(labels_orig) if label == '+']
     extra_labels = [label.removesuffix('\x00').removeprefix('(')
                     for label in annotation.aux_note if label.startswith('(')]
 
@@ -258,18 +231,9 @@ def process_patient(patient, data_folder, name, nk_clean):
         return split_between_hb(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
     elif name == 'static':
         return split_static(cleaned_signal, r_peaks, patient, labels, annotation_positions, extra_labels, age, is_male)
-<<<<<<< HEAD
     else:
         raise ValueError(f"Unknown split type: {name}")
 
-
-
-=======
-    
-    return all_data
-
-
->>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb
 def create_csv_mapping(patient_ids, data_folder, split='train', name='t_wave_split', nk_clean=True):
     """
     Create CSV mapping with parallel processing.

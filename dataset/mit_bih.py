@@ -43,6 +43,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # get all the different values for column patient
         self.patients = self.samples['patient'].unique()
         self.headers = {}
+        self.annotations = {}
 
         # load on memory all the signals
         self.signals = {}
@@ -52,9 +53,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             else:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
+            annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
 
             self.signals[patient] = signal
             self.headers[patient] = header
+            self.annotations[patient] = annotations
 
     def __len__(self):
         return len(self.samples)
