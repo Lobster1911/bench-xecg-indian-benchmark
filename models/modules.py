@@ -2,7 +2,6 @@ from torch import nn
 import torch 
 import numpy as np
 from fastonn import SelfONN1d
-from models.u_net import DoubleXLSTMDown, DoubleXLSTMUp
 from torch.nn import functional as F
 
 class LinearPatchEmbedding(nn.Module):
@@ -94,25 +93,6 @@ class ConvPatchEmbedding(nn.Module):
         # print('x shape after unfold', x.shape)
         return x
     
-class EnrichedLinearPatchEmbedding(nn.Module):
-     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, enrich_dim=64, kernel_size=16):
-         super().__init__()
-         self.kernel_size = kernel_size
-         self.erich_conv1 = nn.Conv1d(num_channels, enrich_dim, kernel_size=kernel_size, padding=0)
-         self.erich_conv2 = nn.Conv1d(enrich_dim, enrich_dim, kernel_size=kernel_size, padding=0)
-         self.conv = nn.Conv1d(num_channels + enrich_dim * 2, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
- 
-     def forward(self, x):
-         # x [bs, num_channels, num_samples]
-         # apply padding of kernel_size - 1 on the left side
-         x_padded = F.pad(x, (self.kernel_size - 1, 0))
-         enriched_x1 = self.erich_conv1(x_padded) # [bs, enrich_dim, num_samples]
-         enriched_x1_padded = F.pad(enriched_x1, (self.kernel_size - 1, 0))
-         enriched_x2 = self.erich_conv2(enriched_x1_padded)
- 
-         x = torch.cat([x, enriched_x1, enriched_x2], dim=1) # [bs, num_channels + enrich_dim, num_samples]
-         x = self.conv(x).flatten(2).transpose(1, 2)
-         return x
     
 class ONNConvPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
@@ -163,7 +143,7 @@ class HeadModule(nn.Module):
         super().__init__()
         self.head = nn.Sequential(
             nn.Linear(inp_size, hidden_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size, out_size),
         )

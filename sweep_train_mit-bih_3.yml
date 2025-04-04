@@ -57,8 +57,6 @@ parameters:
     value: 15
   sched_decay_factor:
     value: 0.8
-  contrastive_loss_lambda:
-    value: 0.
   random_surrogate_prob:
     values: [0.]
   random_jitter_prob:

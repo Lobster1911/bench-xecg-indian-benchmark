@@ -4,11 +4,37 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
+from joblib import Parallel, delayed
+from tqdm import tqdm
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
     'MLII' : 'II',
 }
+
+train = [101, 106, 108, 109, 112, 115, 116, 118, 119, 122, 124, 201, 205, 207, 208, 209, 215, 220, 223, 230]
+test = [100, 103, 105, 111, 113, 117, 121, 123, 200, 202, 210, 212, 213, 214, 219, 221, 222, 228, 231, 232, 233, 234]
+val = [203, 114]
+
+def convert_label(symbol):
+    """
+    Convert the symbols to the main class label
+    """
+    if symbol in ['N', 'L', 'R', 'e', 'j']:
+        return 'N'
+    elif symbol in ['A', 'a', 'J', 'S']:
+        return 'S'  # Supraventricular ectopic
+    elif symbol in ['V', 'E']:
+        return 'V'  # Ventricular ectopic
+    elif symbol in ['F']:
+        return 'F'  # Fusion
+    elif symbol in ['/', 'f', 'Q']:
+        return 'Q'  # Unknown
+    else:
+        print(symbol)
+        raise (f'Unknown symbol {symbol}')
+    
+valid_annotations = set(['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F', '/', 'f', 'Q'])
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
     def __init__(self, config, subset='train', random_shift=False):
@@ -28,36 +54,105 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.normalize = config.normalize
         self.name = config.name
         self.num_classes = config.num_classes 
+        self.win_len = config.win_len
+        self.skip_majority_class_samples = config.skip_majority_class_samples
+        self.bidirectional = config.bidirectional
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
 
-        self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
+        # self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
         # ensure no Nan values
-        self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
+        # self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
 
-        if config.num_classes == 3:
+        # if config.num_classes == 3:
             # keep only the classes N, S and V
-            self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
+        #    self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
         
-        print(self.samples.head())  
+        # print(self.samples.head())  
         # get all the different values for column patient
-        self.patients = self.samples['patient'].unique()
+
+        self.load_patient_data(subset)
+        self.load_samples(subset)
+
+
+    def load_patient_data(self, subset):
+        self.patients = train if subset == 'train' else val if subset == 'val' else test
         self.headers = {}
         self.annotations = {}
-
-        # load on memory all the signals
         self.signals = {}
-        for patient in self.patients:
+        self.r_peaks = {}
+        self.labels = {}
+
+        def process_patient(patient):
             if self.nkclean:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.name, f'{patient}'))
             else:
                 signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
+
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
             annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
 
+            r_peaks = [(r_peak, convert_label(annotations.symbol[i])) for i, r_peak in enumerate(annotations.sample) if annotations.symbol[i] in valid_annotations]
+            labels_orig = [label for label in annotations.symbol if label in valid_annotations]
+            labels = [convert_label(l) for l in labels_orig]
+
+            # filter classes
+            if self.num_classes == 3:
+                r_peaks = [(r_peak, label) for r_peak, label in r_peaks if label in ['N', 'S', 'V']]
+                labels = [l for l in labels if l in ['N', 'S', 'V']]
+
+            # (f'Patient {patient} has {len(r_peaks)} r peaks')
+
+            return patient, signal, header, annotations, r_peaks, labels_orig, labels
+
+        results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
+
+        for patient, signal, header, annotations, r_peaks, labels_orig, labels in results:
             self.signals[patient] = signal
             self.headers[patient] = header
             self.annotations[patient] = annotations
+            self.r_peaks[patient] = r_peaks
+            self.labels[patient] = labels
+            # map labels with r_peaks in a tuple
+
+    def load_samples(self, subset):
+        def process_sample(patient, r_peaks, signal=None):
+            samples = []
+            last_class = None
+            skipped = 0
+            if subset == 'train':
+                for i, r_peak in enumerate(r_peaks):
+                    sample_class = r_peaks[i][1]
+                    if (sample_class != last_class or skipped > 10 or sample_class != 'N') or not self.skip_majority_class_samples:
+                        samples.append({
+                            'patient': patient,
+                            'r_peak': r_peak[0],
+                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - self.win_len < r <= r_peak[0] + self.win_len],
+                        })
+                        skipped = 0
+                    else:
+                        skipped += 1
+
+                    last_class = sample_class
+            else:
+                for n in range(0, len(signal), self.win_len * 2):
+                    around_r_peaks = [(r, l) for r, l in r_peaks if n - self.win_len < r <= n + self.win_len]
+                    samples.append({
+                        'patient': patient,
+                        'r_peak': n,
+                        'around_r_peaks': around_r_peaks,
+                    })
+            return samples
+
+        results = Parallel(n_jobs=-1)(
+            delayed(process_sample)(
+                patient, self.r_peaks[patient], self.signals[patient] if subset != 'train' else None
+            ) for patient in tqdm(self.patients, desc="Processing patients")
+        )
+
+        # Flatten results and reindex with unique keys
+        self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
+        
 
     def __len__(self):
         return len(self.samples)
@@ -68,49 +163,54 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         if label == 'V': return 2
         if label == 'F': return 3
         if label == 'Q': return 4
+        else: raise ValueError(f'Unknown label {label}')
 
     def __getitem__(self, idx):
-        sample = self.samples.iloc[idx]
+        sample = self.samples[idx]
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
         r_peak = sample['r_peak']
+        around_r_peaks = sample['around_r_peaks']
 
         if self.random_shift and self.subset == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-            window_start =  max(0, sample['win_start'] + shift)
-            window_end = min(sample['win_end'] + shift, len(signal))
-            shift_hb = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-            hb_start = max(0, sample['hb_start'] + shift_hb)
-            hb_end = min(sample['hb_end'] + shift_hb, len(signal))
+            window_start = max(0, r_peak - self.win_len + shift)
+            window_end = min(r_peak + self.win_len + shift, len(signal))
         else:
-            window_start = sample['win_start']
-            window_end = sample['win_end']
-            hb_start = sample['hb_start']
-            hb_end = sample['hb_end']
+            window_start = max(0, r_peak - self.win_len)
+            window_end = min(r_peak + self.win_len, len(signal))
 
         window_signal = signal[window_start:window_end]
-        heartbeat_signal = signal[hb_start:hb_end]
-
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
-        heartbeat_signal = self.filter_leads(heartbeat_signal, header.__dict__['sig_name'])
 
         if self.normalize:
             std = window_signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             window_signal = (window_signal - window_signal.mean(axis=(0, -1))) / std
+        
+        r_peaks_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32)
 
-            std = heartbeat_signal.std(axis=(0, -1))
-            std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-            heartbeat_signal = (heartbeat_signal - heartbeat_signal.mean(axis=(0, -1))) / std
+        # Use a list comprehension to filter and set the mask
+        valid_r_peaks = [r - window_start for r, l in around_r_peaks if window_start <= r < window_end]
+        r_peaks_mask[valid_r_peaks] = 1
 
+        labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) -1
+        # Use a list comprehension to filter and set the mask
+        if self.bidirectional:
+            valid_labels = around_r_peaks
+        else:
+            valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
+        for r, l in valid_labels:
+            # print(r, l)
+            if window_start <= r < window_end:
+                labels_mask[r - window_start] = self.get_label_int(l)
 
         return {
-            'heartbeat': heartbeat_signal,
             'signal': window_signal,
-            'label': self.get_label_int(sample['label']),
             'patient_id': patient,
-            'r_peak': r_peak - window_start,
+            'r_peaks': r_peaks_mask,
+            'label': labels_mask,
         }
 
     
@@ -133,74 +233,23 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 signal_to_return[:, i] = signal[:, leads.index(lead)]
         return signal_to_return
 
-    def split_validation_training(self, val_size=0.2, split_by_patient=False):
-        train = [101, 106, 108, 109, 112, 114, 115, 116, 118, 119, 122, 124, 201, 203, 205, 207, 208, 209, 215, 220, 223, 230]
-        val = [203, 114]
-        #       N     S  V  F  Q
-        # 101: [1860, 3, 0, 0, 2], 
-        # 106: [1507, 0, 520, 0, 0], 
-        # 108: [1740, 4, 17, 2, 0], 
-        # 109: [2492, 0, 38, 2, 0], 
-        # 112: [2537, 2, 0, 0, 0], 
-        # 114: [1820, 12, 43, 4, 0], <-----
-        # 115: [1953, 0, 0, 0, 0], 
-        # 116: [2302, 1, 109, 0, 0], 
-        # 118: [2166, 96, 16, 0, 0], 
-        # 119: [1543, 0, 444, 0, 0], 
-        # 122: [2476, 0, 0, 0, 0], 
-        # 124: [1536, 31, 47, 5, 0],
-        # 201: [1635, 128, 198, 2, 0],
-        # 203: [2529, 2, 444, 1, 4], <-----
-        # 205: [2571, 3, 71, 11, 0], 
-        # 207: [1543, 107, 210, 0, 0], 
-        # 208: [1586, 2, 992, 373, 2], 
-        # 209: [2621, 383, 1, 0, 0], 
-        # 215: [3195, 3, 164, 1, 0], 
-        # 220: [1954, 94, 0, 0, 0],
-        # 223: [2045, 73, 473, 14, 0], 
-        # 230: [2255, 0, 1, 0, 0]}
 
-        if self.subset != 'train':
-            raise ValueError('Can only split the training dataset')
-
-        count = 0
-        ids_val, ids_train = [], []
-        for patient in self.patients:
-            df_patient = self.samples[self.samples['patient'] == patient]
-            num_samples = len(df_patient)
-
-            if split_by_patient:
-                if patient in val:
-                    ids_val.extend(range(count, count + num_samples))
-                else:
-                    ids_train.extend(range(count, count + num_samples))
-            else:
-                val_len = int(val_size * num_samples)
-
-                # the first 0.8 of the patients go to the training set
-                ids_train.extend(range(count, count + num_samples - val_len))
-                ids_val.extend(range(count + num_samples - val_len, count + num_samples))
-            count += num_samples
-        return torch.utils.data.Subset(self, ids_train), torch.utils.data.Subset(self, ids_val)
-
-    
 def collate_fn(batch):
     signals = [item['signal'] for item in batch]
-    hb = [item['heartbeat'] for item in batch]
     patients = [item['patient_id'] for item in batch]
+    r_peaks = [item['r_peaks'] for item in batch]
+    labels = [item['label'] for item in batch]
 
     # pad to same length and pad to match the patch size module
-    heartbeat_signals = torch.nn.utils.rnn.pad_sequence(hb, batch_first=True)
 
-    window_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-    labels = torch.tensor([item['label'] for item in batch])
+    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+    r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
+    labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
     return {
-        'heartbeat': heartbeat_signals,
-        'signal': window_signals,
+        'signal': signals,
         'label': labels,
         'patient_ids': torch.tensor(patients),
-        'r_peak': torch.tensor([item['r_peak'] for item in batch]),
-        #'hb_start': torch.tensor([item['hb_start'] for item in batch]),
-        #'hb_end': torch.tensor([item['hb_end'] for item in batch]),
+        'r_peak': r_peaks,
+        'labels': labels,
     }

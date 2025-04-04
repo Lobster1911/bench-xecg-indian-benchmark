@@ -60,7 +60,7 @@ class myxLSTM(nn.Module):
         return x
 
     def forward(self, x):
-        x = self.embed_data(x)
+        x = self.embed_data(x, augment=False)
 
         out = self.xlstm(x)
 
@@ -68,7 +68,6 @@ class myxLSTM(nn.Module):
             out = self.get_bidirectional_emb(x, out)
 
         out = self.reconstruction(out)
-
         return out
     
     def get_bidirectional_emb(self, x, out):
@@ -115,7 +114,7 @@ class myxLSTM(nn.Module):
         return self.fc.parameters() 
     
 
-class xLSTMClassification(myxLSTM):
+class xLSTMClassificationMIT_BIH(myxLSTM):
     def __init__(
             self, 
             config,
@@ -123,12 +122,7 @@ class xLSTMClassification(myxLSTM):
             num_channels
         ): 
 
-        super(xLSTMClassification, self).__init__(num_channels, config)
-
-        self.sep_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        self.cls_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        self.highlight_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
-        self.start_token = nn.Parameter(torch.randn(1, 1, config.embedding_size))
+        super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config)
 
         self.fc = HeadModule(
             inp_size=config.embedding_size if not self.bidirectional else config.embedding_size * 2,
@@ -137,44 +131,23 @@ class xLSTMClassification(myxLSTM):
             dropout=config.dropout
         )
 
-    def forward(self, ctx, x, r_peaks_pos=None):
-        ctx = self.embed_data(ctx)
+        self.r_peak_pos_fc = HeadModule(
+            inp_size=config.embedding_size if not self.bidirectional else config.embedding_size * 2,
+            hidden_size=config.embedding_size // 2,
+            out_size=self.patch_size,
+            dropout=config.dropout
+        )
 
-        if r_peaks_pos is not None and False:
-            # get the r peaks positions
-            mask = torch.zeros_like(ctx)
-            mask[:, r_peaks_pos // self.patch_size, :] = 1
-
-            r_peak_before = torch.clamp(r_peaks_pos // self.patch_size - 1, min=0)
-            r_peak_after = torch.clamp(r_peaks_pos // self.patch_size + 1, max=ctx.shape[1] - 1)
-
-            mask[:, r_peak_before, :] = 1
-            mask[:, r_peak_after, :] = 1
-            mask = mask * self.highlight_token
-            ctx = ctx + mask
-        
-
+    def forward(self, x):
         x = self.embed_data(x)
 
-        # print('ctx', ctx.shape)
-        # print('x', x.shape)
-
-        # add the separation token between the context and the input
-        # start_token = self.start_token.repeat(x.shape[0], -1, -1)
-        # start_token = self.start_token.repeat(x.shape[0], 1, 1)
-        sep_token = self.sep_token.repeat(x.shape[0], 1, 1)
-        cls_token = self.cls_token.repeat(x.shape[0], 1, 1)
-
-        x = torch.cat((ctx, sep_token, x, cls_token), dim=1)
-        # get the last hidden state and apply the head
         out = self.xlstm(x) # [batch_size, embedding_dim]
-
-        cls = out[:, -1, :]
 
         if self.bidirectional:
             out_bi = self.xlstm_bi(x.flip(1))
             cls = torch.cat([cls, out_bi[:, -1, :]], dim=-1)
 
-        x = self.fc(cls)
-        return x, cls 
+        cls = self.fc(out)
+        r_peak_pos = self.r_peak_pos_fc(out)
+        return cls, r_peak_pos
 

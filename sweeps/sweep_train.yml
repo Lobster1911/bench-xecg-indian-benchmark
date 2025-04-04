@@ -1,35 +1,29 @@
 program: sweep.py
 method: random
-name: train-xLSTM-3
+name: train-xLSTM-5
 metric:
   goal: maximize
   name: test_f1/mean
-<<<<<<<< HEAD:sweep_train_mit-bih_3.yml
-========
 
->>>>>>>> c44ffe0ce951fa1644582bda7fea36a2c6919aeb:sweeps/sweep_train.yml
 parameters:
   pretrain:
     value: False
   lr_head:
-    min: 0.00001
-    max: 0.01
+    values: [ 0.0001, 0.001, 0.01 ]
   lr_xlstm:
-    min: 0.0000001
-    max: 0.0001
+    values: [ 0.00001, 0.0001, 0.001 ]
   wd:
-    min: 0.
-    max: 0.1
+    values: [ 0.1, 0.01, 0.001, 0. ]
   batch_size:
     value: 128
   num_workers:
-    value: 32
+    value: 16
   epochs:
     value: 30
   patch_size:
     value: 64
   dropout:
-    value: 0.3
+    values: [0.1, 0.3, 0.5]
   embedding_size:
     value: 512
   deterministic: 
@@ -45,9 +39,11 @@ parameters:
   weight_tying:
     value: False
   use_class_weights:
-    values: [True, False]
+    value: False
   label_smoothing:
     value: 0.
+  num_classes:
+    value: 5
 
   optimizer:
     value: 'adamw'
@@ -59,15 +55,15 @@ parameters:
     value: 15
   sched_decay_factor:
     value: 0.8
-  contrastive_loss_lambda:
-    value: 0.
   random_surrogate_prob:
-    values: [0.]
+    value: 0.
   random_jitter_prob:
-    values: [0.]
+    value: 0.
   loss_type:
     value: ''
-  split_by_patient:
+  win_len:
+    values: [8100, 5400, 2700, 1350]
+  skip_majority_class_samples:
     values: [True, False]
 
   activation_fn:
@@ -90,8 +86,7 @@ parameters:
     value: 'linear'
   bidirectional:
     value: False
-  multi_token_prediction:
-    value: False
+
 
 
   normalize:
@@ -108,7 +103,7 @@ parameters:
   data_folder_mit:
     value: '/media/Volume/data/MIT-BHI/data/'
   name:
-    values: ['between_hb', 't_wave_split', 'static']
+    value: 'static'
   checkpoint:
     value: 'pretrain-xLSTM/6z3h8m30/checkpoints/epoch=33-step=141474.ckpt'
   
