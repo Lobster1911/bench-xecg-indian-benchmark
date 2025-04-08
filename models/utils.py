@@ -94,6 +94,8 @@ def get_large_xlstm(
         dropout=0.2, 
         blocks=['m', 'm', 'm', 'm', 'm', 'm', 'm'],
         num_heads=4,
+        bidirectional=False,
+        random_drop_back_pass=0.2
     ):
     xlstm_config = xLSTMLargeConfig(
         embedding_dim=embedding_dim,
@@ -108,4 +110,4 @@ def get_large_xlstm(
     )
 
     blocks = xLSTMLargeBlockStack(xlstm_config)
-    return mLSTMWrapper(blocks, dropout=dropout)
+    return mLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional, random_drop_back_pass=random_drop_back_pass)

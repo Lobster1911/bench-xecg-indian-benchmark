@@ -2,16 +2,24 @@ epochs: 100
 dropout: 0.1
 lr: 0.001
 wd: 0.001
-patch_size: 256
-embedding_size: 1024
+patch_size: 128
+batch_size: 64
+embedding_size: 512
 xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
-xlstm_type: original
+xlstm_type: large
+random_drop_leads: 0.4
+random_drop_back_pass: 0.2
+dropout: 0.3
 
-# no restarts
-num_epochs_warm_restart: 100
-num_epochs_warmup: 5
+# shceduler
+use_scheduler: true
+num_epochs_warm_restart: 10
+num_epochs_warmup: 2
 patience: 20
 
 patch_embedding: enriched
 
 loss_type: mse_grad_min_max
+debug: false
+bidirectional: true
+wandb_log: true

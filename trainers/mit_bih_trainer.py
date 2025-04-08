@@ -8,8 +8,6 @@ import torchmetrics.classification.specificity
 import numpy as np
 import torch
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
-from utils.loss_utils import contrastive_coupled_loss
-from utils.train_utils import patch_target_pointwise
 
 class TrainingxLSTMNetwork(L.LightningModule):
     def __init__(self, model, config,  len_train_dataset, num_classes=5, weights=None):
@@ -276,7 +274,7 @@ class TrainingxLSTMNetwork(L.LightningModule):
             {'params': self.model.patch_embedding.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
         ]
         if self.model.bidirectional:
-            params.append({'params': self.model.xlstm_bi.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd})
+            params.append({'params': self.model.xlstm_bi.parameters(), 'lr': self.lr_head / 10, 'weight_decay': self.wd})
         return params
         
     def configure_optimizers(self):

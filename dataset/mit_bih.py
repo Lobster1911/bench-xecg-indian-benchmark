@@ -172,14 +172,15 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         header = self.headers[patient]
         r_peak = sample['r_peak']
         around_r_peaks = sample['around_r_peaks']
+        len_signal = signal.shape[0]
 
         if self.random_shift and self.subset == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start = max(0, r_peak - self.win_len + shift)
-            window_end = min(r_peak + self.win_len + shift, len(signal))
+            window_end = min(r_peak + self.win_len + shift, len_signal)
         else:
             window_start = max(0, r_peak - self.win_len)
-            window_end = min(r_peak + self.win_len, len(signal))
+            window_end = min(r_peak + self.win_len, len_signal)
 
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
@@ -201,6 +202,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             valid_labels = around_r_peaks
         else:
             valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
+            valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
+
         for r, l in valid_labels:
             # print(r, l)
             if window_start <= r < window_end:

@@ -136,14 +136,13 @@ class ONNConvPatchEmbedding(nn.Module):
         return x
 
 
-
 class HeadModule(nn.Module):
     
     def __init__(self, inp_size, hidden_size, out_size, dropout=0.1):
         super().__init__()
         self.head = nn.Sequential(
             nn.Linear(inp_size, hidden_size),
-            nn.GELU(),
+            nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size, out_size),
         )
@@ -151,34 +150,78 @@ class HeadModule(nn.Module):
     def forward(self, x):
         return self.head(x)
     
-class mLSTMWrapper(nn.Module):
-    def __init__(self, xlstm, dropout=0.2):
-        super(mLSTMWrapper, self).__init__() 
+class vanillaxLSTMWrapper(nn.Module):
+    def __init__(self, xlstm, dropout=0.2, bidirectional=False):
+        super(vanillaxLSTMWrapper, self).__init__() 
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        x = self.model(x)
+        return x
+    
+class mLSTMWrapper(nn.Module):
+    def __init__(self, xlstm, dropout=0.2, bidirectional=False, random_drop_back_pass=0.2):
+        super(mLSTMWrapper, self).__init__() 
+        self.model = xlstm
+        self.dropout = nn.Dropout(dropout)
+        self.bidirectional = bidirectional
+        self.random_drop_back_pass = random_drop_back_pass
+
+    def forward(self, x, causal_masking=True, drop_back_pass=False):
         len_seq = x.shape[1]
         pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
         x = torch.cat([torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device), x], dim=1)
-        x, _ = self.model_forward_wrap(x)
+        x, _ = self.model_forward_wrap(x, causal_masking=causal_masking, drop_back_pass=drop_back_pass)
         return x[:, pad_len:, :]
     
     def step(self, x, state):
         len_seq = x.shape[1]
         pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
         x = torch.cat([torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device), x], dim=1)
-        x, state = self.model_forward_wrap(x, state)
+        x, state = self.model_forward_wrap(x, state, drop_back_pass=True)
         return x[:, pad_len:, :], state
     
-    def model_forward_wrap(self, x, state = None):
+    def model_forward_wrap(self, x, state = None, causal_masking=True, drop_back_pass=False):
+        # print('x shape before model', x.shape)
+
         if state is None:
             state = {i: None for i in range(len(self.model.blocks))}
 
         for i, block in enumerate(self.model.blocks):
+            if i % 2 == 1 and (drop_back_pass or np.random.rand() < self.random_drop_back_pass):
+                # skip the backward direction for odd layers
+                continue
+
+
+            if i % 2 == 1 and self.bidirectional:
+                # causal masking (x shape: [bs, len, emb_size])
+
+                if causal_masking:
+                    batch_size, seq_len, emb_size = x.shape
+                    causal_mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device, dtype=torch.bool))
+                    causal_mask = causal_mask.unsqueeze(0).unsqueeze(-1)
+                    #print('mask shape', causal_mask.shape)
+                    #print('x shape before masking', x.transpose(1,2).shape)
+
+                    x = x.unsqueeze(1).expand(batch_size, seq_len, seq_len, emb_size)
+                    x = x.masked_fill(~causal_mask, 0)
+                    #print('x shape after masking', x.shape)
+                    x = x.reshape(-1, x.shape[2], x.shape[3])
+                #print('x shape after masking', x.shape)
+                x = x.flip(1)
+
             block_state = state[i]
             x = self.dropout(x)
             x, block_state_new = block(x, block_state)
+
+            if i % 2 == 1 and self.bidirectional:
+                if causal_masking:
+                    x = x.reshape(batch_size, seq_len, x.shape[1], x.shape[2])
+                    x = x[:, :, -1, :]
+                else:
+                    x = x.flip(1)
+
 
             if block_state is None:
                 state[i] = block_state_new

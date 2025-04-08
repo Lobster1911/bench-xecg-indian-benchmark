@@ -13,20 +13,34 @@ from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
 import yaml
 
+class ConfigDict(dict):
+    def __getitem__(self, key):
+        return self.get(key, None)
+
+    def __getattr__(self, key):
+        return self.get(key, None)
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    # merge the two configs, if the key is not in the config file, use the default value
+    def update(self, u):
+        for k, v in u.items():
+            if isinstance(v, dict) and isinstance(self.get(k), dict):
+                self[k].update(v)
+            else:
+                self[k] = v
+
 def parse_config(config_file, default_config_file):
     with open(default_config_file, 'r') as file:
         default_config = yaml.safe_load(file)
 
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
-    
-    class ConfigDict(dict):
-        def __getitem__(self, key):
-            return self.get(key, None)
 
-    # merge the two configs, if the key is not in the config file, use the default value
     merged_config = ConfigDict(default_config)
     merged_config.update(config)
+    # print(merged_config)
     
     return merged_config
 

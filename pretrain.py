@@ -1,5 +1,4 @@
 import os
-from torch import utils
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from models.xLSTM import myxLSTM
@@ -11,6 +10,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Learning
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import utils.utils as utils
 import torch
+from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 
 # pretrain.py --epochs 100 --dropout 0.3 --activation_fn relu --batch_size 256 --patch_size 64 --embedding_size 1024 --use_scheduler --lr 0.001 --wd 0.1 --deterministic --xlstm_config m s m s m s m s m s m s m --loss_type mse_grad_min_max --num_workers 32 --nk_clean --pretrain_datasets code15 mimic ptbxl --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_drop_leads 0.4 --xlstm_type small --patch_embedding enriched --wandb_log
 # for debug:
@@ -21,7 +21,7 @@ import argparse
 import yaml
 parser = argparse.ArgumentParser(description='Train a model')
 
-parser.add_argument('--config_file', type=str, default='config.yaml', help='Path to the config file')
+parser.add_argument('--config_file', type=str, default='configs/pretrain_run_config.yaml', help='Path to the config file')
 
 def pretrain(config, run=None, wandb=False):
     max_cpus = int(os.getenv("SLURM_CPUS_PER_TASK", config.num_workers))
@@ -47,38 +47,56 @@ def pretrain(config, run=None, wandb=False):
     val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
     val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
 
-    val_dataset = utils.data.ConcatDataset([val_dataset_1, val_dataset_2])
+    val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
 
-    train_dataset = utils.data.ConcatDataset(datasets_pretrain)
+    train_dataset = ConcatDataset(datasets_pretrain)
     # keep only 10% of the dataset
-    if config.debug: train_dataset = utils.data.Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = utils.data.DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
+    if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
 
     # cat the two dataloaders
-    if config.debug: val_dataset = utils.data.Subset(val_dataset, range(0, len(val_dataset) // 10))
-    val_dataloader = utils.data.DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
+    if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
 
     len_train_dataset = len(train_dataset)
     test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', random_shift=False)
-    test_dataloader = utils.data.DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
     
     xlstm = myxLSTM(config=config, num_channels=len(config.leads))
+    # xlstm = torch.compile(xlstm)
+
     if config.checkpoint != None:
         model = PretrainedxLSTMNetwork.load_from_checkpoint(checkpoint_path=config.checkpoint, model=xlstm, len_train_dataset=len_train_dataset, config=config)
     else:
         model = PretrainedxLSTMNetwork(model=xlstm, len_train_dataset=len_train_dataset, config=config)
         
     checkpoint_callback = ModelCheckpoint(monitor='val_nrmse')
-    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     early_stopping = EarlyStopping(monitor='val_nrmse', patience=config.patience)
 
     if wandb:
+        lr_monitor = LearningRateMonitor(logging_interval='step')
         wand_logger = WandbLogger(project="pretrain-xLSTM", experiment=run)
         wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[checkpoint_callback, lr_monitor, early_stopping], gradient_clip_val=config.grad_clip)
+        trainer = L.Trainer(
+            max_epochs=config.epochs, 
+            logger=wand_logger, 
+            callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
+            gradient_clip_val=config.grad_clip,
+            accelerator='gpu',
+            devices=1,
+            strategy='auto'
+        )
     else:
-        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[checkpoint_callback, lr_monitor, early_stopping], gradient_clip_val=config.grad_clip)
+        trainer = L.Trainer(
+            logger=False,
+            max_epochs=config.epochs, 
+            callbacks=[checkpoint_callback, early_stopping], 
+            gradient_clip_val=config.grad_clip,
+            accelerator='gpu',
+            devices=1,
+            strategy='auto'
+        )
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)
@@ -88,6 +106,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'configs/pretrain_config.yaml')
+    config = utils.parse_config(args.config_file, 'configs/pretrain_config_defaults.yaml')
 
     pretrain(config, wandb=config.wandb_log)

@@ -64,6 +64,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         """
         When the training loop ends, some representative plots from different classes are saved on wandb
         """
+        if self.logger is None:
+            return super().on_validation_epoch_end()
+        
         sample_1 = self.trainer.train_dataloader.dataset[0]
         sample_2 = self.trainer.train_dataloader.dataset[-42]
 
@@ -96,6 +99,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
+        if self.logger is None:
+            return super().on_validation_epoch_end()
+        
         # save the plots of the reconstruction for some samples
         sample_s = self.trainer.val_dataloaders.dataset[115]
         sample_v = self.trainer.val_dataloaders.dataset[91]

@@ -59,7 +59,7 @@ parser.add_argument('--xlstm_type', type=str, default='small', help='Type of xLS
 parser.add_argument('--patch_embedding', default='linear', help='Patch embedding type')
 parser.add_argument('--reconstruct_embedding', default='linear', help='Reconstruction head type')
 parser.add_argument('--bidirectional', action='store_true', help='Bidirectional LSTM')
-parser.add_argument('--skip_majority_class_samples', action='store_true', help='Remove soem of the consecutive heartbeats of the same majority class')
+parser.add_argument('--skip_majority_class_samples', action='store_true', help='Remove some of the consecutive heartbeats of the same majority class')
 
 # data and augmentations hyperparameters
 parser.add_argument('--normalize', action='store_true', help='Normalize the data')
@@ -92,7 +92,7 @@ def train(config, run=None, wandb=False):
             weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
         elif config.num_classes == 3: 
             print('Using class weights for 3 classes')
-            weights = torch.tensor([0.2781, 13.5098,  3.3668]).to('cuda')
+            weights = torch.tensor([0.367, 17.866, 4.452]).to('cuda')
     else:
         weights = None
 
