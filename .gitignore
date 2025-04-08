@@ -10,3 +10,4 @@ train-xLSTM-5
 pretrained_models
 None
 logs
+checkpoints
