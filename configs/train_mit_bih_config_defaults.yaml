@@ -1,0 +1,46 @@
+lr_head: 0.001
+lr_xlstm: 0.00001
+wd: 0.0001
+batch_size: 64
+num_workers: 32
+epochs: 30
+patch_size: 128
+dropout: 0.4
+embedding_size: 512
+deterministic: true
+is_sweep: false
+grad_clip: 0.5
+weight_tying: false
+label_smoothing: 0.0
+
+optimizer: "adamw"
+use_scheduler: false
+num_epochs_warmup: 1
+num_epochs_warm_restart: 15
+sched_decay_factor: 0.8
+random_surrogate_prob: 0.0
+random_jitter_prob: 0.0
+num_classes: 5
+win_len: 5400
+patience: 15
+r_peaks_ce_lambda: 0.1
+
+activation_fn: "relu"
+xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
+wandb_log: false
+num_heads: 4
+xlstm_type: "small"
+patch_embedding: "linear"
+reconstruct_embedding: "linear"
+bidirectional: false
+skip_majority_class_samples: true
+
+normalize: true
+oversample: false
+random_shift: true
+random_drop_leads: 0.0
+nk_clean: true
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+
+data_folder_mit: "/media/Volume/data/MIT-BHI/data/"
+checkpoint: null

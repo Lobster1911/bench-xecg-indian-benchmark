@@ -7,14 +7,14 @@ from models.SeriesDecomposition import SeriesDecomposition
 from augmentations import RandomDropLeads, FTSurrogate, Jitter
 import numpy as np
 
-class myxLSTM(nn.Module):
+class pretrainedxLSTM(nn.Module):
 
     def __init__(
             self, 
             num_channels,
             config
         ): 
-        super(myxLSTM, self).__init__()
+        super(pretrainedxLSTM, self).__init__()
         self.dropout = nn.Dropout(config.dropout)
         self.patch_size = config.patch_size
         self.weight_tying = config.weight_tying
@@ -54,7 +54,7 @@ class myxLSTM(nn.Module):
     def forward(self, x):
         x = self.embed_data(x, augment=False)
 
-        out = self.xlstm(x, causal_masking=True) # [batch_size, embedding_dim]
+        out = self.xlstm(x) # [batch_size, embedding_dim]
 
         out = self.reconstruction(out)
         return out
@@ -88,8 +88,8 @@ class myxLSTM(nn.Module):
     def head_parameters(self):
         return self.fc.parameters() 
     
-    
-class xLSTMClassificationMIT_BIH(myxLSTM):
+
+class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
     def __init__(
             self, 
             config,
@@ -98,6 +98,11 @@ class xLSTMClassificationMIT_BIH(myxLSTM):
         ): 
 
         super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config)
+
+        self.start_token_1 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+        self.start_token_2 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+        self.start_token_3 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+        self.start_token_4 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
 
         self.fc = HeadModule(
             inp_size=config.embedding_size,
@@ -116,9 +121,42 @@ class xLSTMClassificationMIT_BIH(myxLSTM):
     def forward(self, x):
         x = self.embed_data(x)
 
-        out = self.xlstm(x, causal_masking=False) # [batch_size, embedding_dim]
+        # add the start tokens
+        start_token_1 = self.start_token_1.expand(x.shape[0], -1, -1)
+        start_token_2 = self.start_token_2.expand(x.shape[0], -1, -1)
+        start_token_3 = self.start_token_3.expand(x.shape[0], -1, -1)
+        start_token_4 = self.start_token_4.expand(x.shape[0], -1, -1)
+
+        x = torch.cat((start_token_1, start_token_2, start_token_3, start_token_4, x), dim=1)
+
+        out = self.xlstm(x) # [batch_size, embedding_dim]
+        out = out[:, 4:, :] # remove the start tokens
 
         cls = self.fc(out)
         r_peak_pos = self.r_peak_pos_fc(out)
         return cls, r_peak_pos
 
+class xLSTMClassification(pretrainedxLSTM):
+    def __init__(
+            self, 
+            config,
+            num_classes,
+            num_channels
+        ): 
+
+        super(xLSTMClassification, self).__init__(num_channels, config)
+
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+
+        self.fc = HeadModule(
+            inp_size=config.embedding_size,
+            hidden_size=config.embedding_size // 2,
+            out_size=num_classes,
+            dropout=config.dropout
+        )
+
+    def forward(self, x):
+        x = self.embed_data(x)
+        out = self.xlstm(x)
+        cls = self.fc(out[:, -1, :])
+        return cls

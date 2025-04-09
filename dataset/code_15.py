@@ -68,12 +68,3 @@ class ECGCODE15Dataset(Dataset):
         return {
             'signal':signal,
         }
-        
-    
-def collate_fn(batch):
-    signals = [item['signal'] for item in batch]
-    padded_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-
-    return {
-        'signal': padded_signals,
-    }

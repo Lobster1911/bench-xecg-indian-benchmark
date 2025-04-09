@@ -188,13 +188,13 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
     def configure_optimizers(self):
         if self.optimizer == 'adam':
-            optimizer = optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.wd)
+            optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
         elif self.optimizer == 'adamw':
-            optimizer = optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.wd)
+            optimizer = optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
         elif self.optimizer == 'adafactor':
-            optimizer = optim.Adafactor(self.parameters(), lr=self.lr, weight_decay=self.wd)
+            optimizer = optim.Adafactor(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
         else:
-            optimizer = optim.SGD(self.parameters(), lr=self.lr, weight_decay=self.wd)
+            optimizer = optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
 
         if self.use_scheduler:
             steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)

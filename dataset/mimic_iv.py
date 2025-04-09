@@ -14,7 +14,7 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
 
     def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
         self.data_folder = config.data_folder_mimic
-        self.random_shift = random_shift
+        self.random_shift = config.random_shift if split == 'train' else False
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.patch_size = config.patch_size

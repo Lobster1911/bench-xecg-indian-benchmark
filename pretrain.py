@@ -1,26 +1,21 @@
 import os
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
-from models.xLSTM import myxLSTM
+from models.xLSTM import pretrainedxLSTM
 import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 import dataset.mimic_iv as mimic
 import dataset.ptbxl as ptb_xl
+import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import utils.utils as utils
 import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 
-# pretrain.py --epochs 100 --dropout 0.3 --activation_fn relu --batch_size 256 --patch_size 64 --embedding_size 1024 --use_scheduler --lr 0.001 --wd 0.1 --deterministic --xlstm_config m s m s m s m s m s m s m --loss_type mse_grad_min_max --num_workers 32 --nk_clean --pretrain_datasets code15 mimic ptbxl --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_drop_leads 0.4 --xlstm_type small --patch_embedding enriched --wandb_log
-# for debug:
-# python3 pretrain.py --epochs 100 --dropout 0.2 --activation_fn relu --batch_size 64 --patch_size 64 --embedding_size 128 --use_scheduler --lr 0.0001 --wd 0.01 --deterministic --xlstm_config m --loss_type mse_grad_min_max --num_workers 32 --nk_clean --pretrain_datasets code15 --random_shift --leads I II III aVR aVL aVF V1 V2 V3 V4 V5 V6 --normalize --random_drop_leads 0.2
-
 # argparse
 import argparse
-import yaml
 parser = argparse.ArgumentParser(description='Train a model')
-
 parser.add_argument('--config_file', type=str, default='configs/pretrain_run_config.yaml', help='Path to the config file')
 
 def pretrain(config, run=None, wandb=False):
@@ -38,7 +33,7 @@ def pretrain(config, run=None, wandb=False):
         elif dataset == 'code15':
             datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads))
         elif dataset == 'mit':
-            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, subset='train', random_shift=False))       
+            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train', random_shift=False))       
         elif dataset == 'ptbxl':
             datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', random_shift=False))
         else:
@@ -52,17 +47,17 @@ def pretrain(config, run=None, wandb=False):
     train_dataset = ConcatDataset(datasets_pretrain)
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
 
     # cat the two dataloaders
     if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=code_15.collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
 
     len_train_dataset = len(train_dataset)
-    test_dataset = mit_bih.ECGMITBIHDataset(config, subset='test', random_shift=False)
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', random_shift=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
     
-    xlstm = myxLSTM(config=config, num_channels=len(config.leads))
+    xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))
     # xlstm = torch.compile(xlstm)
 
     if config.checkpoint != None:
@@ -76,7 +71,7 @@ def pretrain(config, run=None, wandb=False):
 
     if wandb:
         lr_monitor = LearningRateMonitor(logging_interval='step')
-        wand_logger = WandbLogger(project="pretrain-xLSTM", experiment=run)
+        wand_logger = WandbLogger(project="pretrain-xLSTM", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(
             max_epochs=config.epochs, 

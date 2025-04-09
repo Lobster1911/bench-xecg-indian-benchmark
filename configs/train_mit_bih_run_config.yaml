@@ -1,0 +1,24 @@
+wandb_log: true
+
+lr_head: 2
+lr_xlstm: 0.0002
+wd: 0.
+dropout: 0.
+random_shift: true
+
+embedding_size: 1024
+xlstm_type: "vanilla"
+xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm', 's', 'm' ]
+checkpoint: pretrained_models/9l_1024/epoch=8-step=38070.ckpt
+patch_embedding: enriched
+
+win_len: 3600
+patch_size: 64
+
+use_scheduler: true
+num_epochs_warm_restart: 30
+patience: 30
+batch_size: 128
+optimizer: 'adamw'
+switch_sched_at_epoch: 5
+r_peaks_ce_lambda: 1. # 0. means only r-peaks loss, 1. means only ce loss

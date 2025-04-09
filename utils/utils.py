@@ -5,7 +5,6 @@ import torch
 import numpy as np
 import random
 from collections import Counter
-from models.xLSTM import myxLSTM
 from models.simple_LSTM import ECG_LSTM, ECG_CONV1D_LSTM
 from models.seq2seq import Seq2SeqModel
 import torch.nn.functional as F
@@ -55,22 +54,6 @@ def print_metrics_table(sensitivity, ppv, specificity, class_names = [ "N", "S",
 
   print(table)
 
-def setup_determinitic_seeds():
-    """
-    Sets up deterministic seeds for reproducibility.
-    """
-    # deterministic seeds 
-    print("Setting deterministic mode")
-    torch.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
-    torch.backends.cudnn.deterministic = True
-    torch.use_deterministic_algorithms(True, warn_only=True)
-
-    g = torch.Generator()
-    g.manual_seed(0)
-    return g
-
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
@@ -97,18 +80,3 @@ def get_training_class_weights(train_dataset, do_not_consider_classes = []):
   weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
   print(f"Class Weights: {weights}")
   return weights
-
-   
-
-def get_model(args):
-    if args.model == 'xLSTM':
-        model = myxLSTM(args.num_leads, num_classes=len(args.classes), dropout=args.dropout, xlstm_depth=args.num_layers, activation_fn=args.act_fn, pooling=args.pooling, num_leads=args.num_leads, channels=[128])
-    elif args.model == 'LSTM':
-        model = ECG_LSTM(args.input_size, args.hidden_size, args.num_layers, len(args.classes), args.dropout)
-    elif args.model == 'CONV1D_LSTM':
-        model = ECG_CONV1D_LSTM(args.input_size, args.hidden_size, args.num_layers, len(args.classes), args.dropout)
-    elif args.model == 'seq2seq':
-        model = Seq2SeqModel(args.input_size, args.hidden_size, args.num_layers, len(args.classes), args.dropout)
-    else:
-        raise ValueError("Model not supported")
-    return model

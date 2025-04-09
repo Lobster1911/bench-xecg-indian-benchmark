@@ -6,7 +6,7 @@ import neurokit2 as nk
 import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
-
+import neurokit2 as nk
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
     'MLII' : 'II',
@@ -37,7 +37,7 @@ def convert_label(symbol):
 valid_annotations = set(['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F', '/', 'f', 'Q'])
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
-    def __init__(self, config, subset='train', random_shift=False):
+    def __init__(self, config, split='train'):
         """
         Args:
             config: configuration object
@@ -46,13 +46,12 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         """
         
         self.data_folder = config.data_folder_mit
-        self.subset = subset
+        self.split = split
         self.samples = []
-        self.random_shift = random_shift
+        self.random_shift = config.random_shift if split == 'train' else False
         self.nkclean = config.nk_clean
         self.patch_size = config.patch_size
         self.normalize = config.normalize
-        self.name = config.name
         self.num_classes = config.num_classes 
         self.win_len = config.win_len
         self.skip_majority_class_samples = config.skip_majority_class_samples
@@ -71,8 +70,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # print(self.samples.head())  
         # get all the different values for column patient
 
-        self.load_patient_data(subset)
-        self.load_samples(subset)
+        self.load_patient_data(split)
+        self.load_samples(split)
 
 
     def load_patient_data(self, subset):
@@ -84,10 +83,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.labels = {}
 
         def process_patient(patient):
+            signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
+
             if self.nkclean:
-                signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.name, f'{patient}'))
-            else:
-                signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
+                for i in range(signal.shape[1]):
+                    signal[:, i] = nk.ecg_clean(signal[:, i], sampling_rate=360, method='neurokit')
 
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
             annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
@@ -174,7 +174,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         around_r_peaks = sample['around_r_peaks']
         len_signal = signal.shape[0]
 
-        if self.random_shift and self.subset == 'train':
+        if self.random_shift:
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start = max(0, r_peak - self.win_len + shift)
             window_end = min(r_peak + self.win_len + shift, len_signal)
@@ -196,13 +196,10 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         valid_r_peaks = [r - window_start for r, l in around_r_peaks if window_start <= r < window_end]
         r_peaks_mask[valid_r_peaks] = 1
 
-        labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) -1
-        # Use a list comprehension to filter and set the mask
-        if self.bidirectional:
-            valid_labels = around_r_peaks
-        else:
-            valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
-            valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
+        labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) - 1
+
+        valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
+        valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
 
         for r, l in valid_labels:
             # print(r, l)

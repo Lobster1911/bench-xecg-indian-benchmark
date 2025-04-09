@@ -32,3 +32,11 @@ def find_records(folder, header_extension='.dat'):
     records.update(filter(None, results))
     records = sorted(records)
     return records
+
+def collate_fn(batch):
+    signals = [item['signal'] for item in batch]
+    padded_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+
+    return {
+        'signal': padded_signals,
+    }

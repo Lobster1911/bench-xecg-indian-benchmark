@@ -26,58 +26,43 @@ class TrainingMIT_BIH(L.LightningModule):
         self.num_epochs_warm_restart = config.num_epochs_warm_restart
         self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
-        self.r_peaks_ce_lambda = config.r_peaks_ce_lambda
 
-        self.num_classes = config.num_classes
-        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
-        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
-        self.train_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)  
-        self.valid_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
-        self.test_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
-        self.train_acc_r_peak = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.valid_acc_r_peak = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.test_acc_r_peak = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.train_f1_r_peak = torchmetrics.classification.BinaryF1Score()
-        self.valid_f1_r_peak = torchmetrics.classification.BinaryF1Score()
-        self.test_f1_r_peak = torchmetrics.classification.BinaryF1Score()
+        self.classification_taksk = config.classification_task
+
+        self.num_classes = 23 if self.classification_taksk == 'diagnosis_subclass' else 5
+
+        self.train_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
+        self.valid_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
+        self.test_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
+        self.test_acc_no_avg = torchmetrics.classification.accuracy.MultilabelAccuracy(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
+        self.train_f1 = torchmetrics.classification.MultilabelF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
+        self.valid_f1 = torchmetrics.classification.MultilabelF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
+        self.test_f1 = torchmetrics.classification.MultilabelF1Score(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
+        self.train_auroc = torchmetrics.classification.MultilabelAUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)  
+        self.valid_auroc = torchmetrics.classification.MultilabelAUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
+        self.test_auroc = torchmetrics.classification.MultilabelAUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
 
         # add sensitivity and specificity for the first class
-        self.val_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.val_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.val_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.val_spec = torchmetrics.classification.specificity.MultilabelSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.test_spec = torchmetrics.classification.specificity.MultilabelSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.val_recall = torchmetrics.classification.precision_recall.MultilabelRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.test_recall = torchmetrics.classification.precision_recall.MultilabelRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.val_precision = torchmetrics.classification.precision_recall.MultilabelPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.test_precision = torchmetrics.classification.precision_recall.MultilabelPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
 
         if not config.is_sweep:
             self.save_hyperparameters()
 
     def training_step(self, batch, _):
-        loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
+        loss, out, pred, targets = self.predict_batch(batch)
 
         self.train_acc = self.train_acc.to(preds.device)
         self.train_acc(preds, targets)
-
-        self.train_acc_r_peak = self.train_acc_r_peak.to(r_peak_pos.device)
-        self.train_acc_r_peak(r_peak_pos, r_peaks)
-
-        self.train_f1_r_peak = self.train_f1_r_peak.to(r_peak_pos.device)
-        self.train_f1_r_peak(r_peak_pos, r_peaks)
 
         self.train_f1 = self.train_f1.to(preds.device)
         self.train_f1(preds, targets)
 
         self.log('train_loss', loss_cls.detach().item(), prog_bar=True, batch_size=self.batch_size)
-
-        self.log('train_r_peak_loss', loss_r_peak_pos.detach().item(), prog_bar=True, batch_size=self.batch_size)
-        self.log('train_rec_r_peak', self.train_acc_r_peak, prog_bar=True, batch_size=self.batch_size)
-        self.log('train_f1_r_peak', self.train_f1_r_peak, prog_bar=True, batch_size=self.batch_size)
-
         self.log('train_acc', self.train_acc, prog_bar=True, batch_size=self.batch_size)
         self.log('train_f1', self.train_f1, prog_bar=True, batch_size=self.batch_size)
 
@@ -87,29 +72,18 @@ class TrainingMIT_BIH(L.LightningModule):
         self.train_auroc(logits, targets)
         self.log("train_auroc", self.train_auroc, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss
     
     def validation_step(self, batch, _):
-        loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
+        loss, out, pred, targets = self.predict_batch(batch)
 
         self.valid_acc = self.valid_acc.to(preds.device)
         self.valid_acc(preds, targets)
-
-        self.valid_acc_r_peak = self.valid_acc_r_peak.to(r_peak_pos.device)
-        self.valid_acc_r_peak(r_peak_pos, r_peaks)
-
-        self.valid_f1_r_peak = self.valid_f1_r_peak.to(r_peak_pos.device)
-        self.valid_f1_r_peak(r_peak_pos, r_peaks)
 
         self.valid_f1 = self.valid_f1.to(preds.device)
         self.valid_f1(preds, targets)
 
         self.log('val_loss', loss_cls.detach().item(), prog_bar=True, batch_size=self.batch_size)
-
-        self.log('val_r_peak_loss', loss_r_peak_pos.detach().item(), prog_bar=True, batch_size=self.batch_size)
-        self.log('val_rec_r_peak', self.valid_acc_r_peak, prog_bar=True, batch_size=self.batch_size)
-        self.log('val_f1_r_peak', self.valid_f1_r_peak, prog_bar=True, batch_size=self.batch_size)
-
         self.log('val_acc', self.valid_acc, prog_bar=True, batch_size=self.batch_size)
         self.log('val_f1', self.valid_f1, prog_bar=True, batch_size=self.batch_size)
 
@@ -119,9 +93,8 @@ class TrainingMIT_BIH(L.LightningModule):
         self.log('val_specificity/N', self.val_spec[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
         self.log('val_specificity/S', self.val_spec[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
         self.log('val_specificity/V', self.val_spec[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        if self.num_classes == 5:
-            self.log('val_specificity/F', self.val_spec[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-            self.log('val_specificity/Q', self.val_spec[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
+        self.log('val_specificity/F', self.val_spec[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
+        self.log('val_specificity/Q', self.val_spec[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
 
         # sensitivity
         self.val_recall = self.val_recall.to(preds.device)
@@ -148,7 +121,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.valid_auroc(logits, targets)
         self.log('val_auroc', self.valid_auroc, prog_bar=True, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss_cls + loss_r_peak_pos
             
     def test_step(self, batch, _):
         loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
@@ -230,36 +203,20 @@ class TrainingMIT_BIH(L.LightningModule):
         self.test_auroc(logits, targets)
         self.log("test_auroc", self.test_auroc, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss_cls + loss_r_peak_pos
             
     
     def predict_batch(self, batch):
         x = batch["signal"]
-        targets = batch['label'].unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
+        targets = batch['class_label']
         # get one hot encoding
 
-        r_peaks = batch['r_peak'] # [bs, seq_len]
-        cls, r_peak_pos = self.model(x)
-        r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
+        out = self.model(x)
+        preds = torch.argmax(out, dim=-1)
 
-        # cls is an array with [batch_size, num_patches, num_classes]
-        # target is an array with [batch_size, seq_len]
-
-        # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
-        preds = torch.argmax(cls, dim=-1)
+        loss_cls = nn.functional.cross_entropy(cls, targets, weight=self.weights, label_smoothing=self.label_smoothing)
         
-
-        loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, label_smoothing=self.label_smoothing, ignore_index=-1)
-        r_peaks = r_peaks[:, :r_peak_pos.shape[1]]
-        loss_r_peak_pos = nn.functional.binary_cross_entropy_with_logits(r_peak_pos, r_peaks)
-
-        # return the masket target and cls
-        mask = targets != -1
-        targets = targets[mask]
-        cls = cls[mask]
-        preds = preds[mask]
-        
-        return loss_cls, loss_r_peak_pos, preds, targets, cls, r_peak_pos, r_peaks
+        return loss_cls, out, pred, targets
 
     def get_params(self):
         params = [
@@ -284,7 +241,7 @@ class TrainingMIT_BIH(L.LightningModule):
         elif self.optimizer == 'adafactor':
             optimizer = optim.Adafactor(params=self.get_params(), lr=self.lr_head, weight_decay=self.wd)
         else:
-            optimizer = optim.SGD(self.get_params())
+            optimizer = optim.SGD(self.get_params(), lr=self.lr_head, momentum=0.9, weight_decay=self.wd)
 
         if self.use_scheduler: 
             steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)

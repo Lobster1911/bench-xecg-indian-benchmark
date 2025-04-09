@@ -2,11 +2,12 @@ import os
 from torch import utils
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
-from models.xLSTM import xLSTMClassificationMIT_BIH
-import dataset.mit_bih as mit_bih
-import dataset.code_15 as code_15
+from models.xLSTM import xLSTMClassification
+
+import dataset.ptb_xl as ptbxl
+import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingMIT_BIH
+from trainers.mit_bih_trainer import TrainingxLSTMNetwork
 import torch
 import argparse
 import os
@@ -20,36 +21,23 @@ os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/c
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
-parser.add_argument('--config_file', type=str, default='configs/train_mit_bih_run_config.yaml', help='Path to the config file')
+parser.add_argument('--config_file', type=str, default='configs/train_ptbxl_run_config.yaml', help='Path to the config file')
 
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    train_dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
+    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train')
     print(f"Train dataset size: {len(train_dataset)}")
-    val_dataset = mit_bih.ECGMITBIHDataset(config, split='val')
+    val_dataset = ptbxl.ECGPTBXLDataset(config, split='val')
     print(f"Val dataset size: {len(val_dataset)}")
 
-    if config.use_class_weights:
-        # weights = get_training_class_weights(train_dataset).to('cuda')
-        # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
-        # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
-        if config.num_classes == 5:
-            print('Using class weights for 5 classes')
-            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
-        elif config.num_classes == 3: 
-            print('Using class weights for 3 classes')
-            weights = torch.tensor([0.367, 17.866, 4.452]).to('cuda')
-    else:
-        weights = None
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn, pin_memory=True)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn, pin_memory=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=mit_bih.collate_fn, pin_memory=True)
+    test_dataset = ptbxl.ECGPTBXLDataset(config, split='test')
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers, pin_memory=True)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.collate_fn, num_workers=config.num_workers, pin_memory=True)
-
-    xlstm = xLSTMClassificationMIT_BIH(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+    xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
     def format_keys(key):
         if key.startswith('model.'):
@@ -68,7 +56,7 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingMIT_BIH(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset))
 
     # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
@@ -89,6 +77,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'configs/train_mit_bih_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'configs/train_ptbxl_config_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

@@ -1,25 +1,24 @@
 epochs: 100
-dropout: 0.1
-lr: 0.001
-wd: 0.001
-patch_size: 128
-batch_size: 64
-embedding_size: 512
-xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
-xlstm_type: large
+lr: 0.003
+wd: 0.00001
+patch_size: 64
+batch_size: 256
+embedding_size: 1024
+xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm', 's', 'm' ]
+xlstm_type: original
 random_drop_leads: 0.4
-random_drop_back_pass: 0.2
-dropout: 0.3
+dropout: 0.
+gradient_clipping: .5
 
-# shceduler
+# scheduler
 use_scheduler: true
 num_epochs_warm_restart: 10
 num_epochs_warmup: 2
-patience: 20
+patience: 30
 
 patch_embedding: enriched
 
 loss_type: mse_grad_min_max
 debug: false
-bidirectional: true
+bidirectional: false
 wandb_log: true
