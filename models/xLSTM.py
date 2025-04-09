@@ -99,10 +99,9 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
 
         super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config)
 
-        self.start_token_1 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-        self.start_token_2 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-        self.start_token_3 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-        self.start_token_4 = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+        self.use_start_token = config.use_start_token
+        if self.use_start_token:
+            self.start_token_1 = nn.Parameter(torch.zero(1, 1, config.embedding_size))
 
         self.fc = HeadModule(
             inp_size=config.embedding_size,
@@ -121,16 +120,12 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
     def forward(self, x):
         x = self.embed_data(x)
 
-        # add the start tokens
-        start_token_1 = self.start_token_1.expand(x.shape[0], -1, -1)
-        start_token_2 = self.start_token_2.expand(x.shape[0], -1, -1)
-        start_token_3 = self.start_token_3.expand(x.shape[0], -1, -1)
-        start_token_4 = self.start_token_4.expand(x.shape[0], -1, -1)
-
-        x = torch.cat((start_token_1, start_token_2, start_token_3, start_token_4, x), dim=1)
+        if self.use_start_token:
+            start_token_1 = self.start_token_1.expand(x.shape[0], -1, -1)
+            x = torch.cat([start_token_1, x], dim=1)
 
         out = self.xlstm(x) # [batch_size, embedding_dim]
-        out = out[:, 4:, :] # remove the start tokens
+        if self.use_start_token: out = out[:, 1:, :] # remove the start tokens
 
         cls = self.fc(out)
         r_peak_pos = self.r_peak_pos_fc(out)

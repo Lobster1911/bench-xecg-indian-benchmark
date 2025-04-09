@@ -87,7 +87,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.train_auroc(logits, targets)
         self.log("train_auroc", self.train_auroc, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss_cls + loss_r_peak_pos
     
     def validation_step(self, batch, _):
         loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
@@ -148,7 +148,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.valid_auroc(logits, targets)
         self.log('val_auroc', self.valid_auroc, prog_bar=True, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss_cls + loss_r_peak_pos
             
     def test_step(self, batch, _):
         loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
@@ -230,7 +230,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.test_auroc(logits, targets)
         self.log("test_auroc", self.test_auroc, batch_size=self.batch_size)
 
-        return loss_cls * self.r_peaks_ce_lambda + loss_r_peak_pos * (1 - self.r_peaks_ce_lambda)
+        return loss_cls + loss_r_peak_pos
             
     
     def predict_batch(self, batch):
@@ -266,14 +266,13 @@ class TrainingMIT_BIH(L.LightningModule):
             # head and sep token with normal lr
             {'params': self.model.fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.r_peak_pos_fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            # {'params': self.model.sep_token, 'lr': self.lr_head, 'weight_decay': self.wd},
-            # {'params': self.model.cls_token, 'lr': self.lr_head, 'weight_decay': self.wd},
-            # {'params': self.model.highlight_token, 'lr': self.lr_head, 'weight_decay': self.wd},
 
             # xlstm and patch embedding with lower lr
             {'params': self.model.xlstm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd},
             {'params': self.model.patch_embedding.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
         ]
+        if self.model.use_start_token:
+            params.append({'params': self.model.start_token_1, 'lr': self.lr_head, 'weight_decay': self.wd})
         return params
         
     def configure_optimizers(self):
@@ -284,7 +283,7 @@ class TrainingMIT_BIH(L.LightningModule):
         elif self.optimizer == 'adafactor':
             optimizer = optim.Adafactor(params=self.get_params(), lr=self.lr_head, weight_decay=self.wd)
         else:
-            optimizer = optim.SGD(self.get_params())
+            optimizer = optim.SGD(self.get_params(), lr=self.lr_head, momentum=0.9, weight_decay=self.wd)
 
         if self.use_scheduler: 
             steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
