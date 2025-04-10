@@ -20,7 +20,7 @@ patience: 30
 batch_size: 128
 optimizer: 'adamw'
 use_cls_token: true
-grad_clip: .
+grad_clip: .5
 
 
 classification_taksk: 'diagnosis_superclass'

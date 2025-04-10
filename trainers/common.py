@@ -4,13 +4,13 @@ from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_de
 
 def configure_optimizers(trainer):
     if trainer.optimizer == 'adam':
-        optimizer = optim.Adam(params=trainer.get_params(), lr=trainer.lr_head, weight_decay=trainer.wd)
+        optimizer = optim.Adam(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'adamw':
-        optimizer = optim.AdamW(params=trainer.get_params(), lr=trainer.lr_head, weight_decay=trainer.wd)
+        optimizer = optim.AdamW(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'adafactor':
-        optimizer = optim.Adafactor(params=trainer.get_params(), lr=trainer.lr_head, weight_decay=trainer.wd)
+        optimizer = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     else:
-        optimizer = optim.SGD(trainer.get_params(), lr=trainer.lr_head, momentum=0.9, weight_decay=trainer.wd)
+        optimizer = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
 
     if trainer.use_scheduler: 
         steps_per_epoch = np.ceil(trainer.len_train_dataset / trainer.batch_size)

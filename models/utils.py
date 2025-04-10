@@ -5,7 +5,7 @@ from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, HeadModule, EmbedPatching, EnrichedLinearPatchEmbedding
+from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
 import os
 from models.kan import KAN
 
@@ -59,7 +59,8 @@ def get_xlstm(
         embedding_dim, 
         dropout=0.2, 
         blocks=['m', 's', 'm', 'm', 'm', 'm', 'm'],
-        num_heads=4
+        num_heads=4,
+        bidirectional=False,
     ):
     cfg = xLSTMBlockStackConfig(
         mlstm_block=mLSTMBlockConfig(
@@ -85,9 +86,8 @@ def get_xlstm(
         slstm_at=[1 if b == 's' else 0 for b in blocks],
         dropout=dropout,
     )
-
-    return xLSTMBlockStack(cfg)
-
+    blocks = xLSTMBlockStack(cfg)
+    return vanillaxLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional)
 
 def get_large_xlstm(       
         embedding_dim, 

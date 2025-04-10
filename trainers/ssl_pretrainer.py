@@ -177,6 +177,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def get_params(self):
         return self.model.parameters()
+    
+    def get_lr(self):
+        return self.lr
 
     def configure_optimizers(self):
         return common.configure_optimizers(self)

@@ -43,6 +43,16 @@ def parse_config(config_file, default_config_file):
     
     return merged_config
 
+def parse_sweep_config(config, default_config_file):
+    with open(default_config_file, 'r') as file:
+        default_config = yaml.safe_load(file)
+
+    merged_config = ConfigDict(default_config)
+    merged_config.update(config)
+    # print(merged_config)
+    
+    return merged_config
+
 def print_metrics_table(sensitivity, ppv, specificity, class_names = [ "N", "S", "V", "F", "Q"] ):
   """Prints a formatted table of per-class metrics."""
 

@@ -276,5 +276,8 @@ class TrainingMIT_BIH(L.LightningModule):
             {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
         ]
         
+    def get_lr(self):
+        return self.lr_head
+    
     def configure_optimizers(self):
         return common.configure_optimizers(self)

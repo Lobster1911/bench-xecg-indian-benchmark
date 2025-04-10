@@ -155,9 +155,35 @@ class vanillaxLSTMWrapper(nn.Module):
         super(vanillaxLSTMWrapper, self).__init__() 
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
+        self.bidirectional = bidirectional
 
-    def forward(self, x):
-        x = self.model(x)
+    def forward(self, x: torch.Tensor, need_expansion=True):
+        expanded = False
+
+        for i, block in enumerate(self.model.blocks):
+            if self.bidirectional: 
+                if not expanded and i > 0 and need_expansion:
+                    bs, seq_len, _ = x.shape
+                    x = x.unsqueeze(1).repeat(1, seq_len, 1, 1)
+                    tril_mask = torch.tril(torch.ones(seq_len, seq_len, dtype=x.dtype, device=x.device)).unsqueeze(0).unsqueeze(-1)
+                    x = x * tril_mask
+                    x = x.reshape(bs * seq_len, seq_len, -1)
+                    expanded = True
+                    # print('x shape after expand', x.shape)
+                # flip the sequence
+                if i > 0:
+                    x = x.flip(1)
+
+            x = block(x)
+
+        if self.bidirectional and expanded:
+            x = x.reshape(bs, seq_len, seq_len, -1)
+            # print('x shape after reshape', x.shape)
+            # keep only the diagonal
+            x = torch.diagonal(x, dim1=1, dim2=2).transpose(1,2)
+            # print('x shape after diagonal', x.shape)
+
+        x = self.model.post_blocks_norm(x)
         return x
     
 class mLSTMWrapper(nn.Module):

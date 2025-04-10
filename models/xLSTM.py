@@ -28,7 +28,7 @@ class pretrainedxLSTM(nn.Module):
         if config.xlstm_type == 'large':
             self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
         else:
-            self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads)
+            self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
          
 
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
@@ -134,7 +134,7 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
             start_token = self.start_token.expand(x.shape[0], -1, -1)
             x = torch.cat([start_token, x], dim=1)
 
-        out = self.xlstm(x) # [batch_size, embedding_dim]
+        out = self.xlstm(x, need_expansion = False) # [batch_size, embedding_dim]
         if self.use_start_token: out = out[:, self.start_token.shape[1]:, :] # remove the start tokens
 
         cls = self.fc(out)
@@ -178,12 +178,12 @@ class xLSTMClassification(pretrainedxLSTM):
 
     def forward(self, x):
         x = self.embed_data(x)
-        
+
         if self.use_cls_token:
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
             x = torch.cat([cls_token, x], dim=1)
 
-        out = self.xlstm(x)[:, -1, :]
+        out = self.xlstm(x, need_expansion=False)[:, -1, :]
         cls = self.fc(out)
         return cls
     
