@@ -1,22 +1,11 @@
-from torch import optim, nn
 import lightning as L
-import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
 from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, ccc_loss, auto_correlation_loss
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 from utils.plot_utils import plot_reconstruction, plot_generation
 import numpy as np
-from transformers import get_cosine_with_hard_restarts_schedule_with_warmup
 import torch
 import lightning
-import sys
-import math
-from torch.optim.lr_scheduler import LambdaLR
-from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
+import trainers.common as common
 
 
 # define the LightningModule
@@ -185,36 +174,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
 
         return loss
+    
+    def get_params(self):
+        return self.model.parameters()
 
     def configure_optimizers(self):
-        if self.optimizer == 'adam':
-            optimizer = optim.Adam(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
-        elif self.optimizer == 'adamw':
-            optimizer = optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
-        elif self.optimizer == 'adafactor':
-            optimizer = optim.Adafactor(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
-        else:
-            optimizer = optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.wd)
-
-        if self.use_scheduler:
-            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
-            num_training_steps = steps_per_epoch * self.epochs
-            warmup_steps = steps_per_epoch * self.num_epochs_warmup
-
-            sched = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
-                optimizer, 
-                num_warmup_steps = warmup_steps, 
-                num_training_steps = num_training_steps, 
-                num_cycles = (self.epochs - self.num_epochs_warmup) // self.num_epochs_warm_restart,
-                decay_factor=self.sched_decay_factor
-            )
-
-            scheduler = {
-                'scheduler': sched,
-                'interval': 'step', # or 'epoch' 
-                'frequency': 1,
-            }
-            return [optimizer], [scheduler]
-        else:
-            return [optimizer]
+        return common.configure_optimizers(self)
 

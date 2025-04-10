@@ -25,10 +25,18 @@ parser.add_argument('--config_file', type=str, default='configs/train_mit_bih_ru
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    train_dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
-    print(f"Train dataset size: {len(train_dataset)}")
-    val_dataset = mit_bih.ECGMITBIHDataset(config, split='val')
-    print(f"Val dataset size: {len(val_dataset)}")
+
+    if config.split_val_by_patient:
+        train_dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
+        print(f"Train dataset size: {len(train_dataset)}")
+        val_dataset = mit_bih.ECGMITBIHDataset(config, split='val')
+        print(f"Val dataset size: {len(val_dataset)}")
+    else:
+        dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
+        dataset_len = len(dataset)
+        train_len = int(dataset_len * 0.9)
+        train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_len, dataset_len - train_len])
+        print(f"Train dataset size: {len(train_dataset)}")
 
     if config.use_class_weights:
         # weights = get_training_class_weights(train_dataset).to('cuda')
@@ -36,7 +44,7 @@ def train(config, run=None, wandb=False):
         # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
         if config.num_classes == 5:
             print('Using class weights for 5 classes')
-            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 1]).to('cuda')
+            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
         elif config.num_classes == 3: 
             print('Using class weights for 3 classes')
             weights = torch.tensor([0.367, 17.866, 4.452]).to('cuda')
@@ -70,14 +78,14 @@ def train(config, run=None, wandb=False):
 
     model = TrainingMIT_BIH(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        wand_logger = WandbLogger(project=f"train-xLSTM-{config.num_classes}", experiment=run, config=config)
+        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
+        wand_logger = WandbLogger(project=f"train-mitbih-{config.num_classes}", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip)
+        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback], gradient_clip_val=config.grad_clip)
     else:
         trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip)
 

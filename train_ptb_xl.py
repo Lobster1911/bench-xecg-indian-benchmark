@@ -7,7 +7,7 @@ from models.xLSTM import xLSTMClassification
 import dataset.ptb_xl as ptbxl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingxLSTMNetwork
+from trainers.ptb_xl_trainer import TrainingPTB_XL
 import torch
 import argparse
 import os
@@ -21,7 +21,7 @@ os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/c
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
-parser.add_argument('--config_file', type=str, default='configs/train_ptbxl_run_config.yaml', help='Path to the config file')
+parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run_config.yaml', help='Path to the config file')
 
 def train(config, run=None, wandb=False):
     # set deterministic training
@@ -31,11 +31,11 @@ def train(config, run=None, wandb=False):
     val_dataset = ptbxl.ECGPTBXLDataset(config, split='val')
     print(f"Val dataset size: {len(val_dataset)}")
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn, pin_memory=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn, pin_memory=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
 
     test_dataset = ptbxl.ECGPTBXLDataset(config, split='test')
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers, pin_memory=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptbxl.collate_fn, num_workers=config.num_workers, pin_memory=True)
 
     xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
@@ -56,18 +56,18 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingxLSTMNetwork(model=xlstm, config=config, len_train_dataset=len(train_dataset))
+    model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset))
 
-    # checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        wand_logger = WandbLogger(project=f"train-xLSTM-{config.num_classes}", experiment=run, config=config)
+        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
+        wand_logger = WandbLogger(project=f"train-ptbxl-{config.classification_taksk}", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip)
+        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
     else:
-        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip)
+        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)
@@ -77,6 +77,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'configs/train_ptbxl_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'configs/train_ptb_xl_config_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

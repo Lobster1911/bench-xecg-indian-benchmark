@@ -8,6 +8,7 @@ import torchmetrics.classification.specificity
 import numpy as np
 import torch
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
+import trainers.common as common
 
 class TrainingMIT_BIH(L.LightningModule):
     def __init__(self, model, config,  len_train_dataset, weights=None):
@@ -26,7 +27,9 @@ class TrainingMIT_BIH(L.LightningModule):
         self.num_epochs_warm_restart = config.num_epochs_warm_restart
         self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
-        self.r_peaks_ce_lambda = config.r_peaks_ce_lambda
+        self.r_peaks_lambda = config.r_peaks_lambda
+        self.use_focal_loss = config.use_focal_loss
+
 
         self.num_classes = config.num_classes
         self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
@@ -87,7 +90,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.train_auroc(logits, targets)
         self.log("train_auroc", self.train_auroc, batch_size=self.batch_size)
 
-        return loss_cls + loss_r_peak_pos
+        return loss_cls + loss_r_peak_pos * self.r_peaks_lambda
     
     def validation_step(self, batch, _):
         loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
@@ -148,7 +151,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.valid_auroc(logits, targets)
         self.log('val_auroc', self.valid_auroc, prog_bar=True, batch_size=self.batch_size)
 
-        return loss_cls + loss_r_peak_pos
+        return loss_cls + loss_r_peak_pos * self.r_peaks_lambda
             
     def test_step(self, batch, _):
         loss_cls, loss_r_peak_pos, preds, targets, logits, r_peak_pos, r_peaks = self.predict_batch(batch)
@@ -230,7 +233,7 @@ class TrainingMIT_BIH(L.LightningModule):
         self.test_auroc(logits, targets)
         self.log("test_auroc", self.test_auroc, batch_size=self.batch_size)
 
-        return loss_cls + loss_r_peak_pos
+        return loss_cls + loss_r_peak_pos * self.r_peaks_lambda
             
     
     def predict_batch(self, batch):
@@ -248,8 +251,14 @@ class TrainingMIT_BIH(L.LightningModule):
         # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
         preds = torch.argmax(cls, dim=-1)
         
-
         loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, label_smoothing=self.label_smoothing, ignore_index=-1)
+        
+        if self.use_focal_loss:
+            pt = torch.exp(-loss_cls)
+            alpha = 2.
+            gamma = .25
+            loss_cls = (alpha * (1-pt)**gamma * loss_cls)
+        
         r_peaks = r_peaks[:, :r_peak_pos.shape[1]]
         loss_r_peak_pos = nn.functional.binary_cross_entropy_with_logits(r_peak_pos, r_peaks)
 
@@ -262,47 +271,10 @@ class TrainingMIT_BIH(L.LightningModule):
         return loss_cls, loss_r_peak_pos, preds, targets, cls, r_peak_pos, r_peaks
 
     def get_params(self):
-        params = [
-            # head and sep token with normal lr
-            {'params': self.model.fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            {'params': self.model.r_peak_pos_fc.parameters(), 'lr': self.lr_head, 'weight_decay': self.wd},
-
-            # xlstm and patch embedding with lower lr
-            {'params': self.model.xlstm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd},
-            {'params': self.model.patch_embedding.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
+        return [
+            {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
+            {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
         ]
-        if self.model.use_start_token:
-            params.append({'params': self.model.start_token_1, 'lr': self.lr_head, 'weight_decay': self.wd})
-        return params
         
     def configure_optimizers(self):
-        if self.optimizer == 'adam':
-            optimizer = optim.Adam(params=self.get_params(), lr=self.lr_head, weight_decay=self.wd)
-        elif self.optimizer == 'adamw':
-            optimizer = optim.AdamW(params=self.get_params(), lr=self.lr_head, weight_decay=self.wd)
-        elif self.optimizer == 'adafactor':
-            optimizer = optim.Adafactor(params=self.get_params(), lr=self.lr_head, weight_decay=self.wd)
-        else:
-            optimizer = optim.SGD(self.get_params(), lr=self.lr_head, momentum=0.9, weight_decay=self.wd)
-
-        if self.use_scheduler: 
-            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
-            num_training_steps = steps_per_epoch * self.epochs
-            warmup_steps = steps_per_epoch * self.num_epochs_warmup
-
-            sched = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
-                optimizer, 
-                num_warmup_steps = warmup_steps, 
-                num_training_steps = num_training_steps, 
-                num_cycles = (num_training_steps // warmup_steps) // self.num_epochs_warm_restart,
-                decay_factor=self.sched_decay_factor
-            )
-
-            scheduler = {
-                'scheduler': sched,
-                'interval': 'step', # or 'epoch' 
-                'frequency': 1,
-            }
-            return [optimizer], [scheduler]
-        else:
-            return [optimizer]
+        return common.configure_optimizers(self)

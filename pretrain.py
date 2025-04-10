@@ -5,7 +5,7 @@ from models.xLSTM import pretrainedxLSTM
 import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 import dataset.mimic_iv as mimic
-import dataset.ptbxl as ptb_xl
+import dataset.ptb_xl as ptb_xl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
@@ -33,7 +33,7 @@ def pretrain(config, run=None, wandb=False):
         elif dataset == 'code15':
             datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads))
         elif dataset == 'mit':
-            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train', random_shift=False))       
+            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train'))       
         elif dataset == 'ptbxl':
             datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', random_shift=False))
         else:
@@ -54,7 +54,7 @@ def pretrain(config, run=None, wandb=False):
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
 
     len_train_dataset = len(train_dataset)
-    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', random_shift=False)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
     
     xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))

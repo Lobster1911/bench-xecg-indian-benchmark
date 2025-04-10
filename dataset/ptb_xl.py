@@ -13,9 +13,9 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 
 class ECGPTBXLDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train'):
+    def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
         self.data_folder = config.data_folder_ptbxl
-        self.random_shift = config.random_shift if split == 'train' else False
+        self.random_shift = random_shift
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.patch_size = config.patch_size
@@ -40,11 +40,10 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
-        self.tab_data = pd.read_csv(self.labels_file)
+        self.tab_data = pd.read_csv(self.labels_file, index_col='ecg_id')
         self.tab_data.scp_codes = self.tab_data.scp_codes.apply(lambda x: ast.literal_eval(x))
 
-
-        statements = pd.read_csv(os.path.join(self.data_folder, 'scp_statements.csv'), index_col=0)
+        statements = pd.read_csv(os.path.join(self.data_folder, '../scp_statements.csv'), index_col=0)
         statements = statements[statements.diagnostic == 1]
 
         def aggregate_diagnostic(y_dic, statements=statements, column='diagnostic_class'):
@@ -60,11 +59,11 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         self.tab_data['diagnostic_superclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_superclass'))
         self.tab_data['diagnostic_subclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_subclass'))
 
-        self.classes = self.tab_data['diagnostic_superclass'].unique()
+        self.classes = statements['diagnostic_class'].unique()
         print("Classes for PTB-XL: ", self.classes)
-        self.subclasses = self.tab_data['diagnostic_subclass'].unique()
+        self.subclasses = statements['diagnostic_subclass'].unique()
         print("Subclasses for PTB-XL: ", self.subclasses)
-        
+
         # change type of age columns from float to int
         self.tab_data['age'] = self.tab_data['age'].fillna(0)
         self.tab_data['age'] = self.tab_data['age'].astype(int)
@@ -76,7 +75,6 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.records[idx].split('/')[1], self.records[idx].split('/')[2]))
-
         if self.random_shift: signal = random_shift(signal, self.patch_size)
 
         signal = torch.tensor(signal, dtype=torch.float32)
@@ -98,7 +96,7 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         subclass_label = self.tab_data.iloc[idx]['diagnostic_subclass']
         # convert the subclass label to a one-hot encoding
         subclass_label = [1 if label in subclass_label else 0 for label in self.subclasses]
-        
+  
         return {
             'signal':signal,
             'class_label': torch.tensor(superclass_label, dtype=torch.float32),
@@ -106,16 +104,16 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         }
     
 
-    def collate_fn(self, batch):
-        signals = [item['signal'] for item in batch]
-        superclass_labels = [item['class_label'] for item in batch]
-        subclass_labels = [item['subclass_label'] for item in batch]
+def collate_fn(batch):
+    signals = [item['signal'] for item in batch]
+    superclass_labels = [item['class_label'] for item in batch]
+    subclass_labels = [item['subclass_label'] for item in batch]
 
-        # pad the signals to the same length
-        signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+    # pad the signals to the same length
+    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-        return {
-            'signals': signals,
-            'class_labels': torch.stack(superclass_labels),
-            'subclass_labels': torch.stack(subclass_labels),
-        }
+    return {
+        'signals': signals,
+        'class_labels': torch.stack(superclass_labels),
+        'subclass_labels': torch.stack(subclass_labels),
+    }

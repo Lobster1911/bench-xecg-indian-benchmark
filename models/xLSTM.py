@@ -60,9 +60,19 @@ class pretrainedxLSTM(nn.Module):
         return out
     
     def generate(self, x, length=10):
-
         # i do not need to drop the leads here
         x = self.embed_data(x, augment=False)
+
+        if self.bidirectional:
+            reconstructed = []
+            for i in range(length - 1):
+                out = self.xlstm(x, need_expansion=False)
+                r = self.reconstruction(out[:, -1, :].unsqueeze(1))
+                reconstructed.append(r)
+                toadd = self.embed_data(r, augment=False)
+                x = torch.cat([x, toadd], dim=1)
+    
+            return torch.cat(reconstructed, dim=1)
 
         state = None
         for i in range(x.shape[1]):
@@ -101,7 +111,7 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
 
         self.use_start_token = config.use_start_token
         if self.use_start_token:
-            self.start_token_1 = nn.Parameter(torch.zero(1, 1, config.embedding_size))
+            self.start_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
 
         self.fc = HeadModule(
             inp_size=config.embedding_size,
@@ -121,15 +131,29 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
         x = self.embed_data(x)
 
         if self.use_start_token:
-            start_token_1 = self.start_token_1.expand(x.shape[0], -1, -1)
-            x = torch.cat([start_token_1, x], dim=1)
+            start_token = self.start_token.expand(x.shape[0], -1, -1)
+            x = torch.cat([start_token, x], dim=1)
 
         out = self.xlstm(x) # [batch_size, embedding_dim]
-        if self.use_start_token: out = out[:, 1:, :] # remove the start tokens
+        if self.use_start_token: out = out[:, self.start_token.shape[1]:, :] # remove the start tokens
 
         cls = self.fc(out)
         r_peak_pos = self.r_peak_pos_fc(out)
         return cls, r_peak_pos
+
+    def finetuning_params(self):
+        params = []
+        params.extend(self.xlstm.parameters())
+        params.extend(self.patch_embedding.parameters())
+        return params
+
+    def training_params(self):
+        params = []
+        if self.use_start_token:
+            params.append(self.start_token)
+        params.extend(self.fc.parameters())
+        params.extend(self.r_peak_pos_fc.parameters())
+        return params
 
 class xLSTMClassification(pretrainedxLSTM):
     def __init__(
@@ -141,7 +165,9 @@ class xLSTMClassification(pretrainedxLSTM):
 
         super(xLSTMClassification, self).__init__(num_channels, config)
 
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+        self.use_cls_token = config.use_cls_token
+        if self.use_cls_token:
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
 
         self.fc = HeadModule(
             inp_size=config.embedding_size,
@@ -152,6 +178,22 @@ class xLSTMClassification(pretrainedxLSTM):
 
     def forward(self, x):
         x = self.embed_data(x)
-        out = self.xlstm(x)
-        cls = self.fc(out[:, -1, :])
+        
+        if self.use_cls_token:
+            cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+            x = torch.cat([cls_token, x], dim=1)
+
+        out = self.xlstm(x)[:, -1, :]
+        cls = self.fc(out)
         return cls
+    
+    def finetuning_params(self):
+        params = []
+        params.extend(self.xlstm.parameters())
+        params.extend(self.patch_embedding.parameters())
+        return params
+
+    def training_params(self):
+        params = []
+        params.extend(self.fc.parameters())
+        return params

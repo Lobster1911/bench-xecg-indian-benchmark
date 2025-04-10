@@ -56,6 +56,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.win_len = config.win_len
         self.skip_majority_class_samples = config.skip_majority_class_samples
         self.bidirectional = config.bidirectional
+        self.split_val_by_patient = config.split_val_by_patient
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
 
@@ -75,7 +76,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
 
     def load_patient_data(self, subset):
-        self.patients = train if subset == 'train' else val if subset == 'val' else test
+        if self.split_val_by_patient:
+            self.patients = train if subset == 'train' else val if subset == 'val' else test
+        else:   
+            self.patients = train + val if subset == 'train' else test if subset == 'test' else val
+
         self.headers = {}
         self.annotations = {}
         self.signals = {}

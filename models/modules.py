@@ -168,19 +168,19 @@ class mLSTMWrapper(nn.Module):
         self.bidirectional = bidirectional
         self.random_drop_back_pass = random_drop_back_pass
 
-    def forward(self, x, drop_back_pass=False):
+    def forward(self, x, need_expansion=True):
         len_seq = x.shape[1]
         # print('len_seq', len_seq)
         pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
         x = torch.cat([x, torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device)], dim=1)
-        x, _ = self.model_forward_wrap(x, drop_back_pass=drop_back_pass)
+        x, _ = self.model_forward_wrap(x, need_expansion=need_expansion)
         return x[:, pad_len:, :]
     
     def step(self, x, state):
         len_seq = x.shape[1]
         pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
         x = torch.cat([x, torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device)], dim=1)
-        x, state = self.model_forward_wrap(x, state, drop_back_pass=True)
+        x, state = self.model_forward_wrap(x, state)
         return x[:, pad_len:, :], state
     
     def init_layer_weights(self, layer):
@@ -194,28 +194,31 @@ class mLSTMWrapper(nn.Module):
             elif 'bias' in name:
                 nn.init.zeros_(param)
     
-    def model_forward_wrap(self, x, state = None, drop_back_pass=False):
+    def model_forward_wrap(self, x, state = None, need_expansion=True):
         # print('x shape before model', x.shape)
 
         if state is None:
             state = {i: None for i in range(len(self.model.blocks))}
 
-        for i, block in enumerate(self.model.blocks):
-            if i % 2 == 1 and self.bidirectional: 
-                if drop_back_pass:
-                    # skip the backward direction for odd layers
-                    continue
+        expanded = False
 
-                x = x.flip(1, 2)
-                block_state = state[i]
-                x = self.dropout(x)
-                x, block_state_new = block(x, state[i])
-                x = x.flip(1, 2)
-                x = x
-            else:
-                block_state = state[i]
-                x = self.dropout(x)
-                x, block_state_new = block(x, block_state)
+        for i, block in enumerate(self.model.blocks):
+            if self.bidirectional: 
+                if not expanded and i > 0 and need_expansion:
+                    bs, seq_len, _ = x.shape
+                    x = x.unsqueeze(1).repeat(1, seq_len, 1, 1)
+                    tril_mask = torch.tril(torch.ones(seq_len, seq_len, dtype=x.dtype, device=x.device)).unsqueeze(0).unsqueeze(-1)
+                    x = x * tril_mask
+                    x = x.reshape(bs * seq_len, seq_len, -1)
+                    expanded = True
+                    # print('x shape after expand', x.shape)
+                # flip the sequence
+                if i > 0:
+                    x = x.flip(1)
+
+            block_state = state[i]
+            x = self.dropout(x)
+            x, block_state_new = block(x, block_state)
 
             if block_state is None:
                 state[i] = block_state_new
@@ -224,6 +227,13 @@ class mLSTMWrapper(nn.Module):
                 # we update the state in place in order to avoid creating new tensors
                 for state_idx in range(len(block_state)):
                     state[i][state_idx].copy_(block_state_new[state_idx])
+
+        if self.bidirectional and expanded:
+            x = x.reshape(bs, seq_len, seq_len, -1)
+            # print('x shape after reshape', x.shape)
+            # keep only the diagonal
+            x = torch.diagonal(x, dim1=1, dim2=2).transpose(1,2)
+            # print('x shape after diagonal', x.shape)
 
         x = self.model.out_norm(x)
 
