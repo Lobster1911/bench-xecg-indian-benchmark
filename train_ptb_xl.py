@@ -77,6 +77,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'configs/train_ptb_xl_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'config_defaults/train_ptb_xl_config_defaults.yaml')
 
     train(config, wandb=config.wandb_log)
