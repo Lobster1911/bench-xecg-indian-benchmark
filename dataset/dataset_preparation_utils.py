@@ -146,8 +146,7 @@ def unpad_signal(signal):
 
 def process_sample(signal, output_file_path, record_name, fs, desired_fs, nk_clean=False):
     # create out directory if not exists
-    if not os.path.exists(output_file_path):
-        os.makedirs(output_file_path)
+    os.makedirs(output_file_path, exist_ok=True)
 
     signal = unpad_signal(signal)
     if signal is None:
