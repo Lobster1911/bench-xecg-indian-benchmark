@@ -5,7 +5,7 @@ from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, ONNConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
+from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
 import os
 from models.kan import KAN
 
@@ -16,9 +16,6 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'conv':
         print('using conv patch embedding')
         return ConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
-    if type == 'onn':
-        print('using ONN patch embedding')
-        return ONNConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     if type == 'enriched':
         print('using enriched patch embedding')
         return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
