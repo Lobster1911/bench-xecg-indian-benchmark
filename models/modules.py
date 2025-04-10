@@ -1,7 +1,6 @@
 from torch import nn
 import torch 
 import numpy as np
-from fastonn import SelfONN1d
 from torch.nn import functional as F
 
 class LinearPatchEmbedding(nn.Module):
@@ -93,49 +92,6 @@ class ConvPatchEmbedding(nn.Module):
         # print('x shape after unfold', x.shape)
         return x
     
-    
-class ONNConvPatchEmbedding(nn.Module):
-    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
-        super().__init__()
-        self.patch_size = patch_size
-        self.conv1 = SelfONN1d(num_channels, num_hiddens // 4, kernel_size=3, stride=1, q=3)
-        self.bn1 = nn.BatchNorm1d(num_hiddens // 4)
-        self.conv2 = SelfONN1d(num_hiddens // 4, num_hiddens, kernel_size=3, stride=1, q=3)
-        self.bn2 = nn.BatchNorm1d(num_hiddens)
-
-        self.pool = nn.MaxPool1d(kernel_size=2)
-        self.activation = nn.Tanh()
-
-        # Calculate the output size after the convolutions and pooling
-        out_size = (patch_size - 3 + 1) // 2 - 3 + 1
-        out_size = (out_size // 2) * num_hiddens
-
-        self.linear = nn.Linear(out_size, num_hiddens)
-
-    def forward(self, x):
-        # print('x shape', x.shape)
-        # transform [bs, n_channels, n_samples] -> [bs, n_channels, n_patches, patch_size]
-        x = x.unfold(2, self.patch_size, self.patch_size).transpose(1, 2)
-        batch_size, n_patches, n_channels, _ = x.shape
-        x = x.view(-1, n_channels, self.patch_size) # [bs * n_patches, n_channels, patch_size]
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        x = x.flatten(1)
-        # print('x shape after conv', x.shape)
-        x = self.linear(x)
-
-        x = x.view(batch_size, n_patches, -1)
-
-        # print('x shape after unfold', x.shape)
-        return x
-
-
 class HeadModule(nn.Module):
     
     def __init__(self, inp_size, hidden_size, out_size, dropout=0.1):
