@@ -1,5 +1,4 @@
 #!/bin/bash -l
-
 #SBATCH --job-name=pretrain_xlstm
 #SBATCH --partition=h100
 #SBATCH --gpus=1
@@ -12,9 +11,9 @@
 echo "Visible GPUs: "
 echo $CUDA_VISIBLE_DEVICES
 
-source /home/$USER/.bashrc
-conda init
-conda activate xlstm_pretrained
+#source /home/$USER/.bashrc
+#conda init
+#conda activate xlstm_pretrained
 
 # run script from above
-srun python3 -u pretrain.py
+srun ~/.conda/envs/xlstm_pretrained/bin/python -u pretrain.py
