@@ -6,7 +6,8 @@ metric:
   name: test_f1/mean
 
 parameters:
-  task: ptb_xl
+  task: 
+    value: ptb_xl
   lr_head:
     min: 0.0001
     max: 0.1

@@ -8,7 +8,7 @@ random_shift: true
 
 embedding_size: 1024
 xlstm_type: "vanilla"
-xlstm_config: [ 's', 's', 'm', 'm', 's', 's', 'm', 'm', 'm' ]
+xlstm_config: [ 'm', 'm', 's', 's', 'm', 'm', 'm', 'm', 'm' ]
 # checkpoint: pretrained_models/9l_1024/epoch=8-step=38070.ckpt
 patch_embedding: enriched
 bidirectional: true

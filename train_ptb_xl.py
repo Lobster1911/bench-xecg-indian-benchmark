@@ -59,18 +59,21 @@ def train(config, run=None, wandb=False):
     model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset))
 
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
+    nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
         checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
-        wand_logger = WandbLogger(project=f"train-ptbxl-{config.classification_taksk}", experiment=run, config=config)
+        prj = 'train-ptbxl-{config.classification_taksk}'
+        wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
+        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
     else:
-        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
+        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)
+
 
 # if main
 if __name__ == '__main__':
