@@ -156,7 +156,10 @@ class mLSTMWrapper(nn.Module):
         pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
         x = torch.cat([x, torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device)], dim=1)
         x, _ = self.model_forward_wrap(x, need_expansion=need_expansion)
-        return x[:, :-pad_len, :]
+        if pad_len > 0:
+            x = x[:, :-pad_len, :]
+        
+        return x
     
     def step(self, x, state):
         len_seq = x.shape[1]
