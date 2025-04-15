@@ -26,6 +26,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.patch_size = config.patch_size
         self.epochs = config.epochs
         self.loss_type = config.loss_type
+        self.mask_ratio = config.mask_ratio
         # self.config = config
         self.len_train_dataset = len_train_dataset
         self.num_epochs_warmup = config.num_epochs_warmup
@@ -33,12 +34,23 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.sched_decay_factor = config.sched_decay_factor
         self.grad_loss_lambda = config.grad_loss_lambda
         self.min_max_loss_lambda = config.min_max_loss_lambda
+        self.pretraining_strategy = config.strategy
+        self.joint_embedding_lambda = config.joint_embedding_lambda
+
         if not config.is_sweep:
             self.save_hyperparameters()
 
     def training_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='train')
-        # Logging to TensorBoard (if installed) by default
+
+        # update the teacher if needed
+        if self.model.use_teacher_student:
+            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
+            num_training_steps = steps_per_epoch * self.epochs
+            beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
+            for param_s, param_t in zip(self.model.xlstm.parameters(), self.model.xlstm_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+
         return loss
     
     def validation_step(self, batch, _):
@@ -68,19 +80,21 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
 
-        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1')
-        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2')
-        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random')
-        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random')
+
+        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
             self.logger.log_image(key="reconstructions_train", images=[img_1, img_2, img_3, img_4])
-        
-        img_1 = plot_generation(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1')
-        img_2 = plot_generation(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2')
-        img_3 = plot_generation(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random')
-        img_4 = plot_generation(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random')
-        if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key="generations_train", images=[img_1, img_2, img_3, img_4])
+
+        if self.pretraining_strategy == 'next_token_prediction':
+            img_1 = plot_generation(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1')
+            img_2 = plot_generation(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2')
+            img_3 = plot_generation(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random')
+            img_4 = plot_generation(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random')
+            if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
+                self.logger.log_image(key="generations_train", images=[img_1, img_2, img_3, img_4])
 
         return super().on_train_epoch_end()
 
@@ -99,59 +113,52 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
 
-        img_s = plot_reconstruction(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s')
-        img_v = plot_reconstruction(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v')
-        img_t = plot_reconstruction(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t')
-        img_n = plot_reconstruction(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n')
+        img_s = plot_reconstruction(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_v = plot_reconstruction(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_t = plot_reconstruction(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_n = plot_reconstruction(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
             self.logger.log_image(key="reconstructions", images=[img_s, img_v, img_t, img_n])
 
-        img_s = plot_generation(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s')
-        img_v = plot_generation(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v')
-        img_t = plot_generation(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t')
-        img_n = plot_generation(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n')
-        if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key="generations", images=[img_s, img_v, img_t, img_n])
+        if self.pretraining_strategy == 'next_token_prediction':
+            img_s = plot_generation(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s')
+            img_v = plot_generation(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v')
+            img_t = plot_generation(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t')
+            img_n = plot_generation(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n')
+            if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
+                self.logger.log_image(key="generations", images=[img_s, img_v, img_t, img_n])
         return super().on_validation_epoch_end()
     
     def reconstruct_batch(self, batch, step):
-        x = batch["signal"]
 
-        if len(x.shape) == 2: x = x.unsqueeze(-1)
-
-        x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
-
-        reconstruction = self.model(x)
-
+        if self.pretraining_strategy == 'next_token_prediction':
+            x, reconstruction, out_teacher, last_emb = self.next_token_prediction(batch)
+        if self.pretraining_strategy == 'masked_token_prediction':
+            # masking is automatically done inside this function
+            # x will be masked with the inverse of the mask
+            # so the loss  function will automatically skip the masked values
+            x, reconstruction = self.masked_token_prediction(batch)
 
         nrmse = np.inf
 
-        shift_x = x[:, self.patch_size:].squeeze()
-        shift_reconstruct = reconstruction[:, :-self.patch_size]
-        # print('shift_reconstruct shape', shift_reconstruct.shape)
-        # print('shift_x shape', shift_x.shape)
-
-        shift_x = x[:, self.patch_size:].squeeze()
-        shift_reconstruct = reconstruction[:, :-self.patch_size]
-
         # compute the loss and use the gradients only when it is needed
         if 'min_max' in self.loss_type:
-            min_max = masked_min_max_loss(shift_reconstruct, shift_x, patch_size=self.patch_size)
+            min_max = masked_min_max_loss(reconstruction, x, patch_size=self.patch_size)
 
         if 'mae' in self.loss_type:
-            mae = masked_mae_loss(shift_reconstruct, shift_x)
+            mae = masked_mae_loss(reconstruction, x)
         else:
-            with torch.no_grad(): mae = masked_mae_loss(shift_reconstruct, shift_x)
+            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x)
 
         if 'grad' in self.loss_type:
-            grad = gradient_loss(shift_reconstruct, shift_x)
+            grad = gradient_loss(reconstruction, x)
         else:
-            with torch.no_grad(): grad = gradient_loss(shift_reconstruct, shift_x)
+            with torch.no_grad(): grad = gradient_loss(reconstruction, x)
         
         if 'mse' in self.loss_type:
-            mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
+            mse = masked_mse_loss(reconstruction, x, reduction='mean')
         else:
-            with torch.no_grad(): mse = masked_mse_loss(shift_reconstruct, shift_x, reduction='mean')
+            with torch.no_grad(): mse = masked_mse_loss(reconstruction, x, reduction='mean', mask= x != 0)
    
         # calculate the normalized root squared error only for the first token prediction
         with torch.no_grad():
@@ -173,10 +180,62 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         
         self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
 
+        if self.model.use_teacher_student:
+            # last_emb [bs, seq_len -1, num_hiddens]
+            # x [bs, seq_len * patch_size, channels]
+            bs, seq_len, channels = x.shape
+            x_reshaped = x.view(bs, seq_len // self.patch_size, self.patch_size, channels)
+            non_zero_mask = x_reshaped.abs().sum(dim=(2, 3)) > 0  # shape: [bs, seq_len]
+
+            teacher_student_loss = masked_mse_loss(last_emb, out_teacher, reduction='mean', mask=non_zero_mask)
+            self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
+            loss = (1 - self.joint_embedding_lambda) * loss + teacher_student_loss * self.joint_embedding_lambda
+
         return loss
+
+    def next_token_prediction(self, batch):
+        x = self.pad(batch["signal"])
+
+        reconstruction, out_teacher, last_emb = self.model(x)
+
+        x = x[:, self.patch_size:].squeeze()
+        reconstruction = reconstruction[:, :-self.patch_size]
+
+        if self.model.use_teacher_student:
+            out_teacher = out_teacher[:, 1:, :] # [bs, seq_len -1, num_hiddens]
+            last_emb = last_emb[:, :-1, :] # [bs, seq_len -1, num_hiddens]
+            return x, reconstruction, out_teacher, last_emb
+        
+        return x, reconstruction, None, None
+    
+    def masked_token_prediction(self, batch):
+        x = self.pad(batch["signal"])
+
+        # masking the signal
+        num_patches = x.shape[1] // self.patch_size
+        rand = torch.rand(x.shape[0], num_patches, device=self.device)
+        mask = (rand > self.mask_ratio) # this is true for non masked
+        # repeat the mask to num_patches * patch_size
+        mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
+
+        # mask a rnadom number of patches
+        masked_x = x.masked_fill(~mask, 0)
+        reconstruction, _, _ = self.model(masked_x)
+
+        # x = x[:, self.patch_size:].squeeze()
+        # reconstruction = reconstruction[:, :-self.patch_size]
+
+        # needed for the loss function, if the masked value is 0, then the loss function will not consider it
+        inverted_masked_x = x.masked_fill(mask, 0)
+        return inverted_masked_x, reconstruction, None, None
+    
+    def pad(self, x):
+        if len(x.shape) == 2: x = x.unsqueeze(-1)
+        x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
+        return x
     
     def get_params(self):
-        return self.model.parameters()
+        return self.model.trainable_parameters()
     
     def get_lr(self):
         return self.lr

@@ -1,5 +1,6 @@
 import numpy as np
 from torch import optim
+from optimizers.lamb import Lamb
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
 
 def configure_optimizers(trainer):
@@ -9,6 +10,8 @@ def configure_optimizers(trainer):
         optimizer = optim.AdamW(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'adafactor':
         optimizer = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
+    elif trainer.optimizer == 'lamb':
+        optimizer = Lamb(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     else:
         optimizer = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
 

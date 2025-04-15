@@ -14,7 +14,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import utils.utils as utils
-from utils.utils import get_training_class_weights
+from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 
 os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
@@ -26,10 +26,21 @@ parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
+    
     train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train')
     print(f"Train dataset size: {len(train_dataset)}")
     val_dataset = ptbxl.ECGPTBXLDataset(config, split='val')
     print(f"Val dataset size: {len(val_dataset)}")
+
+    if config.use_class_weights:
+        if config.num_classes == 5:
+            print('Using class weights for 5 classes')
+            weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
+            # weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
+        else:
+            weights = None # TODO
+    else:
+        weights = None
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
@@ -42,10 +53,7 @@ def train(config, run=None, wandb=False):
     def format_keys(key):
         if key.startswith('model.'):
             key = key[6:]
-
-        if key.startswith('xlstm.model.blocks'):
-            key.replace('xlstm.model.blocks', 'xlstm.blocks')
-        
+            
         return key
 
     if config.checkpoint is not None and config.checkpoint != '':   
@@ -56,7 +64,7 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset))
+    model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
@@ -64,7 +72,7 @@ def train(config, run=None, wandb=False):
 
     if wandb:
         checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
-        prj = 'train-ptbxl-{config.classification_taksk}'
+        prj = f'train-ptbxl-{config.classification_taksk}'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)

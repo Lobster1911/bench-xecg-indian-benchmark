@@ -1,6 +1,6 @@
 lr_head: 0.001
 lr_xlstm: 0.00001
-wd: 0.0001
+wd: 0.01
 batch_size: 64
 num_workers: 32
 epochs: 30
@@ -32,6 +32,7 @@ patch_embedding: "linear"
 reconstruct_embedding: "linear"
 bidirectional: false
 use_cls_token: false
+use_focal_loss: false
 
 normalize: true
 random_shift: true
@@ -44,4 +45,4 @@ labels_file_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv
 checkpoint: null
 
 classification_taksk: 'diagnosis_superclass'
-num_classes: 5 # chenge to 23 if diagnosis_subclass
+num_classes: 5

@@ -70,12 +70,11 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 
-def get_training_class_weights(train_dataset, do_not_consider_classes = []):
+def get_training_class_weights(train_dataset, do_not_consider_classes = [], label_key='label'):
   """
   Returns the class weights for the training dataset.
   """
-  # 2. Instantiate Model, Loss, and Optimizer
-  labels = [sample['label'] for sample in train_dataset]
+  labels = [sample[label_key] for sample in train_dataset]
 
   # remove classes that should not be considered
   labels = [label for label in labels if label not in do_not_consider_classes]
@@ -90,3 +89,23 @@ def get_training_class_weights(train_dataset, do_not_consider_classes = []):
   weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
   print(f"Class Weights: {weights}")
   return weights
+
+def get_training_class_weights_multilabel(train_dataset, label_key='label'):
+    labels = [sample[label_key] for sample in train_dataset]
+    classes_count = torch.zeros_like(labels[0])
+
+    for label in labels:
+        classes_count += label
+
+    num_classes = classes_count.shape[0]
+    total_samples = len(labels)
+
+    class_weights =  total_samples / (classes_count * num_classes)
+    print('Class weights: ', class_weights)
+    return class_weights
+
+
+
+    
+
+

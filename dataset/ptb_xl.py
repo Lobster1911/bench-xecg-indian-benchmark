@@ -30,13 +30,15 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         if split == 'train':
             # get all the tab data index where the fold is not 18 or 19
             self.records = self.tab_data[self.tab_data['strat_fold'] != 9][self.tab_data['strat_fold'] != 10]['filename_hr'].values.tolist()
+            self.tab_data = self.tab_data[self.tab_data['strat_fold'] != 9][self.tab_data['strat_fold'] != 10]
         elif split == 'val':
             # get all the tab data index where the fold is 18
             self.records = self.tab_data[self.tab_data['strat_fold'] == 9]['filename_hr'].values.tolist()
+            self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 9]
         elif split == 'test':
             # get all the tab data index where the fold is 19
             self.records = self.tab_data[self.tab_data['strat_fold'] == 10]['filename_hr'].values.tolist()
-
+            self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 10]
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
@@ -59,9 +61,9 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         self.tab_data['diagnostic_superclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_superclass'))
         self.tab_data['diagnostic_subclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_subclass'))
 
-        self.classes = statements['diagnostic_class'].unique()
+        self.classes = ['STTC', 'NORM', 'MI', 'HYP', 'CD'] # statements['diagnostic_class'].unique()
         print("Classes for PTB-XL: ", self.classes)
-        self.subclasses = statements['diagnostic_subclass'].unique()
+        self.subclasses = ['STTC', 'NST_', 'NORM', 'IMI', 'AMI', 'LVH', 'LAFB/LPFB', 'ISC_', 'IRBBB', '_AVB', 'IVCD', 'ISCA', 'CRBBB', 'CLBBB', 'LAO/LAE', 'ISCI', 'LMI', 'RVH', 'RAO/RAE', 'WPW', 'ILBBB', 'SEHYP', 'PMI'] # statements['diagnostic_subclass'].unique()
         print("Subclasses for PTB-XL: ", self.subclasses)
 
         # change type of age columns from float to int

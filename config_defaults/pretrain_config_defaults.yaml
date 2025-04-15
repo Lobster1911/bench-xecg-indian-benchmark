@@ -35,6 +35,9 @@ weight_tying: false
 patch_embedding: linear
 reconstruct_embedding: linear
 bidirectional: false
+strategy: next_token_prediction # masked_token_prediction
+mask_ratio: 0.5 # only for masked_token_prediction
+use_teacher_student: false
 
 # data and augmentations hyperparameters
 normalize: true

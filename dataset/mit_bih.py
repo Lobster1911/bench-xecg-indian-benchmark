@@ -147,6 +147,16 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                         'r_peak': n,
                         'around_r_peaks': around_r_peaks,
                     })
+
+                missing = len(signal) % (self.win_len * 2)
+                if missing != 0:
+                    around_r_peaks = [(r, l) for r, l in r_peaks if r > len(signal) - missing]
+                    samples.append({
+                        'patient': patient,
+                        'r_peak': len(signal) - missing // 2,
+                        'around_r_peaks': around_r_peaks,
+                    })
+                # maybe some samples are issing at the end? 
             return samples
 
         results = Parallel(n_jobs=-1)(
@@ -203,8 +213,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) - 1
 
-        valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
-        valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
+        if self.bidirectional:
+            valid_labels = around_r_peaks
+        else:
+            valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
+            valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
 
         for r, l in valid_labels:
             # print(r, l)

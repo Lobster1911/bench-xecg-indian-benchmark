@@ -27,6 +27,7 @@ class TrainingPTB_XL(L.LightningModule):
         self.num_epochs_warm_restart = config.num_epochs_warm_restart
         self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
+        self.use_focal_loss = config.use_focal_loss
 
         self.classification_taksk = config.classification_task
 
@@ -153,7 +154,6 @@ class TrainingPTB_XL(L.LightningModule):
         self.log("test_f1/HYP", self.test_f1[3], batch_size=self.batch_size, metric_attribute='test_f1')
         self.log("test_f1/CD", self.test_f1[4], batch_size=self.batch_size, metric_attribute='test_f1')
         self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2] + self.test_f1[3] + self.test_f1[4]) / 5, batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2]) / 3, batch_size=self.batch_size, metric_attribute='test_f1')
 
         # specificity
         self.test_spec = self.test_spec.to(preds.device)
@@ -199,6 +199,13 @@ class TrainingPTB_XL(L.LightningModule):
         preds = (torch.sigmoid(logits) > 0.5).float()
 
         loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights)
+
+        if self.use_focal_loss:
+            pt = torch.exp(-loss_cls)
+            alpha = 2.
+            gamma = .25
+            loss_cls = (alpha * (1-pt)**gamma * loss_cls)
+        
         return loss_cls, logits, preds, targets
 
     def get_params(self):

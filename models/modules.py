@@ -41,10 +41,10 @@ class EmbedPatching(nn.Module):
 
     def forward(self, x):
         if self.use_pre_head: x = self.pre_head(x)
-        x = x.transpose(1, 2)
-        x = self.deconv(x).transpose(1, 2)
+        out = x.transpose(1, 2)
+        out = self.deconv(out).transpose(1, 2)
         # print('x shape after deconv', x.shape) [1, 3584, 12]
-        return x
+        return out, x
     
 class ConvPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
@@ -112,6 +112,9 @@ class vanillaxLSTMWrapper(nn.Module):
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
+
+    def step(self, x, state=None):
+        return self.model.step(x, state=state)
 
     def forward(self, x: torch.Tensor, need_expansion=True):
         expanded = False

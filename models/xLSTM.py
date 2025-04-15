@@ -6,9 +6,9 @@ from models.modules import HeadModule
 from models.SeriesDecomposition import SeriesDecomposition 
 from augmentations import RandomDropLeads, FTSurrogate, Jitter
 import numpy as np
+import torch.nn.functional as F
 
 class pretrainedxLSTM(nn.Module):
-
     def __init__(
             self, 
             num_channels,
@@ -19,18 +19,37 @@ class pretrainedxLSTM(nn.Module):
         self.patch_size = config.patch_size
         self.weight_tying = config.weight_tying
         self.bidirectional = config.bidirectional
+        self.training_strategy = config.strategy
+        self.use_teacher_student = config.use_teacher_student
+        self.ema_0 = config.ema_0
+        self.ema_1 = config.ema_1
 
         self.activation = get_activation_fn(config.activation_fn)
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 
         xlstm_emb_size = config.embedding_size
+
         if config.xlstm_type == 'large':
             self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
         else:
             self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
-         
 
+        if self.use_teacher_student:    
+            if config.xlstm_type == 'large':
+                self.xlstm_teacher = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
+            else:
+                self.xlstm_teacher = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
+            # do not require gradients for the teacher
+            for param in self.xlstm_teacher.parameters():
+                param.requires_grad = False
+            self.predictor = HeadModule(
+                inp_size=config.embedding_size,
+                hidden_size=config.embedding_size // 2,
+                out_size=config.embedding_size,
+                dropout=config.dropout
+            )
+                 
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
         self.random_surrogate = FTSurrogate(0.05, prob=config.random_surrogate_prob)
         self.random_jitter = Jitter(sigma=0.1, prob=config.random_jitter_prob)
@@ -54,12 +73,24 @@ class pretrainedxLSTM(nn.Module):
     def forward(self, x):
         x = self.embed_data(x, augment=False)
 
-        out = self.xlstm(x) # [batch_size, embedding_dim]
+        if self.training_strategy == 'masked_token_prediction':
+            out = self.xlstm(x, need_expansion=False) # [batch_size, embedding_dim]
+        elif self.training_strategy == 'next_token_prediction':
+            out = self.xlstm(x) # [batch_size, embedding_dim]
 
-        out = self.reconstruction(out)
-        return out
+        out, last_emb = self.reconstruction(out)
+
+        if self.use_teacher_student:
+            with torch.no_grad():
+                out_teacher = self.xlstm_teacher(x)
+            return out, out_teacher, last_emb
+        
+        return out, None, None
     
     def generate(self, x, length=10):
+        if self.training_strategy != 'next_token_prediction':
+            raise ValueError('Only next token prediction is supported for generation')
+         
         # i do not need to drop the leads here
         x = self.embed_data(x, augment=False)
 
@@ -67,7 +98,7 @@ class pretrainedxLSTM(nn.Module):
             reconstructed = []
             for i in range(length - 1):
                 out = self.xlstm(x, need_expansion=False)
-                r = self.reconstruction(out[:, -1, :].unsqueeze(1))
+                r, _ = self.reconstruction(out[:, -1, :].unsqueeze(1))
                 reconstructed.append(r)
                 toadd = self.embed_data(r, augment=False)
                 x = torch.cat([x, toadd], dim=1)
@@ -78,7 +109,7 @@ class pretrainedxLSTM(nn.Module):
         for i in range(x.shape[1]):
             new_x, state = self.xlstm.step(x[:, i].unsqueeze(1), state=state)
 
-        r = self.reconstruction(new_x)
+        r, _ = self.reconstruction(new_x)
 
         reconstructed = [r]
 
@@ -86,17 +117,16 @@ class pretrainedxLSTM(nn.Module):
             x = self.embed_data(r, augment=False)
             x, state = self.xlstm.step(x, state=state)
 
-            r = self.reconstruction(x)
+            r, _ = self.reconstruction(x)
 
             reconstructed.append(r)
         
         return torch.cat(reconstructed, dim=1)
 
     def trainable_parameters(self):
+        if self.use_teacher_student:
+            return [param for name, param in self.named_parameters() if "xlstm_teacher" not in name]
         return self.parameters()
-    
-    def head_parameters(self):
-        return self.fc.parameters() 
     
 
 class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
@@ -134,7 +164,7 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
             start_token = self.start_token.expand(x.shape[0], -1, -1)
             x = torch.cat([start_token, x], dim=1)
 
-        out = self.xlstm(x, need_expansion = False) # [batch_size, embedding_dim]
+        out = self.xlstm(x, need_expansion=False) # [batch_size, embedding_dim]
         if self.use_start_token: out = out[:, self.start_token.shape[1]:, :] # remove the start tokens
 
         cls = self.fc(out)
