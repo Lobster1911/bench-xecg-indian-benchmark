@@ -76,7 +76,7 @@ class pretrainedxLSTM(nn.Module):
         elif self.training_strategy == 'next_token_prediction':
             out = self.xlstm(x_emb) # [batch_size, embedding_dim]
 
-        out, last_emb = self.reconstruction(out)
+        rec, _ = self.reconstruction(out)
 
         if self.use_teacher_student:
             with torch.no_grad():
@@ -85,7 +85,7 @@ class pretrainedxLSTM(nn.Module):
                     out_teacher = self.xlstm_teacher(x_emb_techer, need_expansion=False) # [batch_size, embedding_dim]
                 elif self.training_strategy == 'next_token_prediction':
                     out_teacher = self.xlstm_teacher(x_emb_techer)
-            return out, out_teacher, last_emb
+            return rec, out_teacher, out
         
         return out, None, None
     
