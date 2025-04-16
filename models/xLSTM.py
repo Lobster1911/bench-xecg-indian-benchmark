@@ -38,15 +38,19 @@ class pretrainedxLSTM(nn.Module):
             self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
 
         if self.use_teacher_student:   
-            self.patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
-            self.xlstm_teacher = copy.deepcopy(self.xlstm)
+            self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
+            self._xlstm_teacher = copy.deepcopy(self.xlstm)
 
-            self.xlstm_teacher.model.blocks = self.xlstm_teacher.model.blocks[:-2]
+            # discard the last two blocks of the xlstm, in this way the student has to more layers and it is different than the parent
+            self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
             # do not require gradients for the teacher and copy from the student
-            for param_t in self.xlstm_teacher.parameters():
+            for param_t in self._xlstm_teacher.parameters():
                 param_t.requires_grad = False
-            for param_t in self.patch_embedding_teacher.parameters():
+            for param_t in self._patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
+
+            self._xlstm_teacher.eval()
+            self._patch_embedding_teacher.eval()
                  
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
         self.random_surrogate = FTSurrogate(0.05, prob=config.random_surrogate_prob)
@@ -80,11 +84,11 @@ class pretrainedxLSTM(nn.Module):
 
         if self.use_teacher_student:
             with torch.no_grad():
-                x_emb_techer = self.patch_embedding_teacher(x.permute(0, 2, 1))
+                x_emb_techer = self._patch_embedding_teacher(x.permute(0, 2, 1))
                 if self.training_strategy == 'masked_token_prediction':
-                    out_teacher = self.xlstm_teacher(x_emb_techer, need_expansion=False) # [batch_size, embedding_dim]
+                    out_teacher = self._xlstm_teacher(x_emb_techer, need_expansion=False) # [batch_size, embedding_dim]
                 elif self.training_strategy == 'next_token_prediction':
-                    out_teacher = self.xlstm_teacher(x_emb_techer)
+                    out_teacher = self._xlstm_teacher(x_emb_techer)
             return rec, out_teacher, out
         
         return out, None, None
@@ -127,7 +131,7 @@ class pretrainedxLSTM(nn.Module):
 
     def trainable_parameters(self):
         if self.use_teacher_student:
-            return [param for name, param in self.named_parameters() if "xlstm_teacher" not in name and 'reconstruction' not in name]
+            return [param for name, param in self.named_parameters() if "_xlstm_teacher" not in name and 'reconstruction' not in name]
         
         return self.parameters()
     

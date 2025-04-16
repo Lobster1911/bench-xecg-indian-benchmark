@@ -53,10 +53,6 @@ def pretrain(config, run=None, wandb=False):
     if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
 
-    len_train_dataset = len(train_dataset)
-    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
-    
     xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))
     # xlstm = torch.compile(xlstm)
 
@@ -94,6 +90,11 @@ def pretrain(config, run=None, wandb=False):
         )
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+
+    len_train_dataset = len(train_dataset)
+    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
+    
     trainer.test(model=model, dataloaders=test_dataloader)
 
 # if main

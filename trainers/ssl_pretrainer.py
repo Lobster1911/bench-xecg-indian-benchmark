@@ -47,14 +47,17 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         if self.model.use_teacher_student:
             head_loss, jepa_loss = self.reconstruct_batch(batch, step='train')
             opt_core, opt_head = self.optimizers()
+            sched_core, sched_head = self.lr_schedulers()
             
             opt_core.zero_grad()
             self.manual_backward(jepa_loss, retain_graph=True)
             opt_core.step()
+            sched_core.step()
 
             opt_head.zero_grad()
             self.manual_backward(head_loss)
             opt_head.step()
+            sched_head.step()
 
             self.update_teacher()
             return
@@ -63,14 +66,15 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             return loss
     
     def update_teacher(self):
-        steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
-        num_training_steps = steps_per_epoch * self.epochs
-        beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
-        for param_s, param_t in zip(self.model.xlstm.parameters(), self.model.xlstm_teacher.parameters()):
-            param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
-        for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model.patch_embedding_teacher.parameters()):
-            param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
-    
+        with torch.no_grad():
+            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
+            num_training_steps = steps_per_epoch * self.epochs
+            beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
+            for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+        
     def validation_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='val')
         return loss
