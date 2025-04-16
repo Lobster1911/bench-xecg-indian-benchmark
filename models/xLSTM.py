@@ -7,12 +7,14 @@ from models.SeriesDecomposition import SeriesDecomposition
 from augmentations import RandomDropLeads, FTSurrogate, Jitter
 import numpy as np
 import torch.nn.functional as F
+import copy
 
 class pretrainedxLSTM(nn.Module):
     def __init__(
             self, 
             num_channels,
-            config
+            config,
+            reconstruction=True
         ): 
         super(pretrainedxLSTM, self).__init__()
         self.dropout = nn.Dropout(config.dropout)
@@ -35,29 +37,25 @@ class pretrainedxLSTM(nn.Module):
         else:
             self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
 
-        if self.use_teacher_student:    
-            if config.xlstm_type == 'large':
-                self.xlstm_teacher = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
-            else:
-                self.xlstm_teacher = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
-            # do not require gradients for the teacher
-            for param in self.xlstm_teacher.parameters():
-                param.requires_grad = False
-            self.predictor = HeadModule(
-                inp_size=config.embedding_size,
-                hidden_size=config.embedding_size // 2,
-                out_size=config.embedding_size,
-                dropout=config.dropout
-            )
+        if self.use_teacher_student:   
+            self.patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
+            self.xlstm_teacher = copy.deepcopy(self.xlstm)
+            # do not require gradients for the teacher and copy from the student
+            for param_t in self.xlstm_teacher.parameters():
+                param_t.requires_grad = False
+            for param_t in self.patch_embedding_teacher.parameters():
+                param_t.requires_grad = False
+
                  
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
         self.random_surrogate = FTSurrogate(0.05, prob=config.random_surrogate_prob)
         self.random_jitter = Jitter(sigma=0.1, prob=config.random_jitter_prob)
 
-        self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, config.embedding_size, num_channels)
+        if reconstruction:
+            self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, config.embedding_size, num_channels)
 
-        if self.weight_tying and config.patch_embedding == 'linear' and config.reconstruct_embedding == 'linear': 
-            self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
+            if self.weight_tying and config.patch_embedding == 'linear' and config.reconstruct_embedding == 'linear': 
+                self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
 
     def embed_data(self, x, augment=True):
         if augment:
@@ -67,22 +65,25 @@ class pretrainedxLSTM(nn.Module):
 
         x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.patch_embedding(x)
-        
         return x
 
     def forward(self, x):
-        x = self.embed_data(x, augment=False)
+        x_emb = self.embed_data(x, augment=False)
 
         if self.training_strategy == 'masked_token_prediction':
-            out = self.xlstm(x, need_expansion=False) # [batch_size, embedding_dim]
+            out = self.xlstm(x_emb, need_expansion=False) # [batch_size, embedding_dim]
         elif self.training_strategy == 'next_token_prediction':
-            out = self.xlstm(x) # [batch_size, embedding_dim]
+            out = self.xlstm(x_emb) # [batch_size, embedding_dim]
 
         out, last_emb = self.reconstruction(out)
 
         if self.use_teacher_student:
             with torch.no_grad():
-                out_teacher = self.xlstm_teacher(x)
+                x_emb_techer = self.patch_embedding_teacher(x.permute(0, 2, 1))
+                if self.training_strategy == 'masked_token_prediction':
+                    out_teacher = self.xlstm_teacher(x_emb_techer, need_expansion=False) # [batch_size, embedding_dim]
+                elif self.training_strategy == 'next_token_prediction':
+                    out_teacher = self.xlstm_teacher(x_emb_techer)
             return out, out_teacher, last_emb
         
         return out, None, None
@@ -137,7 +138,9 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
             num_channels
         ): 
 
-        super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config)
+        dropout = config.dropout
+        config.dropout = 0.0  
+        super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config, reconstruction=False)
 
         self.use_start_token = config.use_start_token
         if self.use_start_token:
@@ -147,14 +150,14 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
             inp_size=config.embedding_size,
             hidden_size=config.embedding_size // 2,
             out_size=num_classes,
-            dropout=config.dropout
+            dropout=dropout
         )
 
         self.r_peak_pos_fc = HeadModule(
             inp_size=config.embedding_size,
             hidden_size=config.embedding_size // 2,
             out_size=self.patch_size,
-            dropout=config.dropout
+            dropout=dropout
         )
 
     def forward(self, x):
@@ -192,8 +195,9 @@ class xLSTMClassification(pretrainedxLSTM):
             num_classes,
             num_channels
         ): 
-
-        super(xLSTMClassification, self).__init__(num_channels, config)
+        dropout = config.dropout
+        config.dropout = 0.0  
+        super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
         self.use_cls_token = config.use_cls_token
         if self.use_cls_token:
@@ -203,7 +207,7 @@ class xLSTMClassification(pretrainedxLSTM):
             inp_size=config.embedding_size,
             hidden_size=config.embedding_size // 2,
             out_size=num_classes,
-            dropout=config.dropout
+            dropout=dropout
         )
 
     def forward(self, x):

@@ -50,6 +50,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
             for param_s, param_t in zip(self.model.xlstm.parameters(), self.model.xlstm_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model.patch_embedding_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
 
         return loss
     
