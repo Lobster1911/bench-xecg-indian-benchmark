@@ -37,23 +37,39 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.pretraining_strategy = config.strategy
         self.joint_embedding_lambda = config.joint_embedding_lambda
 
+        if self.model.use_teacher_student:
+            self.automatic_optimization=False
+
         if not config.is_sweep:
             self.save_hyperparameters()
 
     def training_step(self, batch, _):
-        loss = self.reconstruct_batch(batch, step='train')
-
-        # update the teacher if needed
         if self.model.use_teacher_student:
-            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
-            num_training_steps = steps_per_epoch * self.epochs
-            beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
-            for param_s, param_t in zip(self.model.xlstm.parameters(), self.model.xlstm_teacher.parameters()):
-                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
-            for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model.patch_embedding_teacher.parameters()):
-                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            head_loss, jepa_loss = self.reconstruct_batch(batch, step='train')
+            opt_core, opt_head = self.optimizers()
+            
+            opt_core.zero_grad()
+            self.manual_backward(jepa_loss, retain_graph=True)
+            opt_core.step()
 
-        return loss
+            opt_head.zero_grad()
+            self.manual_backward(head_loss)
+            opt_head.step()
+
+            self.update_teacher()
+            return
+        else:
+            loss = self.reconstruct_batch(batch, step='train')
+            return loss
+    
+    def update_teacher(self):
+        steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
+        num_training_steps = steps_per_epoch * self.epochs
+        beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
+        for param_s, param_t in zip(self.model.xlstm.parameters(), self.model.xlstm_teacher.parameters()):
+            param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+        for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model.patch_embedding_teacher.parameters()):
+            param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
     
     def validation_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='val')
@@ -191,7 +207,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             teacher_student_loss = masked_mse_loss(last_emb, out_teacher, reduction='mean', mask=non_zero_mask)
             self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
-            loss = (1 - self.joint_embedding_lambda) * loss + teacher_student_loss * self.joint_embedding_lambda
+            return loss, teacher_student_loss
+            # loss = (1 - self.joint_embedding_lambda) * loss + teacher_student_loss * self.joint_embedding_lambda
 
         return loss
 
@@ -243,5 +260,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         return self.lr
 
     def configure_optimizers(self):
-        return common.configure_optimizers(self)
+        if self.model.use_teacher_student:
+            return common.configure_optimizer_teacher_student(self)
+        else:
+            return common.configure_optimizers(self)
 

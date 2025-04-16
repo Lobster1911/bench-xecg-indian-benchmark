@@ -40,12 +40,13 @@ class pretrainedxLSTM(nn.Module):
         if self.use_teacher_student:   
             self.patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
             self.xlstm_teacher = copy.deepcopy(self.xlstm)
+
+            self.xlstm_teacher.model.blocks = self.xlstm_teacher.model.blocks[:-2]
             # do not require gradients for the teacher and copy from the student
             for param_t in self.xlstm_teacher.parameters():
                 param_t.requires_grad = False
             for param_t in self.patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
-
                  
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
         self.random_surrogate = FTSurrogate(0.05, prob=config.random_surrogate_prob)
@@ -126,7 +127,8 @@ class pretrainedxLSTM(nn.Module):
 
     def trainable_parameters(self):
         if self.use_teacher_student:
-            return [param for name, param in self.named_parameters() if "xlstm_teacher" not in name]
+            return [param for name, param in self.named_parameters() if "xlstm_teacher" not in name and 'reconstruction' not in name]
+        
         return self.parameters()
     
 
