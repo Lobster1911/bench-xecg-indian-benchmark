@@ -253,8 +253,11 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         return inverted_masked_x, reconstruction, None, None
     
     def pad(self, x):
+        # remove thte exceeding part of the signal not patchable
         if len(x.shape) == 2: x = x.unsqueeze(-1)
-        x = F.pad(x, (0, 0, 0, self.patch_size - x.shape[1] % self.patch_size))
+        part_to_remove = x.shape[1] % self.patch_size
+        if part_to_remove != 0:
+            x = x[:, :-part_to_remove, :]
         return x
     
     def get_params(self):
