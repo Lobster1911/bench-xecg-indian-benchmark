@@ -48,6 +48,7 @@ def pretrain(config, run=None, wandb=False):
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
+    len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
     if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
@@ -91,7 +92,6 @@ def pretrain(config, run=None, wandb=False):
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    len_train_dataset = len(train_dataset)
     test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
     
