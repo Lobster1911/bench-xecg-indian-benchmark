@@ -18,19 +18,18 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
         return ConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     if type == 'enriched':
         print('using enriched patch embedding')
-        return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
+        return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels, kernel_size=5)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 
 
-def get_reconstruction_head(type, patch_size, embedding_size, num_channels):
-    if type == 'linear':
-        return EmbedPatching(
-            patch_size=patch_size, 
-            num_hiddens=embedding_size, 
-            num_channels=num_channels, 
-            use_pre_head=True
-        )
+def get_reconstruction_head(patch_size, embedding_size, num_channels):
+    return EmbedPatching(
+        patch_size=patch_size, 
+        num_hiddens=embedding_size, 
+        num_channels=num_channels, 
+        use_pre_head=True
+    )
 
 def get_activation_fn(activation_fn):
     if activation_fn == 'relu':

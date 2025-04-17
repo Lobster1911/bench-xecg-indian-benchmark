@@ -1,11 +1,12 @@
 import lightning as L
-from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, ccc_loss, auto_correlation_loss
+from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, embedding_cross_entropy_loss, vicreg_loss
 from torch.nn import functional as F
 from utils.plot_utils import plot_reconstruction, plot_generation
 import numpy as np
 import torch
 import lightning
 import trainers.common as common
+import torch.distributed
 
 
 # define the LightningModule
@@ -35,7 +36,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.grad_loss_lambda = config.grad_loss_lambda
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.pretraining_strategy = config.strategy
-        self.joint_embedding_lambda = config.joint_embedding_lambda
+        self.start_train_head_at_epoch = config.start_train_head_at_epoch
+        self.use_vic_reg_regularization = config.use_vic_reg_regularization
 
         if self.model.use_teacher_student:
             self.automatic_optimization=False
@@ -48,16 +50,19 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             head_loss, jepa_loss = self.reconstruct_batch(batch, step='train')
             opt_core, opt_head = self.optimizers()
             sched_core, sched_head = self.lr_schedulers()
+
+            train_head = self.current_epoch >= self.start_train_head_at_epoch
             
             opt_core.zero_grad()
-            self.manual_backward(jepa_loss, retain_graph=True)
+            self.manual_backward(jepa_loss, retain_graph=train_head)
             opt_core.step()
             sched_core.step()
 
-            opt_head.zero_grad()
-            self.manual_backward(head_loss)
-            opt_head.step()
-            sched_head.step()
+            if train_head:
+                opt_head.zero_grad()
+                self.manual_backward(head_loss)
+                opt_head.step()
+                sched_head.step()
 
             self.update_teacher()
             return
@@ -70,10 +75,12 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
             num_training_steps = steps_per_epoch * self.epochs
             beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
-            for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
-                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            #for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
+            #    param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
             for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+
+            self.model._vocab_teacher.weight.data = self.model._vocab_teacher.weight.data * beta + (1.0 - beta) * self.model.vocab.weight.data
         
     def validation_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='val')
@@ -159,7 +166,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             # masking is automatically done inside this function
             # x will be masked with the inverse of the mask
             # so the loss  function will automatically skip the masked values
-            x, reconstruction = self.masked_token_prediction(batch)
+            x, reconstruction, out_teacher, last_emb = self.masked_token_prediction(batch)
 
         nrmse = np.inf
 
@@ -209,10 +216,22 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             x_reshaped = x.view(bs, seq_len // self.patch_size, self.patch_size, channels)
             non_zero_mask = x_reshaped.abs().sum(dim=(2, 3)) > 0  # shape: [bs, seq_len]
 
-            teacher_student_loss = masked_mse_loss(last_emb, out_teacher, reduction='mean', mask=non_zero_mask)
-            self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
+
+            if self.pretraining_strategy == 'next_token_prediction':
+                teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
+            if self.pretraining_strategy == 'masked_token_prediction':
+                teacher_student_loss = masked_mse_loss(last_emb, out_teacher, reduction='mean', mask=non_zero_mask)
+
+            if self.use_vic_reg_regularization:
+                std_loss, cov_loss = vicreg_loss(last_emb)
+                self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=self.batch_size)
+                self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=self.batch_size)
+                self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
+                teacher_student_loss = teacher_student_loss + std_loss + cov_loss
+
+            self.log(f"{step}_jepa_loss", teacher_student_loss.item(), prog_bar=True, batch_size=self.batch_size)
+
             return loss, teacher_student_loss
-            # loss = (1 - self.joint_embedding_lambda) * loss + teacher_student_loss * self.joint_embedding_lambda
 
         return loss
 
@@ -233,25 +252,29 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def masked_token_prediction(self, batch):
         x = self.pad(batch["signal"])
+        mask = self.get_random_mask(x)
 
+        # mask a rnadom number of patches
+        masked_x = x.masked_fill(~mask, 0)
+        reconstruction, out_teacher, last_emb = self.model(masked_x)
+        inverted_masked_x = x.masked_fill(mask, 0)
+
+        if self.model.use_teacher_student:
+            out_teacher = out_teacher.masked_fill(mask, 0)
+            return inverted_masked_x, reconstruction, out_teacher, last_emb
+
+        # needed for the loss function, if the masked value is 0, then the loss function will not consider it
+        return inverted_masked_x, reconstruction, None, None
+    
+    def get_random_mask(self, x):
         # masking the signal
         num_patches = x.shape[1] // self.patch_size
         rand = torch.rand(x.shape[0], num_patches, device=self.device)
         mask = (rand > self.mask_ratio) # this is true for non masked
         # repeat the mask to num_patches * patch_size
         mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
+        return mask
 
-        # mask a rnadom number of patches
-        masked_x = x.masked_fill(~mask, 0)
-        reconstruction, _, _ = self.model(masked_x)
-
-        # x = x[:, self.patch_size:].squeeze()
-        # reconstruction = reconstruction[:, :-self.patch_size]
-
-        # needed for the loss function, if the masked value is 0, then the loss function will not consider it
-        inverted_masked_x = x.masked_fill(mask, 0)
-        return inverted_masked_x, reconstruction, None, None
-    
     def pad(self, x):
         # remove thte exceeding part of the signal not patchable
         if len(x.shape) == 2: x = x.unsqueeze(-1)

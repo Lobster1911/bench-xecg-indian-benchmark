@@ -29,7 +29,6 @@ wandb_log: false
 num_heads: 4
 xlstm_type: "small"
 patch_embedding: "linear"
-reconstruct_embedding: "linear"
 bidirectional: false
 use_cls_token: false
 use_focal_loss: false

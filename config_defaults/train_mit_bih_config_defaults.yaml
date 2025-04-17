@@ -33,7 +33,6 @@ wandb_log: false
 num_heads: 4
 xlstm_type: "small"
 patch_embedding: "linear"
-reconstruct_embedding: "linear"
 bidirectional: false
 skip_majority_class_samples: true
 

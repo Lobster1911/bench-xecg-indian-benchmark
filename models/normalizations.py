@@ -1,6 +1,25 @@
 import torch
 from torch import nn
 
+class DINOCentering:
+    def __init__(self, dim, momentum=0.9):
+        self.center = torch.zeros(1, dim)  # shape [1, feature_dim]
+        self.momentum = momentum
+
+    @torch.no_grad()
+    def update(self, teacher_output):
+        """
+        Update center using batch mean of the teacher output (before softmax).
+        teacher_output: tensor of shape [batch_size, dim]
+        """
+        batch_center = teacher_output.mean(dim=0, keepdim=True)
+        self.center = self.center * self.momentum + batch_center * (1 - self.momentum)
+
+    def normalize(self, teacher_output):
+        """
+        Subtract center before applying softmax temperature scaling.
+        """
+        return teacher_output - self.center
 
 class RevIN(nn.Module):
     def __init__(self, num_features: int, eps=1e-5, affine=True):

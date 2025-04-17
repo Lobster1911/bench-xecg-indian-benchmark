@@ -3,6 +3,49 @@ import torch.nn.functional as F
 from torchmetrics.regression import ConcordanceCorrCoef
 
 
+def off_diagonal(x):
+    n, m = x.shape
+    assert n == m
+    return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
+
+def vicreg_loss(embedding, reduction='mean'):
+    # subtracting the mean along the batch dimension
+    embedding = embedding - embedding.mean(dim=0, keepdim=True)
+
+    # getting the maxpool along the batch dimension
+    embedding = embedding.max(dim=1, keepdim=False)[0]
+    
+    batch_size, num_features = embedding.shape
+
+    std_x = torch.sqrt(embedding.var(dim=0) + 0.0001)
+    std_loss = torch.mean(F.relu(1 - std_x))
+
+    cov_x = (embedding.T @ embedding) / (batch_size - 1)
+    cov_loss = off_diagonal(cov_x).pow_(2).sum().div(num_features) 
+
+    if reduction == "mean":
+        std_loss = std_loss.mean()
+        cov_loss = cov_loss.mean()
+    elif reduction == "sum":
+        std_loss = std_loss.sum()
+        cov_loss = cov_loss.sum()
+
+    return std_loss, cov_loss
+
+
+def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean'):
+    loss = torch.sum(F.softmax(target, dim=-1) * F.log_softmax(input, dim=-1), dim=-1)
+    if mask is not None:
+        loss = loss[mask]
+    if reduction == "mean":
+        loss = -loss.mean()
+    elif reduction == "sum":
+        loss = -loss.sum()
+    else:
+        loss = -loss
+    return loss
+    
+
 def masked_mse_loss(input, target, reduction='mean', mask=None):
     out = (input - target)**2
     # do not consider elements to 0 from the input
@@ -10,7 +53,9 @@ def masked_mse_loss(input, target, reduction='mean', mask=None):
         out = out[mask]
     if reduction == "mean":
         return out.mean()
-    elif reduction == "none":
+    elif reduction == "sum":
+        return out.sum()
+    else:
         return out
     
 def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
@@ -38,7 +83,9 @@ def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
 
     if reduction == "mean":
         return out.mean() / tokens_num
-    elif reduction == "none":
+    elif reduction == "sum":
+        return out.sum() / tokens_num
+    else:
         return out / tokens_num
 
 def masked_mae_loss(input, target, reduction='mean'):
@@ -47,7 +94,9 @@ def masked_mae_loss(input, target, reduction='mean'):
     out = out[target != 0]
     if reduction == "mean":
         return out.mean()
-    elif reduction == "none":
+    elif reduction == "sum":
+        return out.sum()
+    else:
         return out
     
 def gradient_loss(input, target, reduction='mean', p=2):
@@ -59,37 +108,10 @@ def gradient_loss(input, target, reduction='mean', p=2):
     out = out[target[:, :-1] != 0]
     if reduction == "mean":
         return out.mean()
-    elif reduction == "none":
+    elif reduction == "sum":
+        return out.sum()
+    else:
         return out
     
 
-def auto_correlation_loss(input, target, convolution, reduction='mean'):
-    conv_input = convolution(input.transpose(1,2))
-    conv_target = convolution(target.transpose(1,2))
 
-    out = (conv_input - conv_target) ** 2
-    if reduction == "mean":
-        return out.mean()
-    elif reduction == "none":
-        return out
-
-
- 
-def ccc_loss(input, target, reduction='mean'):
-    input = input.reshape(input.shape[0], -1)
-    # normalize input
-    input = (input - input.mean(dim=1).unsqueeze(1)) / (input.std(dim=1).unsqueeze(1) + 1e-5)
-    target = target.reshape(target.shape[0], -1)
-    # normalize target
-    target = (target - target.mean(dim=1).unsqueeze(1)) / (target.std(dim=1).unsqueeze(1) + 1e-5)
-    ccc = ConcordanceCorrCoef(num_outputs=input.shape[1]).to(input.device)
-    # [256, 3584, 12]
-    # flatten the last two dimensions
-
-    out = 1 - ccc(input, target)
-    # out = out[target != 0]
-
-    if reduction == "mean":
-        return out.mean()
-    elif reduction == "none":
-        return out

@@ -33,11 +33,17 @@ num_heads: 4
 xlstm_type: original
 weight_tying: false
 patch_embedding: linear
-reconstruct_embedding: linear
 bidirectional: false
 strategy: next_token_prediction # masked_token_prediction
 mask_ratio: 0.5 # only for masked_token_prediction
+
+# jepa like args
 use_teacher_student: false
+ema_0: 0.996 
+ema_1: 1.
+vocab_size: 4096
+start_train_head_at_epoch: 0
+use_vic_reg_regularization: false
 
 # data and augmentations hyperparameters
 normalize: true

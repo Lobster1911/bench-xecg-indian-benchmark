@@ -50,18 +50,19 @@ class ConvPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
         super().__init__()
         self.patch_size = patch_size
-        self.conv1 = nn.Conv1d(num_channels, num_hiddens // 4, kernel_size=7, stride=1)
+        k_size1, k_size2, k_size3 = 10, 7, 5
+        self.conv1 = nn.Conv1d(num_channels, num_hiddens // 4, kernel_size=k_size1, stride=1)
         self.bn1 = nn.BatchNorm1d(num_hiddens // 4)
-        self.conv2 = nn.Conv1d(num_hiddens // 4, num_hiddens // 2, kernel_size=5, stride=1)
+        self.conv2 = nn.Conv1d(num_hiddens // 4, num_hiddens // 2, kernel_size=k_size2, stride=1)
         self.bn2 = nn.BatchNorm1d(num_hiddens // 2)
-        self.conv3 = nn.Conv1d(num_hiddens // 2, num_hiddens, kernel_size=3, stride=1)
+        self.conv3 = nn.Conv1d(num_hiddens // 2, num_hiddens, kernel_size=k_size3, stride=1)
         self.bn3 = nn.BatchNorm1d(num_hiddens)
 
         self.pool = nn.MaxPool1d(kernel_size=2)
         self.activation = nn.ReLU()
 
         # Calculate the output size after the convolutions and pooling
-        out_size = ((patch_size - 7 + 1) // 2 - 5 + 1) // 2 - 3 + 1
+        out_size = ((patch_size - k_size1 + 1) // 2 - k_size2 + 1) // 2 - k_size3 + 1
         out_size = (out_size // 2) * num_hiddens
 
         self.linear = nn.Linear(out_size, num_hiddens)

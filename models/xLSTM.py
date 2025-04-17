@@ -8,6 +8,8 @@ from augmentations import RandomDropLeads, FTSurrogate, Jitter
 import numpy as np
 import torch.nn.functional as F
 import copy
+from models.normalizations import DINOCentering
+import torch.distributed as dist
 
 class pretrainedxLSTM(nn.Module):
     def __init__(
@@ -39,27 +41,34 @@ class pretrainedxLSTM(nn.Module):
 
         if self.use_teacher_student:   
             self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
-            self._xlstm_teacher = copy.deepcopy(self.xlstm)
+            # self._xlstm_teacher = copy.deepcopy(self.xlstm)
 
             # discard the last two blocks of the xlstm, in this way the student has to more layers and it is different than the parent
-            self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
+            # self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
             # do not require gradients for the teacher and copy from the student
-            for param_t in self._xlstm_teacher.parameters():
-                param_t.requires_grad = False
+            #for param_t in self._xlstm_teacher.parameters():
+            #    param_t.requires_grad = False
             for param_t in self._patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
 
-            self._xlstm_teacher.eval()
+            # self._xlstm_teacher.eval()
             self._patch_embedding_teacher.eval()
+
+            self.vocab = nn.Linear(config.embedding_size, config.vocab_size)
+            self._vocab_teacher = nn.Linear(config.embedding_size, config.vocab_size)
+            self._vocab_teacher.weight = self.vocab.weight
+            self._vocab_teacher.weight.requires_grad = False
+
+            self._center_module = nn.BatchNorm1d(config.vocab_size, affine=False, momentum=0.9)
                  
         self.random_drop_leads = RandomDropLeads(config.random_drop_leads)
         self.random_surrogate = FTSurrogate(0.05, prob=config.random_surrogate_prob)
         self.random_jitter = Jitter(sigma=0.1, prob=config.random_jitter_prob)
 
         if reconstruction:
-            self.reconstruction = get_reconstruction_head(config.reconstruct_embedding, config.patch_size, config.embedding_size, num_channels)
+            self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
 
-            if self.weight_tying and config.patch_embedding == 'linear' and config.reconstruct_embedding == 'linear': 
+            if self.weight_tying and config.patch_embedding == 'linear': 
                 self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
 
     def embed_data(self, x, augment=True):
@@ -75,23 +84,25 @@ class pretrainedxLSTM(nn.Module):
     def forward(self, x):
         x_emb = self.embed_data(x, augment=False)
 
-        if self.training_strategy == 'masked_token_prediction':
-            out = self.xlstm(x_emb, need_expansion=False) # [batch_size, embedding_dim]
-        elif self.training_strategy == 'next_token_prediction':
-            out = self.xlstm(x_emb) # [batch_size, embedding_dim]
+        need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
+        out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         rec, _ = self.reconstruction(out)
 
         if self.use_teacher_student:
+            out = self.vocab(out) 
             with torch.no_grad():
                 x_emb_techer = self._patch_embedding_teacher(x.permute(0, 2, 1))
                 if self.training_strategy == 'masked_token_prediction':
                     out_teacher = self._xlstm_teacher(x_emb_techer, need_expansion=False) # [batch_size, embedding_dim]
                 elif self.training_strategy == 'next_token_prediction':
-                    out_teacher = self._xlstm_teacher(x_emb_techer)
-            return rec, out_teacher, out
+                    out_teacher = self._vocab_teacher(x_emb_techer)
+                    out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
+                    # centering
+                return rec, out_teacher, out
+            
         
-        return out, None, None
+        return rec, None, None
     
     def generate(self, x, length=10):
         if self.training_strategy != 'next_token_prediction':
@@ -129,9 +140,10 @@ class pretrainedxLSTM(nn.Module):
         
         return torch.cat(reconstructed, dim=1)
 
+
     def trainable_parameters(self):
         if self.use_teacher_student:
-            return [param for name, param in self.named_parameters() if "_xlstm_teacher" not in name and 'reconstruction' not in name]
+            return [param for name, param in self.named_parameters() if "_xlstm_teacher" not in name and 'reconstruction' not in name and 'patch_embedding' not in name]
         
         return self.parameters()
     
@@ -223,7 +235,8 @@ class xLSTMClassification(pretrainedxLSTM):
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
             x = torch.cat([cls_token, x], dim=1)
 
-        out = self.xlstm(x, need_expansion=False)[:, -1, :]
+        out = self.xlstm(x, need_expansion=False)[:, 1:, :]
+        out = out.max(dim=1)[0]
         cls = self.fc(out)
         return cls
     

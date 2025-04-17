@@ -81,8 +81,6 @@ parameters:
     value: 'small'
   patch_embedding:
     value: 'enriched'
-  reconstruct_embedding:
-    value: 'linear'
   bidirectional:
     value: False
   multi_token_prediction:
