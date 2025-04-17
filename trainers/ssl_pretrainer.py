@@ -19,6 +19,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         ):
         super().__init__()
         self.lr = config.lr
+        self.lr_reconstruction = config.lr_reconstruction
         self.model = model
         self.batch_size = config.batch_size
         self.optimizer = config.optimizer

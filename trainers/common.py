@@ -40,19 +40,19 @@ def configure_optimizers(trainer):
 def configure_optimizer_teacher_student(trainer):
     if trainer.optimizer == 'adam':
         optimizer1 = optim.Adam(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-        optimizer2 = optim.Adam(params=trainer.model.reconstruction.parameters(), lr=trainer.get_lr(), weight_decay=trainer.wd)
+        optimizer2 = optim.Adam(params=trainer.model.reconstruction.parameters(), lr=trainer.lr_head, weight_decay=trainer.wd)
     elif trainer.optimizer == 'adamw':
         optimizer1 = optim.AdamW(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-        optimizer2 = optim.AdamW(params=trainer.model.reconstruction.parameters(), lr=trainer.get_lr(), weight_decay=trainer.wd)
+        optimizer2 = optim.AdamW(params=trainer.model.reconstruction.parameters(), lr=trainer.lr_head, weight_decay=trainer.wd)
     elif trainer.optimizer == 'adafactor':
         optimizer1 = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-        optimizer2 = optim.Adafactor(params=trainer.model.reconstruction.parameters(), lr=trainer.get_lr(), weight_decay=trainer.wd)
+        optimizer2 = optim.Adafactor(params=trainer.model.reconstruction.parameters(), lr=trainer.lr_head, weight_decay=trainer.wd)
     elif trainer.optimizer == 'lamb':
         optimizer1 = Lamb(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-        optimizer2 = Lamb(params=trainer.model.reconstruction.parameters(), lr=trainer.get_lr(), weight_decay=trainer.wd)
+        optimizer2 = Lamb(params=trainer.model.reconstruction.parameters(), lr=trainer.lr_head, weight_decay=trainer.wd)
     else:
         optimizer1 = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
-        optimizer2 = optim.SGD(trainer.model.reconstruction.parameters(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
+        optimizer2 = optim.SGD(trainer.model.reconstruction.parameters(), lr=trainer.lr_head, momentum=0.9, weight_decay=trainer.wd)
 
     if trainer.use_scheduler: 
         steps_per_epoch = np.ceil(trainer.len_train_dataset / trainer.batch_size)
