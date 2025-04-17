@@ -39,6 +39,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.pretraining_strategy = config.strategy
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
         self.use_vic_reg_regularization = config.use_vic_reg_regularization
+        self.beta_std = config.beta_std
+        self.beta_cov = config.beta_cov
 
         if self.model.use_teacher_student:
             self.automatic_optimization=False
@@ -228,7 +230,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=self.batch_size)
                 self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=self.batch_size)
                 self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
-                teacher_student_loss = teacher_student_loss + std_loss + cov_loss
+                teacher_student_loss = teacher_student_loss + std_loss * self.beta_std + cov_loss * self.beta_cov
 
             self.log(f"{step}_jepa_loss", teacher_student_loss.item(), prog_bar=True, batch_size=self.batch_size)
 
