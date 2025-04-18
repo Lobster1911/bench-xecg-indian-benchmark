@@ -11,6 +11,7 @@ from sklearn.utils import check_random_state
 
 from typing import Any
 import torch.nn as nn
+from scipy.signal import butter, lfilter, resample
 
 
 class RandomDropLeads(nn.Module):
@@ -31,8 +32,8 @@ class RandomDropLeads(nn.Module):
             leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
 
             # Ensure lead II (index 1 assuming standard 12-lead) is never removed
-            if signal.shape[-1] > 1: # Check if there's more than one lead
-                 leads_to_remove[1] = False
+            # if signal.shape[-1] > 1: # Check if there's more than one lead
+            #    leads_to_remove[1] = False
 
             # Apply modification to the copy
             signal_out[..., leads_to_remove] = 0
@@ -71,127 +72,141 @@ class Jitter(object):
 
         return jittered_tensor
 
-    
 class FTSurrogate(object):
-    """
-    FT surrogate augmentation of a single EEG channel, as proposed in [1]_.
-    Code (modified) from https://github.com/braindecode/braindecode/blob/master/braindecode/augmentation/functional.py 
+     """
+     FT surrogate augmentation of a single EEG channel, as proposed in [1]_.
+     Code (modified) from https://github.com/braindecode/braindecode/blob/master/braindecode/augmentation/functional.py 
+     
+ 
+     Parameters
+     ----------
+     X : torch.Tensor
+         EEG input example.
+     phase_noise_magnitude: float
+         Float between 0 and 1 setting the range over which the phase
+         pertubation is uniformly sampled:
+         [0, `phase_noise_magnitude` * 2 * `pi`].
+     channel_indep : bool
+         Whether to sample phase perturbations independently for each channel or
+         not. It is advised to set it to False when spatial information is
+         important for the task, like in BCI.
+     random_state: int | numpy.random.Generator, optional
+         Used to draw the phase perturbation. Defaults to None.
+ 
+     Returns
+     -------
+     torch.Tensor
+         Transformed inputs.
+     torch.Tensor
+         Transformed labels.
+ 
+     References
+     ----------
+     .. [1] Schwabedal, J. T., Snyder, J. C., Cakmak, A., Nemati, S., &
+        Clifford, G. D. (2018). Addressing Class Imbalance in Classification
+        Problems of Noisy Signals by using Fourier Transform Surrogates. arXiv
+        preprint arXiv:1806.08675.
+     """
+     def __init__(self, phase_noise_magnitude, channel_indep=False, seed=None, prob=1.0) -> None:
+         self.phase_noise_magnitude = phase_noise_magnitude
+         self.channel_indep = channel_indep
+         self.seed = seed
+         self.prob = prob
+         self._new_random_fft_phase = {
+             0: self._new_random_fft_phase_even,
+             1: self._new_random_fft_phase_odd
+         }
+ 
+     def _new_random_fft_phase_odd(self, c, n, device='cpu', seed=None):
+         rng = check_random_state(seed)
+         random_phase = torch.from_numpy(
+             2j * np.pi * rng.random((c, (n - 1) // 2))
+         ).to(device)
+ 
+         return torch.cat([
+             torch.zeros((c, 1), device=device),
+             random_phase,
+             -torch.flip(random_phase, [-1]).to(device=device)
+         ], dim=-1)
+     
+     def _new_random_fft_phase_even(self, c, n, device='cpu', seed=None):
+         rng = check_random_state(seed)
+         random_phase = torch.from_numpy(
+             2j * np.pi * rng.random((c, n // 2 - 1))
+         ).to(device)
+ 
+         return torch.cat([
+             torch.zeros((c, 1), device=device),
+             random_phase,
+             torch.zeros((c, 1), device=device),
+             -torch.flip(random_phase, [-1]).to(device=device)
+         ], dim=-1)
+ 
+     def __call__(self, sample) -> Any:
+         if np.random.uniform() < self.prob:
+             assert isinstance(
+                 self.phase_noise_magnitude,
+                 (Real, torch.FloatTensor, torch.cuda.FloatTensor)
+             ) and 0 <= self.phase_noise_magnitude <= 1, (
+                 f"eps must be a float beween 0 and 1. Got {self.phase_noise_magnitude}."
+             )
+ 
+             f = fft.fft(sample.double(), dim=-1)
+ 
+             n = f.shape[-1]
+             random_phase = self._new_random_fft_phase[n % 2](
+                 f.shape[-2] if self.channel_indep else 1,
+                 n,
+                 device=sample.device,
+                 seed=self.seed
+             )
+ 
+             if not self.channel_indep:
+                 random_phase = torch.tile(random_phase, (f.shape[-2], 1))
+ 
+             if isinstance(self.phase_noise_magnitude, torch.Tensor):
+                 self.phase_noise_magnitude = self.phase_noise_magnitude.to(sample.device)
+ 
+             f_shifted = f * torch.exp(self.phase_noise_magnitude * random_phase)
+             shifted = fft.ifft(f_shifted, dim=-1)
+             sample_transformed = shifted.real.float()
+
+             return sample_transformed
+ 
+         else:
+             return sample
+
+class RandomResample(torch.nn.Module):
+    def __init__(self, current_freq=360, max_freq_delta=15):
+        super().__init__()
+        self.current_freq = current_freq
+        self.max_freq_delta = max_freq_delta
+
+    def forward(self, signal):
+        freq_delta = torch.randint(-self.max_freq_delta, self.max_freq_delta + 1, (1,)).item()
+        target_freq = self.current_freq + freq_delta
+        return resample_signal(signal, self.current_freq, target_freq)
     
 
-    Parameters
-    ----------
-    X : torch.Tensor
-        EEG input example.
-    phase_noise_magnitude: float
-        Float between 0 and 1 setting the range over which the phase
-        pertubation is uniformly sampled:
-        [0, `phase_noise_magnitude` * 2 * `pi`].
-    channel_indep : bool
-        Whether to sample phase perturbations independently for each channel or
-        not. It is advised to set it to False when spatial information is
-        important for the task, like in BCI.
-    random_state: int | numpy.random.Generator, optional
-        Used to draw the phase perturbation. Defaults to None.
-
-    Returns
-    -------
-    torch.Tensor
-        Transformed inputs.
-    torch.Tensor
-        Transformed labels.
-
-    References
-    ----------
-    .. [1] Schwabedal, J. T., Snyder, J. C., Cakmak, A., Nemati, S., &
-       Clifford, G. D. (2018). Addressing Class Imbalance in Classification
-       Problems of Noisy Signals by using Fourier Transform Surrogates. arXiv
-       preprint arXiv:1806.08675.
+def resample_signal(signal: torch.Tensor, current_freq: float = 500, target_freq: float = 400):
     """
-    def __init__(self, phase_noise_magnitude, channel_indep=False, seed=None, prob=1.0) -> None:
-        self.phase_noise_magnitude = phase_noise_magnitude
-        self.channel_indep = channel_indep
-        self.seed = seed
-        self.prob = prob
-        self._new_random_fft_phase = {
-            0: self._new_random_fft_phase_even,
-            1: self._new_random_fft_phase_odd
-        }
+    Resample a tensor of shape (C, L) to the target frequency.
 
-    def _new_random_fft_phase_odd(self, c, n, device='cpu', seed=None):
-        rng = check_random_state(seed)
-        random_phase = torch.from_numpy(
-            2j * np.pi * rng.random((c, (n - 1) // 2))
-        ).to(device)
+    Args:
+        signal (torch.Tensor): A tensor of shape (C, L),
+        where C is the number of channels and L is the length of the signal.
+        current_freq (float): The current frequency of the signal in Hz.
+        target_freq (float): The desired frequency in Hz.
 
-        return torch.cat([
-            torch.zeros((c, 1), device=device),
-            random_phase,
-            -torch.flip(random_phase, [-1]).to(device=device)
-        ], dim=-1)
-    
-    def _new_random_fft_phase_even(self, c, n, device='cpu', seed=None):
-        rng = check_random_state(seed)
-        random_phase = torch.from_numpy(
-            2j * np.pi * rng.random((c, n // 2 - 1))
-        ).to(device)
-
-        return torch.cat([
-            torch.zeros((c, 1), device=device),
-            random_phase,
-            torch.zeros((c, 1), device=device),
-            -torch.flip(random_phase, [-1]).to(device=device)
-        ], dim=-1)
-
-    def __call__(self, sample) -> Any:
-        if self.prob == 0.: return sample    
-
-        mask = torch.rand(sample.shape[0], device=sample.device) < self.prob  # [batch_size]
-
-        if isinstance(self.phase_noise_magnitude, torch.Tensor):
-            # Ensure magnitude tensor is on the correct device and has the right shape
-            self.phase_noise_magnitude = self.phase_noise_magnitude.to(sample.device)
-            if self.phase_noise_magnitude.ndim == 1:
-                 # Expand to [batch_size, 1, 1, ...] for broadcasting.
-                magnitude = self.phase_noise_magnitude.view(sample.shape[0], *([1] * (sample.ndim - 1)))
-            else:
-                raise ValueError("phase_noise_magnitude tensor must be 1-dimensional (batch_size) or a scalar.")
-
-        elif isinstance(self.phase_noise_magnitude, Real):
-             # Expand to [batch_size, 1, 1, ...] for broadcasting.
-            magnitude = torch.full((sample.shape[0], *([1] * (sample.ndim - 1))), self.phase_noise_magnitude, device=sample.device, dtype=sample.dtype)  #Correctly handles the broadcasting of a scalar magnitude.
-        else:
-           raise TypeError("phase_noise_magnitude must be a float or a 1D torch.Tensor")
-        
-        mask = mask.view(mask.size(0), *([1] * (sample.ndim - 1))).float()  # [batch_size, 1, 1, ...]
-
-        # 4. Compute FFT of the entire batch.
-        f = fft.fft(sample.double(), dim=-1)  # [batch_size, ..., num_samples]
-        n = f.shape[-1]
-
-        # 5. Generate random phases for the *entire batch*.
-        num_channels = f.shape[-2] if self.channel_indep else 1
-        random_phase = self._new_random_fft_phase[n % 2](
-            sample.shape[0] * num_channels, n, device=sample.device, seed=self.seed
-        )  # [batch_size * num_channels, n]
-
-        # 6. Reshape and repeat random_phase if necessary.
-        if self.channel_indep:
-            random_phase = random_phase.view(sample.shape[0], num_channels, n) # [batch_size, num_channels, n]
-            random_phase = random_phase.reshape(sample.shape[0], *f.shape[1:-1], n)
-        else:
-            # Repeat the same phase for all channels within each sample.
-            random_phase = random_phase.view(sample.shape[0], 1, n)  # [batch_size, 1, n]
-            random_phase = random_phase.expand(sample.shape[0], *f.shape[1:-1], n) # [batch_size, num_channels, ..., n]
-
-        # 7. Apply phase shift and inverse FFT.
-        f_shifted = f * torch.exp(magnitude * random_phase * 1j) # Use complex number multiplication
-        shifted = fft.ifft(f_shifted, dim=-1)
-        sample_transformed = shifted.real.float()
-
-        # 8. Apply the transformation selectively based on the mask.
-        return mask * sample_transformed + (1 - mask) * sample
-
-
+    Returns:
+        torch.Tensor: A tensor of shape (C, new_L) resampled to the target frequency.
+    """
+    signal = signal.transpose(0, 1)
+    num_channels, signal_length = signal.shape
+    target_length = int(signal_length * target_freq / current_freq)
+    resampled = np.array([resample(channel, target_length) for channel in signal.numpy()])
+    signal = torch.tensor(resampled, dtype=signal.dtype)
+    return signal.transpose(0, 1)
     
 class Rescaling(object):
     """

@@ -35,12 +35,12 @@ def pretrain(config, run=None, wandb=False):
         elif dataset == 'mit':
             datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train'))       
         elif dataset == 'ptbxl':
-            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', random_shift=False))
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train'))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
-    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
-    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', random_shift=False)
+    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val')
+    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val')
 
     val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
 

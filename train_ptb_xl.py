@@ -7,6 +7,8 @@ from models.xLSTM import xLSTMClassification
 import dataset.ptb_xl as ptbxl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
+from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
+
 from trainers.ptb_xl_trainer import TrainingPTB_XL
 import torch
 import argparse
@@ -16,6 +18,7 @@ from tqdm import tqdm
 import utils.utils as utils
 from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
+from torchvision import transforms
 
 os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
@@ -26,8 +29,15 @@ parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
+
+    augmentations = transforms.Compose([ 
+        RandomDropLeads(config.random_drop_leads),
+        FTSurrogate(0.05, prob=config.random_surrogate_prob),
+        Jitter(sigma=0.1, prob=config.random_jitter_prob),
+        RandomResample(360, max_freq_delta=10)
+    ])
     
-    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train')
+    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train', augmentations=augmentations)
     print(f"Train dataset size: {len(train_dataset)}")
     val_dataset = ptbxl.ECGPTBXLDataset(config, split='val')
     print(f"Val dataset size: {len(val_dataset)}")
@@ -42,7 +52,7 @@ def train(config, run=None, wandb=False):
     else:
         weights = None
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.collate_fn, pin_memory=True)
 
     test_dataset = ptbxl.ECGPTBXLDataset(config, split='test')
@@ -77,7 +87,7 @@ def train(config, run=None, wandb=False):
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
     else:
-        trainer = L.Trainer(max_epochs=config.epochs, callbacks=[early_stopping, lr_monitor, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
+        trainer = L.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)

@@ -8,20 +8,22 @@ from dataset.generic_utils import random_shift
 from torch.utils.data import random_split
 import json
 import ast
+import torchvision.transforms as transforms
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 class ECGPTBXLDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
+    def __init__(self, config, leads_to_use=leads, split='train', augmentations=None):
         self.data_folder = config.data_folder_ptbxl
-        self.random_shift = random_shift
+        self.random_shift = config.random_shift and split == 'train'
         self.nkclean = config.nk_clean
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.patch_size = config.patch_size
         self.normalize = config.normalize
         self.labels_file = config.labels_file_ptbxl
         self.split = split
+        self.augmentations = augmentations
         self.load_tabular_data()
         self.load_records(split)
 
@@ -90,6 +92,9 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
             std = signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
+
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
 
         superclass_label = self.tab_data.iloc[idx]['diagnostic_superclass']
         # convert the superclass label to a one-hot encoding

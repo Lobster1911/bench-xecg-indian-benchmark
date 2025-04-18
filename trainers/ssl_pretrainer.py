@@ -78,8 +78,12 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
             num_training_steps = steps_per_epoch * self.epochs
             beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
-            #for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
-            #    param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+
+            # the xlstm teacher is present only if the strategy is multi token prediction
+            if self.pretraining_strategy == 'masked_token_prediction':
+                for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
+                    param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+
             for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
 
@@ -263,6 +267,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         inverted_masked_x = x.masked_fill(mask, 0)
 
         if self.model.use_teacher_student:
+            mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
+            mask = mask.unsqueeze(-1)
             out_teacher = out_teacher.masked_fill(mask, 0)
             return inverted_masked_x, reconstruction, out_teacher, last_emb
 

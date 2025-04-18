@@ -48,7 +48,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_mit
         self.split = split
         self.samples = []
-        self.random_shift = config.random_shift if split == 'train' else False
+        self.random_shift = config.random_shift and split == 'train'
         self.nkclean = config.nk_clean
         self.patch_size = config.patch_size
         self.normalize = config.normalize
@@ -259,7 +259,6 @@ def collate_fn(batch):
     labels = [item['label'] for item in batch]
 
     # pad to same length and pad to match the patch size module
-
     signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
     r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
     labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)

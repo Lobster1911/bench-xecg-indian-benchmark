@@ -9,6 +9,7 @@ class LinearPatchEmbedding(nn.Module):
         self.conv = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
 
     def forward(self, x):
+        x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.conv(x).flatten(2).transpose(1, 2)
         return x
     
@@ -23,6 +24,7 @@ class EnrichedLinearPatchEmbedding(nn.Module):
     def forward(self, x):
         # x [bs, num_channels, num_samples]
         # apply padding of kernel_size - 1 on the left side
+        x = x.permute(0, 2, 1) # put the channels in the middle
         x_padded = F.pad(x, (self.kernel_size - 1, 0))
         enriched_x1 = self.erich_conv1(x_padded) # [bs, enrich_dim, num_samples]
         enriched_x1_padded = F.pad(enriched_x1, (self.kernel_size - 1, 0))
@@ -68,6 +70,7 @@ class ConvPatchEmbedding(nn.Module):
         self.linear = nn.Linear(out_size, num_hiddens)
 
     def forward(self, x):
+        x = x.permute(0, 2, 1) # put the channels in the middle
         # transform [bs, n_channels, n_samples] -> [bs, n_channels, n_patches, patch_size]
         x = x.unfold(2, self.patch_size, self.patch_size).transpose(1, 2)
         batch_size, n_patches, n_channels, _ = x.shape
@@ -145,6 +148,24 @@ class vanillaxLSTMWrapper(nn.Module):
 
         x = self.model.post_blocks_norm(x)
         return x
+    
+
+class DropPath(nn.Module):
+    """Drop paths (Stochastic Depth) per sample (when applied in the main path of residual blocks)."""
+    def __init__(self, drop_prob=None):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
+
+    def forward(self, x):
+        if self.drop_prob == 0. or not self.training:
+            return x
+        keep_prob = 1 - self.drop_prob
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # Broadcast along batch dimension
+        random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+        random_tensor.floor_()  # Binary mask
+        output = x.div(keep_prob) * random_tensor # Apply mask and divide remaining output by keep_prob
+        return output,
+
     
 class mLSTMWrapper(nn.Module):
     def __init__(self, xlstm, dropout=0.2, bidirectional=False, random_drop_back_pass=0.2):

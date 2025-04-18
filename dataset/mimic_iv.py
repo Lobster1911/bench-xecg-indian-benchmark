@@ -5,17 +5,15 @@ import wfdb
 import neurokit2 as nk
 import numpy as np
 from dataset.generic_utils import random_shift
-from torch.utils.data import random_split
 import json
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 class ECGMIMICDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train', random_shift=False):
+    def __init__(self, config, leads_to_use=leads, split='train'):
         self.data_folder = config.data_folder_mimic
-        self.random_shift = config.random_shift if split == 'train' else False
-        self.nkclean = config.nk_clean
+        self.random_shift = config.random_shift and split == 'train'
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.patch_size = config.patch_size
         self.normalize = config.normalize
