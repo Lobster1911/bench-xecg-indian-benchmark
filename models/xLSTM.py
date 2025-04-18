@@ -50,6 +50,7 @@ class pretrainedxLSTM(nn.Module):
                     param_t.requires_grad = False
 
                 self._xlstm_teacher.eval()
+                self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
 
 
             for param_t in self._patch_embedding_teacher.parameters():
@@ -62,7 +63,7 @@ class pretrainedxLSTM(nn.Module):
             self._vocab_teacher.weight = self.vocab.weight
             self._vocab_teacher.weight.requires_grad = False
 
-            # self._center_module = nn.BatchNorm1d(config.vocab_size, affine=False, momentum=0.9)
+            self._center_module = nn.BatchNorm1d(config.vocab_size, affine=False, momentum=0.9)
                  
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -88,7 +89,7 @@ class pretrainedxLSTM(nn.Module):
                     x_emb_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
 
                 out_teacher = self._vocab_teacher(x_emb_teacher)
-                # out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
+                out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
                 # centering
                 return rec, out_teacher, out
             
@@ -131,7 +132,7 @@ class pretrainedxLSTM(nn.Module):
 
     def trainable_parameters(self):
         if self.use_teacher_student:
-            return [param for name, param in self.named_parameters() if "_xlstm_teacher" not in name and 'reconstruction' not in name and 'patch_embedding' not in name]
+            return [param for name, param in self.named_parameters() if "teacher" not in name and 'reconstruction' not in name]
         
         return self.parameters()
     

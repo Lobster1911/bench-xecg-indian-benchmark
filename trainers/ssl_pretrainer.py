@@ -192,7 +192,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             with torch.no_grad(): grad = gradient_loss(reconstruction, x)
         
         if 'mse' in self.loss_type:
-            mse = masked_mse_loss(reconstruction, x, reduction='mean')
+            mse = masked_mse_loss(reconstruction, x, reduction='mean', mask= x != 0)
         else:
             with torch.no_grad(): mse = masked_mse_loss(reconstruction, x, reduction='mean', mask= x != 0)
    
@@ -227,7 +227,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             if self.pretraining_strategy == 'next_token_prediction':
                 teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
             if self.pretraining_strategy == 'masked_token_prediction':
-                teacher_student_loss = masked_mse_loss(last_emb, out_teacher, reduction='mean', mask=non_zero_mask)
+                teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
 
             if self.use_vic_reg_regularization:
                 std_loss, cov_loss = vicreg_loss(last_emb)
@@ -255,16 +255,17 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             last_emb = last_emb[:, :-1, :] # [bs, seq_len -1, num_hiddens]
             return x, reconstruction, out_teacher, last_emb
         
+        
         return x, reconstruction, None, None
     
     def masked_token_prediction(self, batch):
         x = self.pad(batch["signal"])
-        mask = self.get_random_mask(x)
+        mask = self.get_random_mask(x) # 1 is non masked and 0 is masked
 
         # mask a rnadom number of patches
-        masked_x = x.masked_fill(~mask, 0)
+        masked_x = x.masked_fill(~mask, 0) # apply the mask
         reconstruction, out_teacher, last_emb = self.model(masked_x)
-        inverted_masked_x = x.masked_fill(mask, 0)
+        inverted_masked_x = x.masked_fill(mask, 0) # set to 0 the non masked values
 
         if self.model.use_teacher_student:
             mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
@@ -276,6 +277,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         return inverted_masked_x, reconstruction, None, None
     
     def get_random_mask(self, x):
+        """
+        Retutn a mask of the same shape as x, where the masked values are 0 and the unmasked values are 1
+        """
         # masking the signal
         num_patches = x.shape[1] // self.patch_size
         rand = torch.rand(x.shape[0], num_patches, device=self.device)
