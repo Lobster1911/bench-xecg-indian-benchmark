@@ -90,7 +90,7 @@ class pretrainedxLSTM(nn.Module):
                 out_teacher = self._vocab_teacher(x_emb_teacher)
                 out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
                 # centering
-            return rec, x_emb_teacher, out
+            return rec, out_teacher, out
             
         return rec, None, None
     

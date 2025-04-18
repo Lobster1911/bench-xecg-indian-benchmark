@@ -268,9 +268,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         inverted_masked_x = x.masked_fill(mask, 0) # set to 0 the non masked values
 
         if self.model.use_teacher_student:
-            mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
-            mask = mask.unsqueeze(-1)
-            out_teacher = out_teacher.masked_fill(mask, 0)
+            # mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
+            # mask = mask.unsqueeze(-1)
+            # out_teacher = out_teacher.masked_fill(mask, 0)
             return inverted_masked_x, reconstruction, out_teacher, last_emb
 
         # needed for the loss function, if the masked value is 0, then the loss function will not consider it
