@@ -82,7 +82,7 @@ class pretrainedxLSTM(nn.Module):
         if self.use_teacher_student:
             out = self.vocab(out) 
             with torch.no_grad():
-                x_emb_teacher = self._patch_embedding_teacher(x.permute(0, 2, 1))
+                x_emb_teacher = self._patch_embedding_teacher(x)
 
                 if self.training_strategy == 'masked_token_prediction':
                     x_emb_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
@@ -92,7 +92,6 @@ class pretrainedxLSTM(nn.Module):
                 # centering
                 return rec, out_teacher, out
             
-        
         return rec, None, None
     
     def generate(self, x, length=10):

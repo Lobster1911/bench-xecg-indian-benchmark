@@ -11,7 +11,7 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 
 class ECGMIMICDataset(torch.utils.data.Dataset):
 
-    def __init__(self, config, leads_to_use=leads, split='train'):
+    def __init__(self, config, leads_to_use=leads, split='train', augmentations=None):
         self.data_folder = config.data_folder_mimic
         self.random_shift = config.random_shift and split == 'train'
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
@@ -19,6 +19,7 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
         self.normalize = config.normalize
         self.labels_file = config.labels_file_mimic
         self.split = split
+        self.augmentations = augmentations
         self.load_tabular_data()
         self.load_records(split)
 
@@ -68,7 +69,8 @@ class ECGMIMICDataset(torch.utils.data.Dataset):
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
 
-        if '/' in str(record): record = record.split('/')[0]
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
 
         return {
             'signal':signal,

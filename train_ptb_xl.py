@@ -7,7 +7,6 @@ from models.xLSTM import xLSTMClassification
 import dataset.ptb_xl as ptbxl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
 
 from trainers.ptb_xl_trainer import TrainingPTB_XL
 import torch
@@ -19,6 +18,7 @@ import utils.utils as utils
 from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from torchvision import transforms
+from dataset.generic_utils import get_transforms
 
 os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
@@ -29,15 +29,8 @@ parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-
-    augmentations = transforms.Compose([ 
-        RandomDropLeads(config.random_drop_leads),
-        FTSurrogate(0.05, prob=config.random_surrogate_prob),
-        Jitter(sigma=0.1, prob=config.random_jitter_prob),
-        RandomResample(360, max_freq_delta=10)
-    ])
     
-    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train', augmentations=augmentations)
+    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train', augmentations=get_transforms(config))
     print(f"Train dataset size: {len(train_dataset)}")
     val_dataset = ptbxl.ECGPTBXLDataset(config, split='val')
     print(f"Val dataset size: {len(val_dataset)}")

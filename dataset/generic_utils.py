@@ -3,6 +3,17 @@ import os
 from tqdm import tqdm
 import torch
 from joblib import Parallel, delayed
+from torchvision import transforms
+from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
+
+
+def get_transforms(config):
+    return transforms.Compose([ 
+        RandomDropLeads(config.random_drop_leads),
+        FTSurrogate(0.05, prob=config.random_surrogate_prob),
+        Jitter(sigma=0.1, prob=config.random_jitter_prob),
+        RandomResample(360, max_freq_delta=10)
+    ])
 
 def get_max_n_jobs(default=-1):
     n_jobs = int(os.getenv("SLURM_CPUS_PER_TASK", default))

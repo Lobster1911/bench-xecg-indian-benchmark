@@ -12,6 +12,8 @@ from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import utils.utils as utils
 import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
+from dataset.generic_utils import get_transforms
+
 
 # argparse
 import argparse
@@ -29,13 +31,13 @@ def pretrain(config, run=None, wandb=False):
 
     for dataset in config.pretrain_datasets:
         if dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='train'))
+            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='train', augmentations=get_transforms(config)))
         elif dataset == 'code15':
-            datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads))
+            datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads, augmentations=get_transforms(config)))
         elif dataset == 'mit':
-            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train'))       
+            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train', augmentations=get_transforms(config)))       
         elif dataset == 'ptbxl':
-            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train'))
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', augmentations=get_transforms(config)))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 

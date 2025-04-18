@@ -37,7 +37,7 @@ def convert_label(symbol):
 valid_annotations = set(['N', 'L', 'R', 'e', 'j', 'A', 'a', 'J', 'S', 'V', 'E', 'F', '/', 'f', 'Q'])
 
 class ECGMITBIHDataset(torch.utils.data.Dataset):
-    def __init__(self, config, split='train'):
+    def __init__(self, config, split='train', augmentations=None):
         """
         Args:
             config: configuration object
@@ -57,6 +57,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.skip_majority_class_samples = config.skip_majority_class_samples
         self.bidirectional = config.bidirectional
         self.split_val_by_patient = config.split_val_by_patient
+        self.augmentations = augmentations
 
         self.leads_to_use = leads if config.leads == ['*'] else config.leads
 
@@ -204,6 +205,9 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             std = window_signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             window_signal = (window_signal - window_signal.mean(axis=(0, -1))) / std
+
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
         
         r_peaks_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32)
 

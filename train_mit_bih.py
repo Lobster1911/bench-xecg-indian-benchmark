@@ -15,7 +15,7 @@ from tqdm import tqdm
 import utils.utils as utils
 from utils.utils import get_training_class_weights
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-
+from dataset.generic_utils import get_transforms
 os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
@@ -27,12 +27,12 @@ def train(config, run=None, wandb=False):
     if config.deterministic: L.seed_everything(42)
 
     if config.split_val_by_patient:
-        train_dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
+        train_dataset =  mit_bih.ECGMITBIHDataset(config, split='train', augmentations=get_transforms(config))
         print(f"Train dataset size: {len(train_dataset)}")
         val_dataset = mit_bih.ECGMITBIHDataset(config, split='val')
         print(f"Val dataset size: {len(val_dataset)}")
     else:
-        dataset =  mit_bih.ECGMITBIHDataset(config, split='train')
+        dataset =  mit_bih.ECGMITBIHDataset(config, split='train', augmentations=get_transforms(config))
         dataset_len = len(dataset)
         train_len = int(dataset_len * 0.9)
         train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_len, dataset_len - train_len])

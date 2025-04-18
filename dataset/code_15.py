@@ -9,7 +9,7 @@ from dataset.generic_utils import random_shift
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 class ECGCODE15Dataset(Dataset):
-    def __init__(self, config, leads_to_use=leads):
+    def __init__(self, config, leads_to_use=leads, augmentations=None):
         """
         Args:
             records (list): List of records of ECG traces
@@ -20,6 +20,7 @@ class ECGCODE15Dataset(Dataset):
         self.leads = leads if leads_to_use == ['*'] else leads_to_use
         self.random_shift = config.random_shift
         self.patch_size = config.patch_size
+        self.augmentations = augmentations
         self.load_tabular_data()
         self.load_records()
 
@@ -64,6 +65,9 @@ class ECGCODE15Dataset(Dataset):
             std = signal.std(axis=(0, -1))
             std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
             signal = (signal - signal.mean(axis=(0, -1))) / std
+
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
 
         return {
             'signal':signal,
