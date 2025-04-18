@@ -59,8 +59,7 @@ class pretrainedxLSTM(nn.Module):
             self._patch_embedding_teacher.eval()
 
             self.vocab = nn.Linear(config.embedding_size, config.vocab_size, bias=False)
-            self._vocab_teacher = nn.Linear(config.embedding_size, config.vocab_size, bias=False)
-            self._vocab_teacher.weight = self.vocab.weight
+            self._vocab_teacher = copy.deepcopy(self.vocab)
             self._vocab_teacher.weight.requires_grad = False
 
             self._center_module = nn.BatchNorm1d(config.vocab_size, affine=False, momentum=0.9)
@@ -91,7 +90,7 @@ class pretrainedxLSTM(nn.Module):
                 out_teacher = self._vocab_teacher(x_emb_teacher)
                 out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
                 # centering
-                return rec, out_teacher, out
+            return rec, x_emb_teacher, out
             
         return rec, None, None
     
