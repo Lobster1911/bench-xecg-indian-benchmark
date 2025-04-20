@@ -50,19 +50,18 @@ class pretrainedxLSTM(nn.Module):
                     param_t.requires_grad = False
 
                 self._xlstm_teacher.eval()
-                self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
-
+                # self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
 
             for param_t in self._patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
 
             self._patch_embedding_teacher.eval()
 
-            self.vocab = nn.Linear(config.embedding_size, config.vocab_size, bias=False)
-            self._vocab_teacher = copy.deepcopy(self.vocab)
-            self._vocab_teacher.weight.requires_grad = False
+            # self.vocab = nn.Linear(config.embedding_size, config.vocab_size, bias=False)
+            # self._vocab_teacher = copy.deepcopy(self.vocab)
+            # self._vocab_teacher.weight.requires_grad = False
 
-            self._center_module = nn.BatchNorm1d(config.vocab_size, affine=False, momentum=0.9)
+            # self._center_module = nn.BatchNorm1d(config.embedding_size, affine=False, momentum=0.9)
                  
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -80,15 +79,15 @@ class pretrainedxLSTM(nn.Module):
         rec, _ = self.reconstruction(out)
 
         if self.use_teacher_student:
-            out = self.vocab(out) 
+            # out = self.vocab(out) 
             with torch.no_grad():
                 x_emb_teacher = self._patch_embedding_teacher(x)
 
                 if self.training_strategy == 'masked_token_prediction':
-                    x_emb_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
+                    out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
 
-                out_teacher = self._vocab_teacher(x_emb_teacher)
-                out_teacher = self._center_module(out_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
+                # out_teacher = self._vocab_teacher(x_emb_teacher)
+                # out_teacher = self._center_module(x_emb_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
                 # centering
             return rec, out_teacher, out
             

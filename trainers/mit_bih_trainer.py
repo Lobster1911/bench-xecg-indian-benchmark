@@ -30,7 +30,6 @@ class TrainingMIT_BIH(L.LightningModule):
         self.r_peaks_lambda = config.r_peaks_lambda
         self.use_focal_loss = config.use_focal_loss
 
-
         self.num_classes = config.num_classes
         self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
         self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)

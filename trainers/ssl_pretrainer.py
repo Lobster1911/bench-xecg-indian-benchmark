@@ -87,7 +87,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
 
-            self.model._vocab_teacher.weight.data = self.model._vocab_teacher.weight.data * beta + (1.0 - beta) * self.model.vocab.weight.data
+            # self.model._vocab_teacher.weight.data = self.model._vocab_teacher.weight.data * beta + (1.0 - beta) * self.model.vocab.weight.data
         
     def validation_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='val')
@@ -182,9 +182,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             min_max = masked_min_max_loss(reconstruction, x, patch_size=self.patch_size)
 
         if 'mae' in self.loss_type:
-            mae = masked_mae_loss(reconstruction, x)
+            mae = masked_mae_loss(reconstruction, x, mask= x != 0)
         else:
-            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x)
+            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x, mask= x != 0)
 
         if 'grad' in self.loss_type:
             grad = gradient_loss(reconstruction, x)
@@ -223,11 +223,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             x_reshaped = x.view(bs, seq_len // self.patch_size, self.patch_size, channels)
             non_zero_mask = x_reshaped.abs().sum(dim=(2, 3)) > 0  # shape: [bs, seq_len]
 
-
-            if self.pretraining_strategy == 'next_token_prediction':
-                teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
-            if self.pretraining_strategy == 'masked_token_prediction':
-                teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
+            # teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
+            teacher_student_loss = masked_mae_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
 
             if self.use_vic_reg_regularization:
                 std_loss, cov_loss = vicreg_loss(last_emb)
@@ -255,7 +252,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             last_emb = last_emb[:, :-1, :] # [bs, seq_len -1, num_hiddens]
             return x, reconstruction, out_teacher, last_emb
         
-        
         return x, reconstruction, None, None
     
     def masked_token_prediction(self, batch):
@@ -271,10 +267,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             # mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
             # mask = mask.unsqueeze(-1)
             # out_teacher = out_teacher.masked_fill(mask, 0)
-            return inverted_masked_x, reconstruction, out_teacher, last_emb
+            return x, reconstruction, out_teacher, last_emb
 
         # needed for the loss function, if the masked value is 0, then the loss function will not consider it
-        return inverted_masked_x, reconstruction, None, None
+        return x, reconstruction, None, None
     
     def get_random_mask(self, x):
         """

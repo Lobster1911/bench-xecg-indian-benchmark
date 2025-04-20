@@ -58,6 +58,18 @@ def masked_mse_loss(input, target, reduction='mean', mask=None):
     else:
         return out
     
+def masked_mae_loss(input, target, reduction='mean', mask=None):
+    out = torch.abs(input-target)
+    # do not consider elements set to 0
+    if mask is not None:
+        out = out[mask]
+    if reduction == "mean":
+        return out.mean()
+    elif reduction == "sum":
+        return out.sum()
+    else:
+        return out
+    
 def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
     # input should be tokenized
     batch_size, sig_len, num_channels = input.shape
@@ -87,17 +99,6 @@ def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
         return out.sum() / tokens_num
     else:
         return out / tokens_num
-
-def masked_mae_loss(input, target, reduction='mean'):
-    out = torch.abs(input-target)
-    # do not consider elements set to 0
-    out = out[target != 0]
-    if reduction == "mean":
-        return out.mean()
-    elif reduction == "sum":
-        return out.sum()
-    else:
-        return out
     
 def gradient_loss(input, target, reduction='mean', p=2):
     input_grad = input[:, 1:] - input[:, :-1]
