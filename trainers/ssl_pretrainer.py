@@ -166,7 +166,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         return super().on_validation_epoch_end()
     
     def reconstruct_batch(self, batch, step):
-
         if self.pretraining_strategy == 'next_token_prediction':
             x, reconstruction, out_teacher, last_emb = self.next_token_prediction(batch)
             mask = None #TODO fix this and set the mask accorgindli to padded tokens
@@ -176,7 +175,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             # so the loss  function will automatically skip the masked values
             # mask is 1 for masked and 0 for non masked
             x, reconstruction, out_teacher, last_emb, mask = self.masked_token_prediction(batch)
-
+                
         nrmse = np.inf
 
         # compute the loss and use the gradients only when it is needed
@@ -241,7 +240,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self.log(f"{step}_norm_emb", norm.item(), prog_bar=True, batch_size=self.batch_size)
 
             # log the mean cosine similarity between all samples in the batch
-            max_pool = last_emb.max(dim=1)[0] # shape [bs, num_hiddens]
+            max_pool = last_emb.avg(dim=1)[0] # shape [bs, num_hiddens]
             cos_sim = torch.nn.functional.cosine_similarity(max_pool.unsqueeze(1), max_pool.unsqueeze(0), dim=-1)
             cos_sim = cos_sim.mean()
             self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=True, batch_size=batch_size)

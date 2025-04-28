@@ -82,7 +82,7 @@ class pretrainedxLSTM(nn.Module):
 
                 if self.training_strategy == 'masked_token_prediction':
                     out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
-
+                    
                 # out_teacher = self._vocab_teacher(x_emb_teacher)
                 out_teacher = self._centering(x_emb_teacher) # [batch_size, embedding_dim]
 

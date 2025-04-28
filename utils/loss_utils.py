@@ -121,4 +121,3 @@ def contrastive_cluster_loss(outputs, patient_ids, margin=0.1):
     loss = losses.sum(dim=1).mean()
 
     return loss
-
