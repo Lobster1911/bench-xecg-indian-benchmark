@@ -36,7 +36,7 @@ def vicreg_loss(embedding, reduction='mean'):
 def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean'):
     loss = torch.sum(F.softmax(target, dim=-1) * F.log_softmax(input, dim=-1), dim=-1)
     if mask is not None:
-        loss = loss[mask]
+        loss = loss[mask.max(dim=-1)[0]]
     if reduction == "mean":
         loss = -loss.mean()
     elif reduction == "sum":
@@ -48,7 +48,6 @@ def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean'):
 
 def masked_mse_loss(input, target, reduction='mean', mask=None):
     out = (input - target)**2
-    # do not consider elements to 0 from the input
     if mask is not None:
         out = out[mask]
     if reduction == "mean":
@@ -62,6 +61,7 @@ def masked_mae_loss(input, target, reduction='mean', mask=None):
     out = torch.abs(input-target)
     # do not consider elements set to 0
     if mask is not None:
+        #expand the mask with 12 channels
         out = out[mask]
     if reduction == "mean":
         return out.mean()
@@ -70,7 +70,7 @@ def masked_mae_loss(input, target, reduction='mean', mask=None):
     else:
         return out
     
-def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
+def masked_min_max_loss(input, target, reduction='mean', patch_size=100, mask=None):
     # input should be tokenized
     batch_size, sig_len, num_channels = input.shape
     #print('batch_size', batch_size)
@@ -91,7 +91,8 @@ def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
     out = (min_inp - min_target)**2 + (max_inp - max_target)**2
 
     # do not consider elements set to 0
-    out = out[max_target != 0]
+    if mask is not None:
+        out = out[mask]
 
     if reduction == "mean":
         return out.mean() / tokens_num
@@ -100,13 +101,15 @@ def masked_min_max_loss(input, target, reduction='mean', patch_size=100):
     else:
         return out / tokens_num
     
-def gradient_loss(input, target, reduction='mean', p=2):
+def gradient_loss(input, target, reduction='mean', p=2, mask=None):
     input_grad = input[:, 1:] - input[:, :-1]
     target_grad = target[:, 1:] - target[:, :-1]
     out = torch.pow(input_grad - target_grad, p)
     # do not consider elements that was at 0 in the input
     # using [:, :-1] because preserve the order of the elements
-    out = out[target[:, :-1] != 0]
+    if mask is not None:
+        #expand the mask with 12 channels
+        out = out[mask[:, :-1]]
     if reduction == "mean":
         return out.mean()
     elif reduction == "sum":

@@ -169,32 +169,38 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         if self.pretraining_strategy == 'next_token_prediction':
             x, reconstruction, out_teacher, last_emb = self.next_token_prediction(batch)
+            mask = None #TODO fix this and set the mask accorgindli to padded tokens
         if self.pretraining_strategy == 'masked_token_prediction':
             # masking is automatically done inside this function
             # x will be masked with the inverse of the mask
             # so the loss  function will automatically skip the masked values
-            x, reconstruction, out_teacher, last_emb = self.masked_token_prediction(batch)
+            # mask is 1 for masked and 0 for non masked
+            x, reconstruction, out_teacher, last_emb, mask = self.masked_token_prediction(batch)
 
         nrmse = np.inf
 
         # compute the loss and use the gradients only when it is needed
+        batch_size, tokens_num, channels = x.shape
+        patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)
+        mask = mask.view(batch_size, tokens_num, 1).repeat_interleave(channels, dim=-1)
+
         if 'min_max' in self.loss_type:
-            min_max = masked_min_max_loss(reconstruction, x, patch_size=self.patch_size)
+            min_max = masked_min_max_loss(reconstruction, x, patch_size=self.patch_size, mask=patched_mask)
 
         if 'mae' in self.loss_type:
-            mae = masked_mae_loss(reconstruction, x, mask= x != 0)
+            mae = masked_mae_loss(reconstruction, x, mask=mask)
         else:
-            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x, mask= x != 0)
+            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x, mask=mask)
 
         if 'grad' in self.loss_type:
-            grad = gradient_loss(reconstruction, x)
+            grad = gradient_loss(reconstruction, x, mask=mask)
         else:
-            with torch.no_grad(): grad = gradient_loss(reconstruction, x)
-        
+            with torch.no_grad(): grad = gradient_loss(reconstruction, x, mask=mask)
+
         if 'mse' in self.loss_type:
-            mse = masked_mse_loss(reconstruction, x, reduction='mean', mask= x != 0)
+            mse = masked_mse_loss(reconstruction, x, reduction='mean', mask=mask)
         else:
-            with torch.no_grad(): mse = masked_mse_loss(reconstruction, x, reduction='mean', mask= x != 0)
+            with torch.no_grad(): mse = masked_mse_loss(reconstruction, x, reduction='mean', mask=mask)
    
         # calculate the normalized root squared error only for the first token prediction
         with torch.no_grad():
@@ -207,33 +213,40 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
         if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
 
-        self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=self.batch_size)
+        self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=batch_size)
 
-        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=self.batch_size)
-        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=self.batch_size)
-        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=self.batch_size)
+        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=batch_size)
+        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=batch_size)
+        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=batch_size)
+        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=batch_size)
         
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=self.batch_size)
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=batch_size)
 
         if self.model.use_teacher_student:
             # last_emb [bs, seq_len -1, num_hiddens]
             # x [bs, seq_len * patch_size, channels]
-            bs, seq_len, channels = x.shape
-            x_reshaped = x.view(bs, seq_len // self.patch_size, self.patch_size, channels)
-            non_zero_mask = x_reshaped.abs().sum(dim=(2, 3)) > 0  # shape: [bs, seq_len]
-
-            # teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
-            teacher_student_loss = masked_mae_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
+            teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, reduction='mean', mask=patched_mask)
+            # teacher_student_loss = masked_mae_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
 
             if self.use_vic_reg_regularization:
                 std_loss, cov_loss = vicreg_loss(last_emb)
-                self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=self.batch_size)
-                self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=self.batch_size)
-                self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=self.batch_size)
+                self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=batch_size)
+                self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=batch_size)
+                self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=batch_size)
                 teacher_student_loss = teacher_student_loss + std_loss * self.beta_std + cov_loss * self.beta_cov
 
-            self.log(f"{step}_jepa_loss", teacher_student_loss.item(), prog_bar=True, batch_size=self.batch_size)
+            # log norm of output
+            norm = torch.norm(last_emb, dim=-1)
+            norm = norm.mean()
+            self.log(f"{step}_norm_emb", norm.item(), prog_bar=True, batch_size=self.batch_size)
+
+            # log the mean cosine similarity between all samples in the batch
+            max_pool = last_emb.max(dim=1)[0] # shape [bs, num_hiddens]
+            cos_sim = torch.nn.functional.cosine_similarity(max_pool.unsqueeze(1), max_pool.unsqueeze(0), dim=-1)
+            cos_sim = cos_sim.mean()
+            self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=True, batch_size=batch_size)
+
+            self.log(f"{step}_jepa_loss", teacher_student_loss.item(), prog_bar=True, batch_size=batch_size)
 
             return loss, teacher_student_loss
 
@@ -256,33 +269,33 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def masked_token_prediction(self, batch):
         x = self.pad(batch["signal"])
-        mask = self.get_random_mask(x) # 1 is non masked and 0 is masked
+        mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
 
         # mask a rnadom number of patches
-        masked_x = x.masked_fill(~mask, 0) # apply the mask
+        masked_x = x.masked_fill(mask, 0) # apply the mask
         reconstruction, out_teacher, last_emb = self.model(masked_x)
-        inverted_masked_x = x.masked_fill(mask, 0) # set to 0 the non masked values
 
         if self.model.use_teacher_student:
-            # mask = mask.view(mask.shape[0], out_teacher.shape[1], self.patch_size).sum(dim=-1) == 0
-            # mask = mask.unsqueeze(-1)
-            # out_teacher = out_teacher.masked_fill(mask, 0)
-            return x, reconstruction, out_teacher, last_emb
+            return x, reconstruction, out_teacher, last_emb, mask
 
         # needed for the loss function, if the masked value is 0, then the loss function will not consider it
-        return x, reconstruction, None, None
+        return x, reconstruction, None, None, mask
     
     def get_random_mask(self, x):
         """
-        Retutn a mask of the same shape as x, where the masked values are 0 and the unmasked values are 1
+        Retutn a mask of the same shape as x, masked values are set to TRUE
         """
         # masking the signal
         num_patches = x.shape[1] // self.patch_size
         rand = torch.rand(x.shape[0], num_patches, device=self.device)
-        mask = (rand > self.mask_ratio) # this is true for non masked
+        mask = (rand < self.mask_ratio) # this is true for masked
         # repeat the mask to num_patches * patch_size
         mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
-        return mask
+        # check when the x was all 0 and set the mask to 0
+        padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
+        #print('padding mask', padding_mask.shape)
+        #print('mask', mask.shape)
+        return mask | padding_mask
 
     def pad(self, x):
         # remove thte exceeding part of the signal not patchable

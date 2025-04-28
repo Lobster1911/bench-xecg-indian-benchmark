@@ -24,7 +24,7 @@ def configure_optimizers(trainer):
             optimizer, 
             num_warmup_steps = warmup_steps, 
             num_training_steps = num_training_steps, 
-            num_cycles = (num_training_steps // warmup_steps) // trainer.num_epochs_warm_restart,
+            num_cycles = (num_training_steps // warmup_steps) / trainer.num_epochs_warm_restart,
             decay_factor=trainer.sched_decay_factor
         )
 

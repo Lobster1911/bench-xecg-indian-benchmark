@@ -58,6 +58,8 @@ def get_xlstm(
         num_heads=4,
         bidirectional=False,
     ):
+    print(f"Using xLSTM with blocks: {blocks}")
+    print([1 if b == 's' else 0 for b in blocks])
     cfg = xLSTMBlockStackConfig(
         mlstm_block=mLSTMBlockConfig(
             mlstm=mLSTMLayerConfig(
@@ -79,7 +81,7 @@ def get_xlstm(
         context_length=700,
         num_blocks=len(blocks),
         embedding_dim=embedding_dim,
-        slstm_at=[1 if b == 's' else 0 for b in blocks],
+        slstm_at=[idx if b == 's' else 0 for idx, b in enumerate(blocks)],
         dropout=dropout,
     )
     blocks = xLSTMBlockStack(cfg)

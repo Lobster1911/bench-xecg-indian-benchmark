@@ -28,6 +28,7 @@ class TrainingPTB_XL(L.LightningModule):
         self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
         self.use_focal_loss = config.use_focal_loss
+        self.linear_probing = config.linear_probing
 
         self.classification_taksk = config.classification_task
 
@@ -209,6 +210,11 @@ class TrainingPTB_XL(L.LightningModule):
         return loss_cls, logits, preds, targets
 
     def get_params(self):
+        if self.linear_probing:
+            return [
+                {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
+            ]
+
         return [
             {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
             {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}

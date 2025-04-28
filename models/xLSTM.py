@@ -42,26 +42,23 @@ class pretrainedxLSTM(nn.Module):
         if self.use_teacher_student:   
             self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
             
-            if self.training_strategy == 'masked_token_prediction':
-                self._xlstm_teacher = copy.deepcopy(self.xlstm)
-                # discard the last two blocks of the xlstm, in this way the student has to more layers and it is different than the parent
-                # do not require gradients for the teacher and copy from the student
-                for param_t in self._xlstm_teacher.parameters():
-                    param_t.requires_grad = False
+            self._xlstm_teacher = copy.deepcopy(self.xlstm)
 
-                self._xlstm_teacher.eval()
-                # self._xlstm_teacher.model.blocks = self._xlstm_teacher.model.blocks[:-2]
+            # do not require gradients for the teacher and copy from the student
+            for param_t in self._xlstm_teacher.parameters():
+                param_t.requires_grad = False
+
 
             for param_t in self._patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
 
             self._patch_embedding_teacher.eval()
 
-            # self.vocab = nn.Linear(config.embedding_size, config.vocab_size, bias=False)
+            self.predictor = nn.Linear(config.embedding_size, config.embedding_size)
             # self._vocab_teacher = copy.deepcopy(self.vocab)
             # self._vocab_teacher.weight.requires_grad = False
 
-            # self._center_module = nn.BatchNorm1d(config.embedding_size, affine=False, momentum=0.9)
+            self._centering = Centering(config.embedding_size, momentum=0.95)
                  
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -79,7 +76,7 @@ class pretrainedxLSTM(nn.Module):
         rec, _ = self.reconstruction(out)
 
         if self.use_teacher_student:
-            # out = self.vocab(out) 
+            out = self.predictor(out) 
             with torch.no_grad():
                 x_emb_teacher = self._patch_embedding_teacher(x)
 
@@ -87,8 +84,8 @@ class pretrainedxLSTM(nn.Module):
                     out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
 
                 # out_teacher = self._vocab_teacher(x_emb_teacher)
-                # out_teacher = self._center_module(x_emb_teacher.permute(0, 2, 1)).permute(0, 2, 1) # [batch_size, embedding_dim]
-                # centering
+                out_teacher = self._centering(x_emb_teacher) # [batch_size, embedding_dim]
+
             return rec, out_teacher, out
             
         return rec, None, None
@@ -126,7 +123,6 @@ class pretrainedxLSTM(nn.Module):
                 reconstructed.append(r)
             
             return torch.cat(reconstructed, dim=1)
-
 
     def trainable_parameters(self):
         if self.use_teacher_student:
@@ -204,9 +200,14 @@ class xLSTMClassification(pretrainedxLSTM):
         # config.dropout = 0.0  
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
+    
         self.use_cls_token = config.use_cls_token
         if self.use_cls_token:
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+            nn.init.xavier_uniform_(self.cls_token, gain=1.0)
+
+
+        self.norm = nn.LayerNorm(normalized_shape=config.embedding_size)
 
         self.fc = HeadModule(
             inp_size=config.embedding_size,
@@ -223,19 +224,59 @@ class xLSTMClassification(pretrainedxLSTM):
             x = torch.cat([x, cls_token], dim=1)
 
         out = self.xlstm(x, need_expansion=False)# [:, -1, :]
-        out = out.max(dim=1)[0]
+
+        if self.use_cls_token: out = out[:, -1, :] # remove the cls token
+        else: out = out.max(dim=1)[0]
+
+        out = self.norm(out)
         cls = self.fc(out)
         return cls
     
     def finetuning_params(self):
         params = []
         params.extend(self.xlstm.parameters())
-        params.extend(self.patch_embedding.parameters())
+        params.extend(self.patch_embedding.parameters())       
+        if self.use_cls_token:
+            params.append(self.cls_token)
         return params
 
     def training_params(self):
         params = []
         params.extend(self.fc.parameters())
-        if self.use_cls_token:
-            params.append(self.cls_token)
+ 
         return params
+
+
+class Centering(nn.Module):
+    def __init__(self, dim, momentum=0.9):
+        """
+        Args:
+            dim (int): Dimension of the embeddings to center.
+            momentum (float): EMA momentum for updating the center (e.g., 0.9 or 0.99).
+        """
+        super().__init__()
+        self.momentum = momentum
+        self.register_buffer('center', torch.zeros(1, dim))
+
+    @torch.no_grad()
+    def update_center(self, batch_output):
+        """
+        Update the running center with the current batch output.
+
+        Args:
+            batch_output (Tensor): Batch of teacher outputs [batch_size, dim].
+        """
+        batch_center = batch_output.mean(dim=0, keepdim=True)
+        self.center = self.center * self.momentum + batch_center * (1 - self.momentum)
+
+    def forward(self, teacher_output):
+        """
+        Center the teacher output by subtracting the running center.
+
+        Args:
+            teacher_output (Tensor): Teacher outputs [batch_size, dim].
+
+        Returns:
+            centered_output (Tensor): Centered teacher outputs.
+        """
+        return teacher_output - self.center

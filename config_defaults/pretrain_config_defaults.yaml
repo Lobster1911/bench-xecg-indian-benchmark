@@ -1,6 +1,6 @@
 # training hyperparameters
 epochs: 100
-lr: 0.0001
+lr: 0.001
 wd: 0.0001
 dropout: 0.3
 grad_clip: 0.5

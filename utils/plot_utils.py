@@ -21,12 +21,11 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
         if training_strategy == 'masked_token_prediction':
             num_patches = x.shape[1] // patch_size
             rand = torch.rand(x.shape[0], num_patches, device=device)
-            mask = (rand > mask_ratio) # it will be 0 where I have to mask
+            mask = (rand < mask_ratio) # it will be 0 where I have to mask
             # repeat the mask to num_patches * patch_size
             mask = mask.repeat_interleave(patch_size, dim=1).unsqueeze(-1)
             # mask a rnadom number of patches
-            x = x.masked_fill(~mask, 0)
-
+            x = x.masked_fill(mask, 0)
 
 
         reconstruct, _, _ = model(x)
@@ -65,9 +64,9 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
                 
             if training_strategy == 'masked_token_prediction':
                 if mask.shape[0] == 1:
-                    ax_mask = ~mask.squeeze()
+                    ax_mask = mask.squeeze()
                 else:
-                    ax_mask = ~mask[i]
+                    ax_mask = mask[i]
 
                 ax.fill_between(
                     list(range(x.shape[1])),
