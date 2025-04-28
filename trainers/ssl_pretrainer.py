@@ -240,7 +240,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self.log(f"{step}_norm_emb", norm.item(), prog_bar=True, batch_size=self.batch_size)
 
             # log the mean cosine similarity between all samples in the batch
-            max_pool = last_emb.avg(dim=1)[0] # shape [bs, num_hiddens]
+            max_pool = last_emb.mean(dim=1)[0] # shape [bs, num_hiddens]
             cos_sim = torch.nn.functional.cosine_similarity(max_pool.unsqueeze(1), max_pool.unsqueeze(0), dim=-1)
             cos_sim = cos_sim.mean()
             self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=True, batch_size=batch_size)
