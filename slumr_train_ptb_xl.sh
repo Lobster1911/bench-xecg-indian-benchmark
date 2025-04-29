@@ -3,7 +3,7 @@
 #SBATCH --partition=h100
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=128
 #SBATCH --mem-per-cpu=1G
 #SBATCH --time=7-00:00:00
 #SBATCH -o ./logs/slurm_output_%j_%x.out # STDOUT
@@ -16,4 +16,4 @@ echo $CUDA_VISIBLE_DEVICES
 #conda activate xlstm_pretrained
 
 # run script from above
-srun ~/.conda/envs/xlstm_pretrained/bin/python -u pretrain.py
+srun ~/.conda/envs/xlstm_pretrained/bin/python -u train_ptb_xl.py
