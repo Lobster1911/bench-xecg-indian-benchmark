@@ -47,7 +47,7 @@ use_vic_reg_regularization: false
 
 # data and augmentations hyperparameters
 normalize: true
-random_shift: true
+random_crop: 0.9
 random_drop_leads: 0
 random_surrogate_prob: 0
 random_jitter_prob: 0

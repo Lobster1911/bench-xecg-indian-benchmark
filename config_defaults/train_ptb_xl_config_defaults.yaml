@@ -34,7 +34,7 @@ use_cls_token: false
 use_focal_loss: false
 
 normalize: true
-random_shift: true
+random_crop: 0.9
 nk_clean: true
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 

@@ -4,28 +4,29 @@ from tqdm import tqdm
 import torch
 from joblib import Parallel, delayed
 from torchvision import transforms
-from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
+from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop
 
 
 def get_transforms(config):
-    return transforms.Compose([ 
-        RandomDropLeads(config.random_drop_leads),
-        FTSurrogate(0.05, prob=config.random_surrogate_prob),
-        Jitter(sigma=0.1, prob=config.random_jitter_prob),
-        RandomResample(360, max_freq_delta=10)
-    ])
+    t = transforms.Compose([])
+    if config.normalize:
+        t.transforms.append(Normalize(mean=config.mean, std=config.std))
+    if config.random_crop < 1.:
+        t.transforms.append(RandomCrop(config.random_crop))
+    if config.random_drop_leads > 0.:
+        t.transforms.append(RandomDropLeads(config.random_drop_leads))
+    if config.random_surrogate_prob > 0.:
+        t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))
+    if config.random_jitter_prob > 0.:  
+        t.transforms.append(Jitter(sigma=0.1, prob=config.random_jitter_prob))
+    if config.random_resample > 0.:
+        t.transforms.append(RandomResample(360, max_freq_delta=10))
+    return t
+
 
 def get_max_n_jobs(default=-1):
     n_jobs = int(os.getenv("SLURM_CPUS_PER_TASK", default))
     return n_jobs
-    
-
-def random_shift(signal, patch_size):
-    # remove a random number of datapoints from the signal from 0 to patch size 
-    shift = np.random.randint(0, patch_size // 2)
-    if shift > 0 and len(signal) > shift:
-        signal = signal[shift:]
-    return signal
 
     
 def find_records(folder, header_extension='.dat'):
@@ -44,10 +45,20 @@ def find_records(folder, header_extension='.dat'):
     records = sorted(records)
     return records
 
+
 def collate_fn(batch):
     signals = [item['signal'] for item in batch]
-    padded_signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+    # pad the signals to the same length
+    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-    return {
-        'signal': padded_signals,
+    tortn = {
+        'signals': signals,
     }
+
+    if 'signal_2' in batch[0].keys() is not None:    
+        signals_2 = [item['signal_2'] for item in batch]
+        # pad the signals to the same length
+        signals_2 = torch.nn.utils.rnn.pad_sequence(signals_2, batch_first=True)
+        tortn['signals_2'] = signals_2
+        
+    return tortn

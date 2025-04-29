@@ -17,23 +17,15 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
         orig_signal = x.clone()
         x = F.pad(x, (0, 0, 0, patch_size - x.shape[1] % patch_size))
 
-
-        if training_strategy == 'masked_token_prediction':
-            num_patches = x.shape[1] // patch_size
-            rand = torch.rand(x.shape[0], num_patches, device=device)
-            mask = (rand < mask_ratio) # it will be 0 where I have to mask
-            # repeat the mask to num_patches * patch_size
-            mask = mask.repeat_interleave(patch_size, dim=1).unsqueeze(-1)
-            # mask a rnadom number of patches
-            x = x.masked_fill(mask, 0)
-
-
-        reconstruct, _, _ = model(x)
+        reconstruct, _, _, mask = model(x)
 
         if training_strategy == 'next_token_prediction':
             orig_signal = orig_signal[:, :reconstruct.shape[1]]
             orig_signal = orig_signal[:, patch_size:].squeeze()
             reconstruct = reconstruct[:, :-patch_size]
+        else:
+            mask = mask[:, :-patch_size, :]
+            reconstruct = reconstruct[:, :-patch_size, :]
 
         # try to reconstruct one element at a time
         reconstruct = reconstruct.view(1, -1, orig_signal.shape[-1])

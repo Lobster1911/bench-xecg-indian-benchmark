@@ -2,28 +2,18 @@ import torch
 import os
 import pandas as pd
 import wfdb
-import neurokit2 as nk
-import numpy as np
-from dataset.generic_utils import random_shift
-from torch.utils.data import random_split
-import json
 import ast
-import torchvision.transforms as transforms
+from dataset.pretraining_dataset import PretrainDataset
+
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
-class ECGPTBXLDataset(torch.utils.data.Dataset):
+class ECGPTBXLDataset(PretrainDataset):
 
     def __init__(self, config, leads_to_use=leads, split='train', augmentations=None):
+        super().__init__(config, leads_to_use=leads_to_use, split=split, augmentations=augmentations)
         self.data_folder = config.data_folder_ptbxl
-        self.random_shift = config.random_shift and split == 'train'
-        self.nkclean = config.nk_clean
-        self.leads = leads if leads_to_use == ['*'] else leads_to_use
-        self.patch_size = config.patch_size
-        self.normalize = config.normalize
         self.labels_file = config.labels_file_ptbxl
-        self.split = split
-        self.augmentations = augmentations
         self.load_tabular_data()
         self.load_records(split)
 
@@ -41,6 +31,8 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
             # get all the tab data index where the fold is 19
             self.records = self.tab_data[self.tab_data['strat_fold'] == 10]['filename_hr'].values.tolist()
             self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 10]
+
+        self.records = [os.path.join(self.data_folder, record.split('/')[1], record.split('/')[2]) for record in self.records]
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
@@ -78,24 +70,6 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         return len(self.records)
 
     def __getitem__(self, idx):
-        signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, self.records[idx].split('/')[1], self.records[idx].split('/')[2]))
-        if self.random_shift: signal = random_shift(signal, self.patch_size)
-
-        signal = torch.tensor(signal, dtype=torch.float32)
-
-        if self.leads != leads:
-            # keep the selected leads
-            signal = signal[:, [leads.index(lead) for lead in self.leads]].squeeze()
-
-        # normalize the signal by subtracting the mean and dividing by the standard deviation
-        if self.normalize:
-            std = signal.std(axis=(0, -1))
-            std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-            signal = (signal - signal.mean(axis=(0, -1))) / std
-
-        if self.augmentations is not None:
-            signal = self.augmentations(signal)
-
         superclass_label = self.tab_data.iloc[idx]['diagnostic_superclass']
         # convert the superclass label to a one-hot encoding
         superclass_label = [1 if label in superclass_label else 0 for label in self.classes]
@@ -104,23 +78,36 @@ class ECGPTBXLDataset(torch.utils.data.Dataset):
         # convert the subclass label to a one-hot encoding
         subclass_label = [1 if label in subclass_label else 0 for label in self.subclasses]
   
-        return {
-            'signal':signal,
+        class_info = {
             'class_label': torch.tensor(superclass_label, dtype=torch.float32),
             'subclass_label': torch.tensor(subclass_label, dtype=torch.float32),
         }
-    
+
+        signal = super().__getitem__(idx)
+        # concatenate the two dictionaries
+        signal.update(class_info)
+        return signal
 
 def collate_fn(batch):
     signals = [item['signal'] for item in batch]
+
     superclass_labels = [item['class_label'] for item in batch]
     subclass_labels = [item['subclass_label'] for item in batch]
 
     # pad the signals to the same length
     signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-    return {
+    tortn = {
         'signals': signals,
         'class_labels': torch.stack(superclass_labels),
         'subclass_labels': torch.stack(subclass_labels),
     }
+
+    if 'signal_2' in batch[0].keys() is not None:    
+        signals_2 = [item['signal_2'] for item in batch]
+        signals_2 = torch.nn.utils.rnn.pad_sequence(signals_2, batch_first=True)
+        tortn['signals_2'] = signals_2
+
+    return tortn
+
+    

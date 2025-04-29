@@ -26,6 +26,7 @@ class pretrainedxLSTM(nn.Module):
         self.training_strategy = config.strategy
         self.use_teacher_student = config.use_teacher_student
         self.mask_ratio = config.mask_ratio
+        self.embedding_size = config.embedding_size
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
@@ -39,6 +40,11 @@ class pretrainedxLSTM(nn.Module):
             self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
         else:
             self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
+
+        if self.training_strategy == 'masked_token_prediction':
+            self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+            self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+            nn.init.xavier_uniform_(self.cls_token, gain=1.0)
 
         if self.use_teacher_student:   
             self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
@@ -61,8 +67,10 @@ class pretrainedxLSTM(nn.Module):
 
             self._centering = Centering(config.embedding_size, momentum=0.95)
 
-        if self.training_strategy == 'masked_token_prediction':
-            self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+            if self.training_strategy == 'masked_token_prediction':
+                self._cls_token_teacher = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+                self._cls_token_teacher.data.copy_(self.cls_token.data)
+                self._cls_token_teacher.requires_grad = False
             
                  
         if reconstruction:
@@ -83,6 +91,13 @@ class pretrainedxLSTM(nn.Module):
             batch_size, tokens_num, _ = x.shape
             patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
             x_emb[patched_mask] = self.mask_token
+
+            # add the cls_token
+            cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+            x_emb = torch.cat([x_emb, cls_token], dim=1)
+            # add the cls token to the mask
+            cls_token_mask = torch.zeros(batch_size, self.patch_size, 1, device=x.device).bool()
+            mask = torch.cat([mask, cls_token_mask], dim=1)
         else:
             mask = None
             x_emb = self.patch_embedding(x)
@@ -95,15 +110,14 @@ class pretrainedxLSTM(nn.Module):
         if self.use_teacher_student:
             out = self.predictor(out) 
             with torch.no_grad():
-                x_emb_teacher = self._patch_embedding_teacher(masked_x)
-
                 if self.training_strategy == 'masked_token_prediction':
                     x_emb_teacher = self._patch_embedding_teacher(masked_x)
+                    cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+                    x_emb_teacher = torch.cat([x_emb_teacher, cls_token], dim=1)
                 else: 
                     x_emb_teacher = self._patch_embedding_teacher(x)
                 
                 out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=need_expansion)
-                    
                 out_teacher = self._centering(x_emb_teacher) # [batch_size, embedding_dim]
 
             return rec, out_teacher, out, mask

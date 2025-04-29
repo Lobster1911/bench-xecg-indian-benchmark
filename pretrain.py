@@ -41,8 +41,8 @@ def pretrain(config, run=None, wandb=False):
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
-    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val')
-    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val')
+    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val', augmentations=get_transforms(config))
+    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', augmentations=get_transforms(config))
 
     val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
 
@@ -53,7 +53,7 @@ def pretrain(config, run=None, wandb=False):
     len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
-    if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
+    # if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
 
     xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))

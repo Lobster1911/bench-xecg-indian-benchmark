@@ -29,8 +29,6 @@ parameters:
     value: 0.3
   wandb_log:
     value: True
-  random_shift:
-    value: True
   data_folder_mit:
     value: '/media/Volume/data/MIT-BHI/data/'
   pretrain_with_code15:

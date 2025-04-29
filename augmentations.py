@@ -13,6 +13,39 @@ from typing import Any
 import torch.nn as nn
 from scipy.signal import butter, lfilter, resample
 
+class Normalize(nn.Module):
+    """
+        Normalize the signal.
+    """
+    def __init__(self, mean=0.0, std=1.0):
+        super(Normalize, self).__init__()
+        self.mean = mean
+        self.std = std
+
+    def forward(self, signal):
+        std = signal.std(axis=(0, -1))
+        std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
+        return (signal - signal.mean(axis=(0, -1))) / std
+    
+class RandomCrop(nn.Module):
+    """
+        Randomly crop the signal.
+    """
+    def __init__(self, crop_size=0.9):
+        super(RandomCrop, self).__init__()
+        self.crop_size = crop_size
+
+    def forward(self, signal):
+        # Get the size of the signal
+        signal_length = signal.shape[0]
+        # Calculate the target length
+        target_length = int(signal_length * self.crop_size)
+        # Randomly sample the starting point for the cropping (cut-off)
+        start_idx = np.random.randint(low=0, high=signal_length - target_length)
+        # Crop the signal
+        return signal[start_idx:start_idx + target_length, ...]
+
+
 
 class RandomDropLeads(nn.Module):
     """

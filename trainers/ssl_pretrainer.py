@@ -86,6 +86,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            
+            self.model._cls_token_teacher.data = self.model._cls_token_teacher.data * beta + (1.0 - beta) * self.model.cls_token.data
 
             # self.model._vocab_teacher.weight.data = self.model._vocab_teacher.weight.data * beta + (1.0 - beta) * self.model.vocab.weight.data
         
@@ -166,44 +168,32 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         return super().on_validation_epoch_end()
     
     def reconstruct_batch(self, batch, step):
+        signal = batch["signals"]
+        batch_size, _, _ = signal.shape
         if self.pretraining_strategy == 'next_token_prediction':
-            x, reconstruction, out_teacher, last_emb = self.next_token_prediction(batch)
-            mask = None #TODO fix this and set the mask accorgindli to padded tokens
+            x, rec, out_teacher, last_emb = self.next_token_prediction(batch)
+            mask = None #TODO fix this and set the mask accordingly to padded tokens
         if self.pretraining_strategy == 'masked_token_prediction':
             # masking is automatically done inside this function
             # x will be masked with the inverse of the mask
             # so the loss  function will automatically skip the masked values
             # mask is 1 for masked and 0 for non masked
-            x, reconstruction, out_teacher, last_emb, mask = self.masked_token_prediction(batch)
+            x, rec, out_teacher, last_emb, mask = self.masked_token_prediction(signal)
+            if self.model.use_teacher_student:
+                signal2 = batch["signals_2"]
+                x2, rec2, out_teacher2, last_emb2, mask2 = self.masked_token_prediction(signal2)
                 
-        nrmse = np.inf
-
         # compute the loss and use the gradients only when it is needed
-        batch_size, tokens_num, channels = x.shape
-        patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)
-        mask = mask.view(batch_size, tokens_num, 1).repeat_interleave(channels, dim=-1)
 
-        if 'min_max' in self.loss_type:
-            min_max = masked_min_max_loss(reconstruction, x, patch_size=self.patch_size, mask=patched_mask)
+        nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(rec, x, mask)
 
-        if 'mae' in self.loss_type:
-            mae = masked_mae_loss(reconstruction, x, mask=mask)
-        else:
-            with torch.no_grad(): mae = masked_mae_loss(reconstruction, x, mask=mask)
-
-        if 'grad' in self.loss_type:
-            grad = gradient_loss(reconstruction, x, mask=mask)
-        else:
-            with torch.no_grad(): grad = gradient_loss(reconstruction, x, mask=mask)
-
-        if 'mse' in self.loss_type:
-            mse = masked_mse_loss(reconstruction, x, reduction='mean', mask=mask)
-        else:
-            with torch.no_grad(): mse = masked_mse_loss(reconstruction, x, reduction='mean', mask=mask)
-   
-        # calculate the normalized root squared error only for the first token prediction
-        with torch.no_grad():
-            nrmse = torch.sqrt(mse) / (x.max() - x.min())
+        if self.pretraining_strategy == 'masked_token_prediction' and self.model.use_teacher_student:
+            nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(rec2, x2, mask2)
+            nrmse = (nrmse + nrmse2) / 2
+            mse = (mse + mse2) / 2
+            mae = (mae + mae2) / 2
+            grad = (grad + grad2) / 2
+            min_max = (min_max + min_max2) / 2
         
         loss = torch.tensor(0.0, device=self.device)
         if 'mae' in self.loss_type: loss += mae
@@ -224,14 +214,32 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         if self.model.use_teacher_student:
             # last_emb [bs, seq_len -1, num_hiddens]
             # x [bs, seq_len * patch_size, channels]
+            
+            num_patches = x.shape[1] // self.patch_size + 1 if self.pretraining_strategy == 'masked_token_prediction' else x.shape[1] // self.patch_size
+            patched_mask = mask.view(batch_size, num_patches, self.patch_size)
+
             teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, reduction='mean', mask=patched_mask)
-            # teacher_student_loss = masked_mae_loss(last_emb, out_teacher, mask=non_zero_mask, reduction='mean')
+            self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=batch_size)
+
+            if self.pretraining_strategy == 'masked_token_prediction':
+                num_patches = x2.shape[1] // self.patch_size + 1
+                patched_mask2 = mask2.view(batch_size, num_patches, self.patch_size)
+
+                teacher_student_loss2 = embedding_cross_entropy_loss(last_emb2, out_teacher2, reduction='mean', mask=patched_mask2)
+
+                cls_token, cls_token2 = last_emb[:, -1, :], last_emb2[:, -1, :]
+                cls_token_teacher, cls_token_teacher2 = out_teacher[:, -1, :], out_teacher2[:, -1, :]
+
+                cls_loss = embedding_cross_entropy_loss(cls_token, cls_token_teacher2, reduction='mean')
+                cls_loss2 = embedding_cross_entropy_loss(cls_token2, cls_token_teacher, reduction='mean')
+
+                self.log(f"{step}_cls_loss", ((cls_loss + cls_loss2) / 2).item(), prog_bar=True, batch_size=batch_size)
+                teacher_student_loss = (teacher_student_loss + teacher_student_loss2 + cls_loss + cls_loss2) / 4
 
             if self.use_vic_reg_regularization:
                 std_loss, cov_loss = vicreg_loss(last_emb)
                 self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=batch_size)
                 self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=batch_size)
-                self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=batch_size)
                 teacher_student_loss = teacher_student_loss + std_loss * self.beta_std + cov_loss * self.beta_cov
 
             # log norm of output
@@ -240,8 +248,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self.log(f"{step}_norm_emb", norm.item(), prog_bar=True, batch_size=self.batch_size)
 
             # log the mean cosine similarity between all samples in the batch
-            max_pool = last_emb.mean(dim=1)[0] # shape [bs, num_hiddens]
-            cos_sim = torch.nn.functional.cosine_similarity(max_pool.unsqueeze(1), max_pool.unsqueeze(0), dim=-1)
+            cls_token = last_emb[:, -1, :] # shape [bs, num_hiddens]
+            cos_sim = torch.nn.functional.cosine_similarity(cls_token.unsqueeze(1), cls_token.unsqueeze(0), dim=-1)
             cos_sim = cos_sim.mean()
             self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=True, batch_size=batch_size)
 
@@ -250,7 +258,43 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             return loss, teacher_student_loss
 
         return loss
+    
+    def calculate_metrics_reconstruction(self, rec, x, mask):
+        if self.pretraining_strategy == 'masked_token_prediction':
+            rec = rec[:, :-self.patch_size, :]
+            mask = mask[:, :-self.patch_size, :]
 
+        batch_size, tokens_num, channels = x.shape
+        patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)
+        mask = mask.view(batch_size, tokens_num, 1).repeat_interleave(channels, dim=-1)
+
+        nrmse = np.inf
+    
+        if 'min_max' in self.loss_type:
+            min_max = masked_min_max_loss(rec, x, patch_size=self.patch_size, mask=patched_mask)
+
+        if 'mae' in self.loss_type:
+            mae = masked_mae_loss(rec, x, mask=mask)
+        else:
+            with torch.no_grad(): mae = masked_mae_loss(rec, x, mask=mask)
+
+        if 'grad' in self.loss_type:
+            grad = gradient_loss(rec, x, mask=mask)
+        else:
+            with torch.no_grad(): grad = gradient_loss(rec, x, mask=mask)
+
+        if 'mse' in self.loss_type:
+            mse = masked_mse_loss(rec, x, reduction='mean', mask=mask)
+        else:
+            with torch.no_grad(): mse = masked_mse_loss(rec, x, reduction='mean', mask=mask)
+   
+        # calculate the normalized root squared error only for the first token prediction
+        with torch.no_grad():
+            nrmse = torch.sqrt(mse) / (x.max() - x.min())
+
+        return nrmse, mse, mae, grad, min_max
+
+     
     def next_token_prediction(self, batch):
         x = self.pad(batch["signal"])
 
@@ -266,9 +310,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         
         return x, reconstruction, None, None
     
-    def masked_token_prediction(self, batch):
-        x = self.pad(batch["signal"])
-
+    def masked_token_prediction(self, signal):
+        x = self.pad(signal)
         reconstruction, out_teacher, last_emb, mask = self.model(x)
 
         if self.model.use_teacher_student:
@@ -277,7 +320,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # needed for the loss function, if the masked value is 0, then the loss function will not consider it
         return x, reconstruction, None, None, mask
     
-
 
     def pad(self, x):
         # remove thte exceeding part of the signal not patchable
