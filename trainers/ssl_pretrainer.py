@@ -7,7 +7,7 @@ import torch
 import lightning
 import trainers.common as common
 import torch.distributed
-
+from loss import KoLeoLoss, DINOLoss, iBOTPatchLoss
 
 # define the LightningModule
 class PretrainedxLSTMNetwork(L.LightningModule):
@@ -41,6 +41,15 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.use_vic_reg_regularization = config.use_vic_reg_regularization
         self.beta_std = config.beta_std
         self.beta_cov = config.beta_cov
+        self.use_koleo_regularization = config.use_koleo_regularization
+        self.centering = config.centering
+        self.teacher_temp = config.teacher_temp
+
+        if self.model.use_teacher_student:
+            self.dino_loss = DINOLoss(config.n_prototypes)
+            self.ibot_loss = iBOTPatchLoss(config.n_prototypes)
+        if self.use_koleo_regularization: self.koleo_reg = KoLeoLoss()
+        
 
         if self.model.use_teacher_student:
             self.automatic_optimization=False
@@ -80,14 +89,16 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
 
             # the xlstm teacher is present only if the strategy is multi token prediction
-            if self.pretraining_strategy == 'masked_token_prediction':
-                for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
-                    param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+            for param_s, param_t in zip(self.model.xlstm.parameters(), self.model._xlstm_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
+                
+            self.model._cls_token_teacher.data = self.model._cls_token_teacher.data * beta + (1.0 - beta) * self.model.cls_token.data
 
             for param_s, param_t in zip(self.model.patch_embedding.parameters(), self.model._patch_embedding_teacher.parameters()):
                 param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
-            
-            self.model._cls_token_teacher.data = self.model._cls_token_teacher.data * beta + (1.0 - beta) * self.model.cls_token.data
+
+            for param_s, param_t in zip(self.model.predictor.parameters(), self.model._predictor_teacher.parameters()):
+                param_t.data = param_t.data * beta + (1.0 - beta) * param_s.data
 
             # self.model._vocab_teacher.weight.data = self.model._vocab_teacher.weight.data * beta + (1.0 - beta) * self.model.vocab.weight.data
         
@@ -189,21 +200,16 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         if self.pretraining_strategy == 'masked_token_prediction' and self.model.use_teacher_student:
             nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(rec2, x2, mask2)
-            nrmse = (nrmse + nrmse2) / 2
-            mse = (mse + mse2) / 2
-            mae = (mae + mae2) / 2
-            grad = (grad + grad2) / 2
-            min_max = (min_max + min_max2) / 2
+            nrmse, mse, mae, grad, min_max = (nrmse + nrmse2) / 2, (mse + mse2) / 2, (mae + mae2) / 2, (grad + grad2) / 2, (min_max + min_max2) / 2
         
         loss = torch.tensor(0.0, device=self.device)
+
         if 'mae' in self.loss_type: loss += mae
         elif 'mse' in self.loss_type: loss += mse
-
         if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
         if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
 
         self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=batch_size)
-
         self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=batch_size)
         self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=batch_size)
         self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=batch_size)
@@ -212,39 +218,45 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, batch_size=batch_size)
 
         if self.model.use_teacher_student:
-            # last_emb [bs, seq_len -1, num_hiddens]
-            # x [bs, seq_len * patch_size, channels]
-            
-            num_patches = x.shape[1] // self.patch_size + 1 if self.pretraining_strategy == 'masked_token_prediction' else x.shape[1] // self.patch_size
-            patched_mask = mask.view(batch_size, num_patches, self.patch_size)
+            # here i should center and use the dino loss
+            num_patches1 = x.shape[1] // self.patch_size + 1
+            patched_mask1 = mask.view(batch_size, num_patches1, self.patch_size)
 
-            teacher_student_loss = embedding_cross_entropy_loss(last_emb, out_teacher, reduction='mean', mask=patched_mask)
-            self.log(f"{step}_teacher_student_loss", teacher_student_loss.item(), prog_bar=False, batch_size=batch_size)
+            num_patches2 = x2.shape[1] // self.patch_size + 1
+            patched_mask2 = mask2.view(batch_size, num_patches2, self.patch_size)
 
-            if self.pretraining_strategy == 'masked_token_prediction':
-                num_patches = x2.shape[1] // self.patch_size + 1
-                patched_mask2 = mask2.view(batch_size, num_patches, self.patch_size)
+            teacher_cls_token = torch.cat([out_teacher[:, -1, :], out_teacher2[:, -1, :]], dim=0)
+            teacher_patch_tokens = torch.cat([out_teacher[:, :-1, :], out_teacher2[:, :-1, :]], dim=0).flatten(0, 1)
+            mask_patches = torch.cat([patched_mask1[:, :-1, :], patched_mask2[:, :-1, :]], dim=0)
 
-                teacher_student_loss2 = embedding_cross_entropy_loss(last_emb2, out_teacher2, reduction='mean', mask=patched_mask2)
+            student_patch_tokens = torch.cat([last_emb[:, :-1, :], last_emb2[:, :-1, :]], dim=0).flatten(0, 1)
+            # first the embedding of the second part and then the first one
+            # in this way i can calculate the softmax on the cross cls
+            student_cls_token = torch.cat([last_emb2[:, -1, :], last_emb[:, -1, :]], dim=0) 
 
-                cls_token, cls_token2 = last_emb[:, -1, :], last_emb2[:, -1, :]
-                cls_token_teacher, cls_token_teacher2 = out_teacher[:, -1, :], out_teacher2[:, -1, :]
+            teacher_dino_softmaxed_centered = self.dino_loss.sinkhorn_knopp_teacher(
+                teacher_cls_token, teacher_temp=self.teacher_temp, 
+            )
 
-                cls_loss = embedding_cross_entropy_loss(cls_token, cls_token_teacher2, reduction='mean')
-                cls_loss2 = embedding_cross_entropy_loss(cls_token2, cls_token_teacher, reduction='mean')
+            masked_teacher_ibot_softmaxed_centered = self.ibot_loss.sinkhorn_knopp_teacher(
+                teacher_patch_tokens,
+                teacher_temp=self.teacher_temp,
+                n_masked_patches_tensor=mask_patches[:, :, 0].sum(),
+            )
 
-                rank_me1 = self.rank_me(cls_token)
-                rank_me2 = self.rank_me(cls_token2)
+            ibot_loss = self.ibot_loss(student_patch_tokens, masked_teacher_ibot_softmaxed_centered, student_masks_flat=mask_patches[:, :, 0].flatten())
+            self.log(f"{step}_ibot_loss", ibot_loss.item(), prog_bar=True, batch_size=batch_size)
 
-                self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True, batch_size=batch_size)
-                self.log(f"{step}_cls_loss", ((cls_loss + cls_loss2) / 2).item(), prog_bar=False, batch_size=batch_size)
-                teacher_student_loss = (teacher_student_loss + teacher_student_loss2 + cls_loss + cls_loss2) / 4
+            dino_loss = self.dino_loss(student_cls_token, teacher_dino_softmaxed_centered)
+            self.log(f"{step}_dino_loss", dino_loss.item(), prog_bar=True, batch_size=batch_size)
 
-            if self.use_vic_reg_regularization:
-                std_loss, cov_loss = vicreg_loss(last_emb)
-                self.log(f"{step}_std_loss", std_loss.item(), prog_bar=False, batch_size=batch_size)
-                self.log(f"{step}_cov_loss", cov_loss.item(), prog_bar=False, batch_size=batch_size)
-                teacher_student_loss = teacher_student_loss + std_loss * self.beta_std + cov_loss * self.beta_cov
+            rank_me1 = self.rank_me(last_emb[:, -1, :])
+            rank_me2 = self.rank_me(last_emb2[:, -1, :])
+
+            self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True, batch_size=batch_size)
+
+            teacher_student_loss = ibot_loss + dino_loss
+
 
             # log norm of output
             with torch.no_grad():
@@ -253,8 +265,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
 
                 # log the mean cosine similarity between all samples in the batch
-                cos_sim = torch.nn.functional.cosine_similarity(cls_token.unsqueeze(1), cls_token.unsqueeze(0), dim=-1)
-                cos_sim2 = torch.nn.functional.cosine_similarity(cls_token2.unsqueeze(1), cls_token2.unsqueeze(0), dim=-1)
+                cos_sim = torch.nn.functional.cosine_similarity(last_emb[:, -1, :].unsqueeze(1), last_emb[:, -1, :].unsqueeze(0), dim=-1)
+                cos_sim2 = torch.nn.functional.cosine_similarity(last_emb2[:, -1, :].unsqueeze(1), last_emb2[:, -1, :].unsqueeze(0), dim=-1)
                 cos_sim = (cos_sim.mean() + cos_sim2.mean()) / 2
                 self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False, batch_size=batch_size)
 

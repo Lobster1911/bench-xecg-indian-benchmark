@@ -30,6 +30,8 @@ class pretrainedxLSTM(nn.Module):
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
+        self.layer_norm = nn.LayerNorm(config.embedding_size)
+
         self.activation = get_activation_fn(config.activation_fn)
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
@@ -48,24 +50,28 @@ class pretrainedxLSTM(nn.Module):
 
         if self.use_teacher_student:   
             self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
-            
             self._xlstm_teacher = copy.deepcopy(self.xlstm)
 
             # do not require gradients for the teacher and copy from the student
             for param_t in self._xlstm_teacher.parameters():
                 param_t.requires_grad = False
-
+            self._xlstm_teacher.eval()
 
             for param_t in self._patch_embedding_teacher.parameters():
                 param_t.requires_grad = False
-
             self._patch_embedding_teacher.eval()
 
-            self.predictor = nn.Linear(config.embedding_size, config.embedding_size)
-            # self._vocab_teacher = copy.deepcopy(self.vocab)
-            # self._vocab_teacher.weight.requires_grad = False
+            self.predictor = HeadModule(
+                inp_size=config.embedding_size,
+                hidden_size=config.embedding_size // 2,
+                out_size=config.n_prototypes,
+                dropout=0.
+            )
 
-            self._centering = Centering(config.embedding_size, momentum=0.95)
+            self._predictor_teacher = copy.deepcopy(self.predictor)
+            for param_t in self._predictor_teacher.parameters():
+                param_t.requires_grad = False
+            self._predictor_teacher.eval()
 
             if self.training_strategy == 'masked_token_prediction':
                 self._cls_token_teacher = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
@@ -118,7 +124,7 @@ class pretrainedxLSTM(nn.Module):
                     x_emb_teacher = self._patch_embedding_teacher(x)
                 
                 out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=need_expansion)
-                out_teacher = self._centering(x_emb_teacher) # [batch_size, embedding_dim]
+                out_teacher = self._predictor_teacher(out_teacher)
 
             return rec, out_teacher, out, mask
             
