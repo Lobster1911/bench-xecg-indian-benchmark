@@ -25,6 +25,7 @@ class pretrainedxLSTM(nn.Module):
         self.bidirectional = config.bidirectional
         self.training_strategy = config.strategy
         self.use_teacher_student = config.use_teacher_student
+        self.mask_ratio = config.mask_ratio
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
@@ -59,6 +60,10 @@ class pretrainedxLSTM(nn.Module):
             # self._vocab_teacher.weight.requires_grad = False
 
             self._centering = Centering(config.embedding_size, momentum=0.95)
+
+        if self.training_strategy == 'masked_token_prediction':
+            self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+            
                  
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -68,7 +73,19 @@ class pretrainedxLSTM(nn.Module):
 
 
     def forward(self, x):
-        x_emb = self.patch_embedding(x)
+        if self.training_strategy == 'masked_token_prediction':
+            mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
+            # mask a rnadom number of patches
+            masked_x = x.masked_fill(mask, 0) # apply the mask
+            x_emb = self.patch_embedding(masked_x)
+
+            # set the elements to 0 with the mask token
+            batch_size, tokens_num, _ = x.shape
+            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
+            x_emb[patched_mask] = self.mask_token
+        else:
+            mask = None
+            x_emb = self.patch_embedding(x)
 
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
         out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
@@ -78,17 +95,36 @@ class pretrainedxLSTM(nn.Module):
         if self.use_teacher_student:
             out = self.predictor(out) 
             with torch.no_grad():
-                x_emb_teacher = self._patch_embedding_teacher(x)
+                x_emb_teacher = self._patch_embedding_teacher(masked_x)
 
                 if self.training_strategy == 'masked_token_prediction':
-                    out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=False) # [batch_size, embedding_dim]
+                    x_emb_teacher = self._patch_embedding_teacher(masked_x)
+                else: 
+                    x_emb_teacher = self._patch_embedding_teacher(x)
+                
+                out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=need_expansion)
                     
-                # out_teacher = self._vocab_teacher(x_emb_teacher)
                 out_teacher = self._centering(x_emb_teacher) # [batch_size, embedding_dim]
 
-            return rec, out_teacher, out
+            return rec, out_teacher, out, mask
             
-        return rec, None, None
+        return rec, None, None, mask
+    
+    def get_random_mask(self, x):
+        """
+        Retutn a mask of the same shape as x, masked values are set to TRUE
+        """
+        # masking the signal
+        num_patches = x.shape[1] // self.patch_size
+        rand = torch.rand(x.shape[0], num_patches, device=x.device)
+        mask = (rand < self.mask_ratio) # this is true for masked
+        # repeat the mask to num_patches * patch_size
+        mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
+        # check when the x was all 0 and set the mask to 0
+        padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
+        #print('padding mask', padding_mask.shape)
+        #print('mask', mask.shape)
+        return mask | padding_mask
     
     def generate(self, x, length=10):
         if self.training_strategy != 'next_token_prediction':

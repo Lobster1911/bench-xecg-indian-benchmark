@@ -268,11 +268,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     def masked_token_prediction(self, batch):
         x = self.pad(batch["signal"])
-        mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
 
-        # mask a rnadom number of patches
-        masked_x = x.masked_fill(mask, 0) # apply the mask
-        reconstruction, out_teacher, last_emb = self.model(masked_x)
+        reconstruction, out_teacher, last_emb, mask = self.model(x)
 
         if self.model.use_teacher_student:
             return x, reconstruction, out_teacher, last_emb, mask
@@ -280,21 +277,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # needed for the loss function, if the masked value is 0, then the loss function will not consider it
         return x, reconstruction, None, None, mask
     
-    def get_random_mask(self, x):
-        """
-        Retutn a mask of the same shape as x, masked values are set to TRUE
-        """
-        # masking the signal
-        num_patches = x.shape[1] // self.patch_size
-        rand = torch.rand(x.shape[0], num_patches, device=self.device)
-        mask = (rand < self.mask_ratio) # this is true for masked
-        # repeat the mask to num_patches * patch_size
-        mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
-        # check when the x was all 0 and set the mask to 0
-        padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
-        #print('padding mask', padding_mask.shape)
-        #print('mask', mask.shape)
-        return mask | padding_mask
+
 
     def pad(self, x):
         # remove thte exceeding part of the signal not patchable
