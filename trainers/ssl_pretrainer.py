@@ -209,7 +209,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=batch_size)
         if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=batch_size)
         
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=True, batch_size=batch_size)
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, batch_size=batch_size)
 
         if self.model.use_teacher_student:
             # last_emb [bs, seq_len -1, num_hiddens]
@@ -233,7 +233,11 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 cls_loss = embedding_cross_entropy_loss(cls_token, cls_token_teacher2, reduction='mean')
                 cls_loss2 = embedding_cross_entropy_loss(cls_token2, cls_token_teacher, reduction='mean')
 
-                self.log(f"{step}_cls_loss", ((cls_loss + cls_loss2) / 2).item(), prog_bar=True, batch_size=batch_size)
+                rank_me1 = self.rank_me(cls_token)
+                rank_me2 = self.rank_me(cls_token2)
+
+                self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True, batch_size=batch_size)
+                self.log(f"{step}_cls_loss", ((cls_loss + cls_loss2) / 2).item(), prog_bar=False, batch_size=batch_size)
                 teacher_student_loss = (teacher_student_loss + teacher_student_loss2 + cls_loss + cls_loss2) / 4
 
             if self.use_vic_reg_regularization:
@@ -243,21 +247,36 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 teacher_student_loss = teacher_student_loss + std_loss * self.beta_std + cov_loss * self.beta_cov
 
             # log norm of output
-            norm = torch.norm(last_emb, dim=-1)
-            norm = norm.mean()
-            self.log(f"{step}_norm_emb", norm.item(), prog_bar=True, batch_size=self.batch_size)
+            with torch.no_grad():
+                norm = torch.norm(last_emb, dim=-1)
+                norm = norm.mean()
+                self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
 
-            # log the mean cosine similarity between all samples in the batch
-            cls_token = last_emb[:, -1, :] # shape [bs, num_hiddens]
-            cos_sim = torch.nn.functional.cosine_similarity(cls_token.unsqueeze(1), cls_token.unsqueeze(0), dim=-1)
-            cos_sim = cos_sim.mean()
-            self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=True, batch_size=batch_size)
+                # log the mean cosine similarity between all samples in the batch
+                cos_sim = torch.nn.functional.cosine_similarity(cls_token.unsqueeze(1), cls_token.unsqueeze(0), dim=-1)
+                cos_sim2 = torch.nn.functional.cosine_similarity(cls_token2.unsqueeze(1), cls_token2.unsqueeze(0), dim=-1)
+                cos_sim = (cos_sim.mean() + cos_sim2.mean()) / 2
+                self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False, batch_size=batch_size)
 
             self.log(f"{step}_jepa_loss", teacher_student_loss.item(), prog_bar=True, batch_size=batch_size)
 
             return loss, teacher_student_loss
 
         return loss
+    
+    def rank_me(self, tensor, eps=1e-8):
+        with torch.no_grad():
+            _, S, _ = torch.svd(tensor)  # shape: (min(N, D),)
+
+            # Normalize singular values to get a probability distribution
+            S_norm = S / (S.sum() + eps)
+
+            # Entropy of the distribution
+            entropy = -torch.sum(S_norm * torch.log(S_norm + eps))
+
+            # Effective rank
+            rank_me = torch.exp(entropy)
+            return rank_me
     
     def calculate_metrics_reconstruction(self, rec, x, mask):
         if self.pretraining_strategy == 'masked_token_prediction':
