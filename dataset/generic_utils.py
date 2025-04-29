@@ -7,19 +7,19 @@ from torchvision import transforms
 from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop
 
 
-def get_transforms(config):
+def get_transforms(config, split='train'):
     t = transforms.Compose([])
     if config.normalize:
         t.transforms.append(Normalize(mean=config.mean, std=config.std))
-    if config.random_crop < 1.:
+    if config.random_crop < 1. and split == 'train':
         t.transforms.append(RandomCrop(config.random_crop))
-    if config.random_drop_leads > 0.:
+    if config.random_drop_leads > 0. and split == 'train':
         t.transforms.append(RandomDropLeads(config.random_drop_leads))
-    if config.random_surrogate_prob > 0.:
+    if config.random_surrogate_prob > 0. and split == 'train':
         t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))
-    if config.random_jitter_prob > 0.:  
+    if config.random_jitter_prob > 0. and split == 'train':  
         t.transforms.append(Jitter(sigma=0.1, prob=config.random_jitter_prob))
-    if config.random_resample > 0.:
+    if config.random_resample > 0. and split == 'train':
         t.transforms.append(RandomResample(360, max_freq_delta=10))
     return t
 
@@ -60,5 +60,4 @@ def collate_fn(batch):
         # pad the signals to the same length
         signals_2 = torch.nn.utils.rnn.pad_sequence(signals_2, batch_first=True)
         tortn['signals_2'] = signals_2
-        
     return tortn
