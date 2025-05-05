@@ -15,6 +15,9 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
 from utils.utils import get_least_used_gpu
 
+gpu_id = get_least_used_gpu()
+os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
 # argparse
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -88,7 +91,7 @@ def pretrain(config, run=None, wandb=False):
             callbacks=[checkpoint_callback, early_stopping], 
             gradient_clip_val=config.grad_clip,
             accelerator='gpu',
-            devices=get_least_used_gpu(),
+            devices=1,
             strategy='auto'
         )
 
