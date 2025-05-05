@@ -35,8 +35,8 @@ def vicreg_loss(embedding, reduction='mean'):
 
 def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean', centering=None, stud_temp=0.1, teacher_temp=0.1):
     if mask is not None:
-        target = target[mask.max(dim=-1)[0]]
-        input = input[mask.max(dim=-1)[0]]
+        target = target[mask]
+        input = input[mask]
 
     if centering == 'sinkhorn_knopp':
         target = sinkhorn_knopp_teacher(target, teacher_temp)

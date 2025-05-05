@@ -27,11 +27,8 @@ class pretrainedxLSTM(nn.Module):
         self.use_teacher_student = config.use_teacher_student
         self.mask_ratio = config.mask_ratio
         self.embedding_size = config.embedding_size
-        self.ema_0 = config.ema_0
-        self.ema_1 = config.ema_1
+        self.use_sim_dino = config.use_sim_dino
 
-        # self.layer_norm = nn.LayerNorm(config.embedding_size)
-        self.activation = get_activation_fn(config.activation_fn)
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 
         xlstm_emb_size = config.embedding_size
@@ -48,49 +45,106 @@ class pretrainedxLSTM(nn.Module):
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
 
         if self.use_teacher_student:   
-            self._patch_embedding_teacher = self.create_teacher_module(self.patch_embedding)
-            self._xlstm_teacher = self.create_teacher_module(self.xlstm)
-            # self._layer_norm_teacher = self.create_teacher_module(self.layer_norm)
+            if not self.use_sim_dino:
+                self.dino_head = HeadModule(
+                    inp_size=config.embedding_size,
+                    hidden_size=config.embedding_size // 2,
+                    out_size=config.n_prototypes,
+                    dropout=0.
+                )
 
-            #self.dino_head = HeadModule(
-            #    inp_size=config.embedding_size,
-            #    hidden_size=config.embedding_size // 2,
-            #    out_size=config.n_prototypes,
-            #    dropout=0.
-            #)
-            #self._dino_head_teacher = self.create_teacher_param(self.dino_head)
+                self.ibot_head = HeadModule(
+                    inp_size=config.embedding_size,
+                    hidden_size=config.embedding_size // 2,
+                    out_size=config.n_prototypes,
+                    dropout=0.
+                )
 
-            #self.ibot_head = HeadModule(
-            #    inp_size=config.embedding_size,
-            #    hidden_size=config.embedding_size // 2,
-            #    out_size=config.n_prototypes,
-            #    dropout=0.
-            #)
-            #self._ibot_head_teacher = self.create_teacher_param(self.ibot_head)
-
-            self._cls_token_teacher = self.create_teacher_param(self.cls_token)
-            self._reg_tokens_teacher = self.create_teacher_param(self.reg_token)
-
+            self.layer_norm = nn.LayerNorm(config.embedding_size)
                           
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
 
-            if self.weight_tying and config.patch_embedding == 'linear': 
-                self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
+    def init_teacher(self):
+        self._teacher = self.create_teacher_module()
 
-    def create_teacher_module(self, original):
-        param = copy.deepcopy(original)
+    def create_teacher_module(self):
+        param = copy.deepcopy(self)
+        # remove reconstruction params
+        for name in list(param._modules.keys()):
+            if 'reconstruction' in name or 'teacher' in name:
+                print(f'removing {name} from teacher network')
+                del param._modules[name]
+
         for param_t in param.parameters():
-                param_t.requires_grad = False
+            param_t.requires_grad = False
+
         param.eval()
+
         return param
     
     def create_teacher_param(self, original):
         param = copy.deepcopy(original)
         param.requires_grad = False
         return param
+    
+    def forward(self, x, masking=True, reconstruct=True):
+        num_reg_tokens = self.reg_token.shape[1]
+
+        if masking:   # masking
+            mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
+            x = x.masked_fill(mask, 0) # apply the mask
+
+        # patching
+        x_emb = self.patch_embedding(x)
+
+        # adding mask tokens
+        if masking:
+            batch_size, tokens_num, _ = x.shape
+            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
+            x_emb[patched_mask] = self.mask_token
+
+        # add the [cls] and [reg] tokens
+        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+        reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
+        x_emb = torch.cat([x_emb, cls_token, reg_tokens], dim=1)
+
+        # pass to xlstm
+        need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
+        out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
+
+        out = out[:, :-num_reg_tokens, :]
+
+        # reconstruct signal
+        if reconstruct:
+            rec, _ = self.reconstruction(out[:, :-1, :].clone().detach())
+
+        out = self.layer_norm(out)
+
+        student_cls = out[:, -1, :]
+        student_patches = out[:, :-1, :]
+       
+        tortn = {
+            'patches': student_patches,
+            'cls': student_cls,
+        }
         
-    def forward(self, x):
+        if masking: tortn['mask'] = mask
+        if reconstruct: tortn['reconstruction'] = rec
+        
+        if not self.use_sim_dino:
+            cls_after_head = self.dino_head(student_cls)
+            patches_after_head = self.ibot_head(student_patches)
+            tortn['cls_after_head'] = cls_after_head
+            tortn['patches_after_head'] = patches_after_head
+        
+        return tortn
+
+    @torch.no_grad()
+    def teacher_fwd(self, x):
+        return self._teacher(x, masking=False, reconstruct=False)
+        
+    def _forward(self, x):
         if self.training_strategy == 'masked_token_prediction':
             mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
             # mask a rnadom number of patches

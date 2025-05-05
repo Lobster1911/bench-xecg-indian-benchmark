@@ -38,21 +38,23 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.pretraining_strategy = config.strategy
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
-        self.use_vic_reg_regularization = config.use_vic_reg_regularization
-        self.beta_std = config.beta_std
-        self.beta_cov = config.beta_cov
-        self.use_koleo_regularization = config.use_koleo_regularization
+
+        self.ema_0 = config.ema_0
+        self.ema_1 = config.ema_1
+
+        self.use_sim_dino = config.use_sim_dino
+        self.use_koleo_regularization = config.use_koleo_regularization and not self.use_sim_dino
 
         self.centering = config.centering
         self.teacher_temp = config.teacher_temp
         self.stud_temp = config.stud_temp
-        self.lambda_l2_regularization = config.lambda_l2_regularization
-        self.mcr_loss = MCRLoss(eps=0.05)
 
+        if self.use_sim_dino: self.mcr_loss = MCRLoss(eps=0.05)
         if self.use_koleo_regularization: self.koleo_reg = KoLeoLoss()
-        
+
 
         if self.model.use_teacher_student:
+            self.model.init_teacher()
             self.automatic_optimization=False
 
         if not config.is_sweep:
@@ -88,15 +90,17 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     def update_teacher(self):
         steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
         num_training_steps = steps_per_epoch * self.epochs
-        beta = self.model.ema_0 + self.global_step * (self.model.ema_1 - self.model.ema_0) / num_training_steps
+        beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
 
-        self.update_module(self.model.xlstm, self.model._xlstm_teacher, beta)
-        self.update_module(self.model.patch_embedding, self.model._patch_embedding_teacher, beta)
-        # self.update_module(self.model.layer_norm, self.model._layer_norm_teacher, beta)
-        self.update_param(self.model.cls_token, self.model._cls_token_teacher, beta)
+        self.update_module(self.model._teacher, self.model, beta)
+        #self.update_module(self.model.patch_embedding, self.model._patch_embedding_teacher, beta)
+        #self.update_param(self.model.cls_token, self.model._cls_token_teacher, beta)
+        #self.update_param(self.model.reg_token, self.model._reg_tokens_teacher, beta)
 
-        # self.update_module(self.model.dino_head, self.model._dino_head_teacher, beta)
-        # self.update_module(self.model.ibot_head, self.model._ibot_head_teacher, beta)
+        #if not self.use_sim_dino:
+        #    self.update_module(self.model.layer_norm, self.model._layer_norm_teacher, beta)
+        #    self.update_module(self.model.dino_head, self.model._dino_head_teacher, beta)
+        #    self.update_module(self.model.ibot_head, self.model._ibot_head_teacher, beta)
         
     def update_module(self, teacher_module, student_module, beta):
         for param_s, param_t in zip(student_module.parameters(), teacher_module.parameters()):
@@ -193,89 +197,85 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             # so the loss  function will automatically skip the masked values
             # mask is 1 for masked and 0 for non masked
             x = self.pad(signal)
-            out = self.model(x)
+            out = self.model(x, masking=True)
             if self.model.use_teacher_student:
+                out_teacher = self.model.teacher_fwd(x)
                 signal2 = batch["signals_2"]
                 x2 = self.pad(signal2)
-                out2 = self.model(x2)
+                out2 = self.model(x2, masking=True)
+                out2_teacher = self.model.teacher_fwd(x2)
                 
         # compute the loss and use the gradients only when it is needed
         teacher_student_loss = None
         if self.model.use_teacher_student:
             mask1 = out['mask']
             patched_mask1 = mask1.view(batch_size, x.shape[1] // self.patch_size, self.patch_size)
-
             mask2 = out2['mask']
             patched_mask2 = mask2.view(batch_size,  x2.shape[1] // self.patch_size, self.patch_size)
+            combined_mask = torch.cat([patched_mask1, patched_mask2], dim=0).max(dim=-1)[0].flatten(0, 1)
 
-            # cat embeddings
-            stud_embeddings = torch.cat([out['student_patches'], out2['student_patches']], dim=0) # .flatten(0,1)
-            combined_mask = torch.cat([patched_mask1, patched_mask2], dim=0).max(dim=-1)[0] # .flatten(0,1)
-            teacher_embeddings = torch.cat([out['teacher_patches'], out2['teacher_patches']], dim=0) #.flatten(0,1)
-            
-            # i use first cls tokens of the second augmented signal to match the cls of the first augmented signal
-            # cls_tokens_stud = torch.cat([out2['student_cls_after_head'], out['student_cls_after_head']], dim=0)
-            # cls_tokens_teacher = torch.cat([out['teacher_cls_after_head'], out2['teacher_cls_after_head']], dim=0)
+            if self.use_sim_dino:
+                stud_embeddings = torch.cat([out['patches'], out2['patches']], dim=0).flatten(0, 1)
+                teacher_embeddings = torch.cat([out_teacher['patches'], out2_teacher['patches']], dim=0).flatten(0, 1)
 
-            cls_tokens_stud = torch.cat([out2['student_cls'], out['student_cls']], dim=0)
-            cls_tokens_teacher = torch.cat([out['teacher_cls'], out2['teacher_cls']], dim=0)
+                cls_tokens_stud = torch.cat([out2['cls'], out['cls']], dim=0)
+                cls_tokens_teacher = torch.cat([out_teacher['cls'], out2_teacher['cls']], dim=0)
 
-            # patch_loss = embedding_cross_entropy_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
-            # cross_cls_loss = embedding_cross_entropy_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
+                # simplified dino uses only the mse between the embeddigns
+                cross_cls_loss = masked_mse_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', mask=None)
+                patch_loss = masked_mse_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
+            else:
+                stud_embeddings = torch.cat([out['patches_after_head'], out2['patches_after_head']], dim=0).flatten(0, 1)
+                teacher_embeddings = torch.cat([out_teacher['patches_after_head'], out2_teacher['patches_after_head']], dim=0).flatten(0, 1)
+                # i use first cls tokens of the second augmented signal to match the cls of the first augmented signal
+                cls_tokens_stud = torch.cat([out2['cls_after_head'], out['cls_after_head']], dim=0)
+                cls_tokens_teacher = torch.cat([out_teacher['cls_after_head'], out2_teacher['cls_after_head']], dim=0)
 
-            cross_cls_loss = masked_mse_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', mask=None)
-            patch_loss = masked_mse_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
+                patch_loss = embedding_cross_entropy_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
+                cross_cls_loss = embedding_cross_entropy_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
 
             self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, batch_size=batch_size)
             self.log(f"{step}_cross_cls_loss", cross_cls_loss.item(), prog_bar=True, batch_size=batch_size)
 
             teacher_student_loss = patch_loss + cross_cls_loss
 
-            cls_tok_stud_g = torch.stack([out['student_cls'], out2['student_cls']], dim=0)
-            cls_tok_teacher_g = torch.stack([out['teacher_cls'], out2['teacher_cls']], dim=0)
-        
-            R_eps, compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
-            self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, batch_size=batch_size)
-            self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, batch_size=batch_size)
-            self.log(f"{step}_R_eps", R_eps.item(), prog_bar=True, batch_size=batch_size)
+            if self.use_sim_dino:
+                cls_tok_stud_g = torch.stack([out['cls'], out2['cls']], dim=0)
+                cls_tok_teacher_g = torch.stack([out_teacher['cls'], out2_teacher['cls']], dim=0)
+            
+                R_eps, compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
+                self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, batch_size=batch_size)
+                self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, batch_size=batch_size)
+                self.log(f"{step}_R_eps", R_eps.item(), prog_bar=True, batch_size=batch_size)
 
-            teacher_student_loss = teacher_student_loss + R_eps
+                teacher_student_loss = teacher_student_loss + R_eps
             
             if self.use_koleo_regularization:
-                koleo_loss1 = self.koleo_reg(out['student_cls']) # on cls tokens
-                koleo_loss2 = self.koleo_reg(out2['student_cls'])
+                koleo_loss1 = self.koleo_reg(out['cls']) # on cls tokens
+                koleo_loss2 = self.koleo_reg(out2['cls'])
                 koleo_loss = (koleo_loss1 + koleo_loss2) / 2
                 teacher_student_loss = teacher_student_loss + koleo_loss * 0.1
                 self.log(f"{step}_koleo_loss", koleo_loss.item(), prog_bar=True, batch_size=batch_size)
 
-            if self.lambda_l2_regularization > 0:
-                l2_norm1 = torch.mean(out['student_patches'] ** 2) + torch.mean(out['student_cls'] ** 2)
-                l2_norm2 = torch.mean(out2['student_patches'] ** 2) + torch.mean(out2['student_cls'] ** 2)
-                l2_norm = (l2_norm1 + l2_norm2) / 2
-                l2_norm = l2_norm * self.lambda_l2_regularization
-                self.log(f"{step}_l2_norm_reg", l2_norm.item(), prog_bar=True, batch_size=batch_size)
-                teacher_student_loss = teacher_student_loss + l2_norm
-
             self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, batch_size=batch_size)
 
 
-            rank_me1 = self.rank_me(out['student_cls'])
-            rank_me2 = self.rank_me(out2['student_cls'])
+            rank_me1 = self.rank_me(out['cls'])
+            rank_me2 = self.rank_me(out2['cls'])
             self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True, batch_size=batch_size)
 
             # log norm of output
             with torch.no_grad():
-                norm = torch.norm(out['student_patches'], dim=-1)
+                norm = torch.norm(out['patches'], dim=-1)
                 norm = norm.mean()
                 self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
 
                 # log the mean cosine similarity between all samples in the batch
-                cos_sim = torch.nn.functional.cosine_similarity(out['student_cls'].unsqueeze(1), out['student_cls'].unsqueeze(0), dim=-1)
-                cos_sim2 = torch.nn.functional.cosine_similarity(out2['student_cls'].unsqueeze(1), out2['student_cls'].unsqueeze(0), dim=-1)
+                cos_sim = torch.nn.functional.cosine_similarity(out['cls'].unsqueeze(1), out['cls'].unsqueeze(0), dim=-1)
+                cos_sim2 = torch.nn.functional.cosine_similarity(out2['cls'].unsqueeze(1), out2['cls'].unsqueeze(0), dim=-1)
                 cos_sim = (cos_sim.mean() + cos_sim2.mean()) / 2
                 self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False, batch_size=batch_size)
         
-
         if self.pretraining_strategy == 'masked_token_prediction' and self.model.use_teacher_student:
             nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(out['reconstruction'], x, mask = None) #  out['mask'])
             nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(out2['reconstruction'], x2, mask=None) #, out2['mask'])

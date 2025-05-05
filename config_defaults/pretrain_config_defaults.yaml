@@ -43,7 +43,6 @@ ema_0: 0.996
 ema_1: 1.
 n_prototypes: 65536
 start_train_head_at_epoch: 0
-use_vic_reg_regularization: false
 use_koleo_regularization: false
 centering: sinkhorn_knopp
 teacher_temp: 0.07
