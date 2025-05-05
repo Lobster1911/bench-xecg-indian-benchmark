@@ -14,8 +14,6 @@ import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
 
-torch.autograd.set_detect_anomaly(True)
-
 # argparse
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')

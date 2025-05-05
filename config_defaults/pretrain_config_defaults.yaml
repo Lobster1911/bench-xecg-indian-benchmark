@@ -6,7 +6,7 @@ dropout: 0.3
 grad_clip: 0.5
 
 # dataloaders
-batch_size: 128
+batch_size: 192
 num_workers: 32
 deterministic: true
 
