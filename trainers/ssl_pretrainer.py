@@ -266,7 +266,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             # log norm of output
             with torch.no_grad():
-                norm = torch.norm(out['patches'], dim=-1)
+                norm = torch.norm(out['patches_after_head'], dim=-1)
                 norm = norm.mean()
                 self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
 
@@ -313,7 +313,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             # Effective rank
             rank_me = torch.exp(entropy)
-            return rank_me
+            return rank_me / tensor.shape[0]
         except:
             return torch.tensor(0.0, device=self.device)
     

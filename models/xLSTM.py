@@ -121,20 +121,20 @@ class pretrainedxLSTM(nn.Module):
 
         out = self.layer_norm(out)
 
-        student_cls = out[:, -1, :]
-        student_patches = out[:, :-1, :]
+        cls = out[:, -1, :]
+        patches = out[:, :-1, :]
        
         tortn = {
-            'patches': student_patches,
-            'cls': student_cls,
+            'patches': patches,
+            'cls': cls,
         }
         
         if masking: tortn['mask'] = mask
         if reconstruct: tortn['reconstruction'] = rec
         
         if not self.use_sim_dino:
-            cls_after_head = self.dino_head(student_cls)
-            patches_after_head = self.ibot_head(student_patches)
+            cls_after_head = self.dino_head(cls)
+            patches_after_head = self.ibot_head(patches)
             tortn['cls_after_head'] = cls_after_head
             tortn['patches_after_head'] = patches_after_head
         
