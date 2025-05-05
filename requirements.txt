@@ -220,3 +220,4 @@ widgetsnbextension==4.0.13
 xlstm==2.0.2
 xyzservices==2025.1.0
 yarl==1.18.3
+pynvml

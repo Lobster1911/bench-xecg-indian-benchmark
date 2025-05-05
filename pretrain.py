@@ -13,6 +13,7 @@ import utils.utils as utils
 import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
+from utils.utils import get_least_used_gpu
 
 # argparse
 import argparse
@@ -77,7 +78,7 @@ def pretrain(config, run=None, wandb=False):
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
             gradient_clip_val=config.grad_clip,
             accelerator='gpu',
-            devices=1,
+            devices=[get_least_used_gpu()],
             strategy='auto'
         )
     else:
@@ -87,7 +88,7 @@ def pretrain(config, run=None, wandb=False):
             callbacks=[checkpoint_callback, early_stopping], 
             gradient_clip_val=config.grad_clip,
             accelerator='gpu',
-            devices=1,
+            devices=get_least_used_gpu(),
             strategy='auto'
         )
 

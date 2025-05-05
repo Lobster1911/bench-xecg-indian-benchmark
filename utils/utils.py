@@ -107,5 +107,18 @@ def get_training_class_weights_multilabel(train_dataset, label_key='label'):
 
 
     
+import pynvml
 
-
+def get_least_used_gpu():
+    pynvml.nvmlInit()
+    device_count = pynvml.nvmlDeviceGetCount()
+    min_mem_used = float('inf')
+    best_gpu = 0
+    for i in range(device_count):
+        handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+        mem = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        if mem.used < min_mem_used:
+            min_mem_used = mem.used
+            best_gpu = i
+    pynvml.nvmlShutdown()
+    return best_gpu

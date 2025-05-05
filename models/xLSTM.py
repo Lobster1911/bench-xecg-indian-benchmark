@@ -339,13 +339,6 @@ class xLSTMClassification(pretrainedxLSTM):
         # config.dropout = 0.0  
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-    
-        self.use_cls_token = config.use_cls_token
-        if self.use_cls_token:
-            self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-            nn.init.xavier_uniform_(self.cls_token, gain=1.0)
-
-
         self.norm = nn.LayerNorm(normalized_shape=config.embedding_size)
 
         self.fc = HeadModule(
@@ -358,16 +351,14 @@ class xLSTMClassification(pretrainedxLSTM):
     def forward(self, x):
         x = self.patch_embedding(x)
 
-        if self.use_cls_token:
-            cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-            x = torch.cat([x, cls_token], dim=1)
+        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+        reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
+        x = torch.cat([x, cls_token, reg_tokens], dim=1)
 
         out = self.xlstm(x, need_expansion=False)# [:, -1, :]
+        out = out[:, :-reg_tokens.shape[1], :]
 
-        if self.use_cls_token: out = out[:, -1, :] # remove the cls token
-        else: out = out.max(dim=1)[0]
-
-        out = self.norm(out)
+        out = self.norm(out[:, -1, :] )
         cls = self.fc(out)
         return cls
     
@@ -375,14 +366,13 @@ class xLSTMClassification(pretrainedxLSTM):
         params = []
         params.extend(self.xlstm.parameters())
         params.extend(self.patch_embedding.parameters())       
-        if self.use_cls_token:
-            params.append(self.cls_token)
+        params.append(self.cls_token)
+        params.append(self.reg_token)
         return params
 
     def training_params(self):
         params = []
         params.extend(self.fc.parameters())
- 
         return params
 
 

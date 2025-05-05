@@ -45,3 +45,6 @@ checkpoint: null
 
 classification_taksk: 'diagnosis_superclass'
 num_classes: 5
+
+strategy: masked_token_prediction
+num_reg_token: 4
