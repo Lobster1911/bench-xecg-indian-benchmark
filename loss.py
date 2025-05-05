@@ -51,6 +51,9 @@ class MCRLoss(nn.Module):
         """
         student_feat = student_feat.view(2, -1, student_feat.shape[-1])
         teacher_feat = teacher_feat.view(2, -1, teacher_feat.shape[-1])
+
+        student_feat = F.normalize(student_feat, p=2, dim=-1)
+        teacher_feat = F.normalize(teacher_feat, p=2, dim=-1)
         
         comp_loss = self.calc_compression(student_feat, teacher_feat)
         expa_loss = self.calc_expansion(student_feat[:len(teacher_feat)])

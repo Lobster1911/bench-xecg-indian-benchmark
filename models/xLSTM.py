@@ -90,7 +90,6 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
         
-
     def forward(self, x):
         if self.training_strategy == 'masked_token_prediction':
             mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
