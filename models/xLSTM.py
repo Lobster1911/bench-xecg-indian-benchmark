@@ -30,10 +30,8 @@ class pretrainedxLSTM(nn.Module):
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
-        self.layer_norm = nn.LayerNorm(config.embedding_size)
-
+        # self.layer_norm = nn.LayerNorm(config.embedding_size)
         self.activation = get_activation_fn(config.activation_fn)
-
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 
         xlstm_emb_size = config.embedding_size
@@ -41,50 +39,57 @@ class pretrainedxLSTM(nn.Module):
         if config.xlstm_type == 'large':
             self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
         else:
-            self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
+            self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)
 
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
+            self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
 
         if self.use_teacher_student:   
-            self._patch_embedding_teacher = copy.deepcopy(self.patch_embedding)
-            self._xlstm_teacher = copy.deepcopy(self.xlstm)
+            self._patch_embedding_teacher = self.create_teacher_module(self.patch_embedding)
+            self._xlstm_teacher = self.create_teacher_module(self.xlstm)
+            # self._layer_norm_teacher = self.create_teacher_module(self.layer_norm)
 
-            # do not require gradients for the teacher and copy from the student
-            for param_t in self._xlstm_teacher.parameters():
-                param_t.requires_grad = False
-            self._xlstm_teacher.eval()
+            #self.dino_head = HeadModule(
+            #    inp_size=config.embedding_size,
+            #    hidden_size=config.embedding_size // 2,
+            #    out_size=config.n_prototypes,
+            #    dropout=0.
+            #)
+            #self._dino_head_teacher = self.create_teacher_param(self.dino_head)
 
-            for param_t in self._patch_embedding_teacher.parameters():
-                param_t.requires_grad = False
-            self._patch_embedding_teacher.eval()
+            #self.ibot_head = HeadModule(
+            #    inp_size=config.embedding_size,
+            #    hidden_size=config.embedding_size // 2,
+            #    out_size=config.n_prototypes,
+            #    dropout=0.
+            #)
+            #self._ibot_head_teacher = self.create_teacher_param(self.ibot_head)
 
-            self.predictor = HeadModule(
-                inp_size=config.embedding_size,
-                hidden_size=config.embedding_size // 2,
-                out_size=config.n_prototypes,
-                dropout=0.
-            )
+            self._cls_token_teacher = self.create_teacher_param(self.cls_token)
+            self._reg_tokens_teacher = self.create_teacher_param(self.reg_token)
 
-            self._predictor_teacher = copy.deepcopy(self.predictor)
-            for param_t in self._predictor_teacher.parameters():
-                param_t.requires_grad = False
-            self._predictor_teacher.eval()
-
-            if self.training_strategy == 'masked_token_prediction':
-                self._cls_token_teacher = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-                self._cls_token_teacher.data.copy_(self.cls_token.data)
-                self._cls_token_teacher.requires_grad = False
-            
-                 
+                          
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
 
             if self.weight_tying and config.patch_embedding == 'linear': 
                 self.reconstruction.deconv.weight = self.patch_embedding.conv.weight
 
+    def create_teacher_module(self, original):
+        param = copy.deepcopy(original)
+        for param_t in param.parameters():
+                param_t.requires_grad = False
+        param.eval()
+        return param
+    
+    def create_teacher_param(self, original):
+        param = copy.deepcopy(original)
+        param.requires_grad = False
+        return param
+        
 
     def forward(self, x):
         if self.training_strategy == 'masked_token_prediction':
@@ -100,35 +105,60 @@ class pretrainedxLSTM(nn.Module):
 
             # add the cls_token
             cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-            x_emb = torch.cat([x_emb, cls_token], dim=1)
-            # add the cls token to the mask
-            cls_token_mask = torch.zeros(batch_size, self.patch_size, 1, device=x.device).bool()
-            mask = torch.cat([mask, cls_token_mask], dim=1)
+            reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
+            x_emb = torch.cat([x_emb, cls_token, reg_tokens], dim=1)
         else:
             mask = None
             x_emb = self.patch_embedding(x)
 
+        num_reg_tokens = self.reg_token.shape[1]
+
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
         out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
-        rec, _ = self.reconstruction(out)
+        rec, _ = self.reconstruction(out[:, :-(1 + num_reg_tokens), :].clone().detach())
 
         if self.use_teacher_student:
-            out = self.predictor(out) 
+            # out = self.layer_norm(out)
+            student_cls = out[:, -(1 + num_reg_tokens), :]
+            student_patches = out[:, :-(1 + num_reg_tokens), :]
+
+            # student_cls_after_head = self.dino_head(student_cls)
+            # student_patches = self.ibot_head(student_patches)
+
             with torch.no_grad():
                 if self.training_strategy == 'masked_token_prediction':
                     x_emb_teacher = self._patch_embedding_teacher(masked_x)
-                    cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-                    x_emb_teacher = torch.cat([x_emb_teacher, cls_token], dim=1)
+                    cls_token = self._cls_token_teacher.expand(x.shape[0], -1, -1)
+                    reg_tokens = self._reg_tokens_teacher.expand(x.shape[0], -1, -1)
+                    x_emb_teacher = torch.cat([x_emb_teacher, cls_token, reg_tokens], dim=1)
                 else: 
                     x_emb_teacher = self._patch_embedding_teacher(x)
                 
                 out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=need_expansion)
-                out_teacher = self._predictor_teacher(out_teacher)
+                # out_teacher = self._layer_norm_teacher(out_teacher)
 
-            return rec, out_teacher, out, mask
+                teacher_cls = out_teacher[:, -(1 + num_reg_tokens), :]
+                teacher_patches = out_teacher[:, :-(1 + num_reg_tokens), :]
+
+                # teacher_cls_after_head = self._dino_head_teacher(teacher_cls)
+                # teacher_patches = self._ibot_head_teacher(teacher_patches)
+
+            return {
+                'reconstruction': rec, 
+                'teacher_patches': teacher_patches,
+                'student_patches': student_patches,
+                'teacher_cls': teacher_cls,
+                'student_cls': student_cls,
+                # 'student_cls_after_head': student_cls_after_head,
+                # 'teacher_cls_after_head': teacher_cls_after_head,
+                'mask': mask,
+            }
             
-        return rec, None, None, mask
+        return {
+            'reconstruction': rec, 
+            'mask': mask,
+        }
     
     def get_random_mask(self, x):
         """

@@ -14,6 +14,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
 
+torch.autograd.set_detect_anomaly(True)
 
 # argparse
 import argparse
@@ -94,10 +95,9 @@ def pretrain(config, run=None, wandb=False):
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
 
-    test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
-    
-    trainer.test(model=model, dataloaders=test_dataloader)
+    #test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
+    #test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
+    # trainer.test(model=model, dataloaders=test_dataloader)
 
 # if main
 if __name__ == '__main__':

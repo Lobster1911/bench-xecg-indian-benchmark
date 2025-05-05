@@ -18,7 +18,7 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
         return ConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     if type == 'enriched':
         print('using enriched patch embedding')
-        return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels, kernel_size=5)
+        return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels, enrich_dim=num_hiddens //4, kernel_size=5)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 
@@ -57,6 +57,7 @@ def get_xlstm(
         blocks=['m', 's', 'm', 'm', 'm', 'm', 'm'],
         num_heads=4,
         bidirectional=False,
+        drop_path=0.
     ):
     print(f"Using xLSTM with blocks: {blocks}")
     print([1 if b == 's' else 0 for b in blocks])
@@ -85,7 +86,7 @@ def get_xlstm(
         dropout=dropout,
     )
     blocks = xLSTMBlockStack(cfg)
-    return vanillaxLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional)
+    return vanillaxLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional, drop_path=drop_path)
 
 def get_large_xlstm(       
         embedding_dim, 

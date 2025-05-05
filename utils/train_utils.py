@@ -33,10 +33,18 @@ def vicreg_loss(embedding, reduction='mean'):
     return std_loss, cov_loss
 
 
-def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean'):
-    loss = torch.sum(F.softmax(target, dim=-1) * F.log_softmax(input, dim=-1), dim=-1)
+def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean', centering=None, stud_temp=0.1, teacher_temp=0.1):
     if mask is not None:
-        loss = loss[mask.max(dim=-1)[0]]
+        target = target[mask.max(dim=-1)[0]]
+        input = input[mask.max(dim=-1)[0]]
+
+    if centering == 'sinkhorn_knopp':
+        target = sinkhorn_knopp_teacher(target, teacher_temp)
+    else:
+        target = F.softmax(target, dim=-1)
+    
+    loss = torch.sum(target * F.log_softmax(input / stud_temp, dim=-1), dim=-1)
+    
     if reduction == "mean":
         loss = -loss.mean()
     elif reduction == "sum":
@@ -44,6 +52,31 @@ def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean'):
     else:
         loss = -loss
     return loss
+
+@torch.no_grad()
+def sinkhorn_knopp_teacher(teacher_output, teacher_temp, n_iterations=3):
+    teacher_output = teacher_output.float()
+    Q = torch.exp(teacher_output / teacher_temp).t()  # Q is K-by-B for consistency with notations from our paper
+    B = Q.shape[1]  # number of samples to assign
+    K = Q.shape[0]  # how many prototypes
+
+    # make the matrix sums to 1
+    sum_Q = torch.sum(Q)
+
+    Q /= sum_Q
+
+    for it in range(n_iterations):
+        # normalize each row: total weight per prototype must be 1/K
+        sum_of_rows = torch.sum(Q, dim=1, keepdim=True)
+        Q /= sum_of_rows
+        Q /= K
+
+        # normalize each column: total weight per sample must be 1/B
+        Q /= torch.sum(Q, dim=0, keepdim=True)
+        Q /= B
+
+    Q *= B  # the columns must sum to 1 so that Q is an assignment
+    return Q.t()
     
 
 def masked_mse_loss(input, target, reduction='mean', mask=None):

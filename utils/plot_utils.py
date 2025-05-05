@@ -17,15 +17,15 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
         orig_signal = x.clone()
         x = F.pad(x, (0, 0, 0, patch_size - x.shape[1] % patch_size))
 
-        reconstruct, _, _, mask = model(x)
+        out = model(x)
+        reconstruct = out['reconstruction']
+        mask = out['mask']
 
         if training_strategy == 'next_token_prediction':
             orig_signal = orig_signal[:, :reconstruct.shape[1]]
             orig_signal = orig_signal[:, patch_size:].squeeze()
             reconstruct = reconstruct[:, :-patch_size]
-        else:
-            mask = mask[:, :-patch_size, :]
-            reconstruct = reconstruct[:, :-patch_size, :]
+
 
         # try to reconstruct one element at a time
         reconstruct = reconstruct.view(1, -1, orig_signal.shape[-1])

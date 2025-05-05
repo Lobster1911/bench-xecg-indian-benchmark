@@ -111,11 +111,12 @@ class HeadModule(nn.Module):
         return self.head(x)
     
 class vanillaxLSTMWrapper(nn.Module):
-    def __init__(self, xlstm, dropout=0.2, bidirectional=False):
+    def __init__(self, xlstm, dropout=0.2, bidirectional=False, drop_path=0.):
         super(vanillaxLSTMWrapper, self).__init__() 
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
+        self.drop_path = DropPath(drop_path)
 
     def step(self, x, state=None):
         return self.model.step(x, state=state)
@@ -137,7 +138,8 @@ class vanillaxLSTMWrapper(nn.Module):
                 if i > 0:
                     x = x.flip(1)
 
-            x = block(x)
+            x = self.drop_path(x, block)
+            # x = block(x)
 
         if self.bidirectional and expanded:
             x = x.reshape(bs, seq_len, seq_len, -1)
@@ -148,25 +150,25 @@ class vanillaxLSTMWrapper(nn.Module):
 
         x = self.model.post_blocks_norm(x)
         return x
-    
-
+     
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample (when applied in the main path of residual blocks)."""
-    def __init__(self, drop_prob=None):
+    def __init__(self, drop_path_prob=None):
         super(DropPath, self).__init__()
-        self.drop_prob = drop_prob
+        self.drop_path_prob = drop_path_prob
 
-    def forward(self, x):
-        if self.drop_prob == 0. or not self.training:
-            return x
-        keep_prob = 1 - self.drop_prob
-        shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # Broadcast along batch dimension
-        random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
-        random_tensor.floor_()  # Binary mask
-        output = x.div(keep_prob) * random_tensor # Apply mask and divide remaining output by keep_prob
-        return output,
+    def forward(self, x, block):
+        if self.drop_path_prob == 0. or not self.training:
+            return block(x)
+        
+        # indexes of the batch
+        idxs = torch.randperm(x.shape[0])
+        num_to_keep = int(np.ceil((1.0 - self.drop_path_prob) * x.shape[0]))
+        idxs_to_keep = idxs[:num_to_keep]  # First N elements are kept
 
-    
+        x[idxs_to_keep] = block(x[idxs_to_keep])
+        return x
+
 class mLSTMWrapper(nn.Module):
     def __init__(self, xlstm, dropout=0.2, bidirectional=False, random_drop_back_pass=0.2):
         super(mLSTMWrapper, self).__init__() 
@@ -248,4 +250,3 @@ class mLSTMWrapper(nn.Module):
         x = self.model.out_norm(x)
 
         return x, state
-    
