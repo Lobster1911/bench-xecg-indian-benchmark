@@ -266,7 +266,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             # log norm of output
             with torch.no_grad():
-                norm = torch.norm(out['patches_after_head'], dim=-1)
+                if self.use_sim_dino:
+                    norm = torch.norm(out['patches'], dim=-1)
+                else: 
+                    norm = torch.norm(out['patches_after_head'], dim=-1)
                 norm = norm.mean()
                 self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
 
