@@ -33,7 +33,7 @@ class KoLeoLoss(nn.Module):
             student_output = F.normalize(student_output, eps=eps, p=2, dim=-1)
             I = self.pairwise_NNs_inner(student_output)  # noqa: E741
             distances = self.pdist(student_output, student_output[I])  # BxD, BxD -> B
-            distances = torch.clamp(distances, min=self.eps)
+            distances = torch.clamp(distances, min=eps)
             loss = -torch.log(distances + eps).mean()
         return loss
     
