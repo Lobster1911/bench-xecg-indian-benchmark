@@ -81,7 +81,7 @@ def pretrain(config, run=None, wandb=False):
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
             gradient_clip_val=config.grad_clip,
             accelerator='gpu',
-            devices=[get_least_used_gpu()],
+            devices=1,
             strategy='auto'
         )
     else:
