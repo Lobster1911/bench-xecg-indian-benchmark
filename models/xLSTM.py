@@ -50,17 +50,18 @@ class pretrainedxLSTM(nn.Module):
                     inp_size=config.embedding_size,
                     hidden_size=config.embedding_size // 2,
                     out_size=config.n_prototypes,
-                    dropout=0.
+                    dropout=config.dropout
                 )
 
                 self.ibot_head = HeadModule(
                     inp_size=config.embedding_size,
                     hidden_size=config.embedding_size // 2,
                     out_size=config.n_prototypes,
-                    dropout=0.
+                    dropout=config.dropout
                 )
 
-            self.layer_norm = nn.LayerNorm(config.embedding_size)
+
+        self.layer_norm = nn.LayerNorm(config.embedding_size)
                           
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -80,7 +81,6 @@ class pretrainedxLSTM(nn.Module):
             param_t.requires_grad = False
 
         param.eval()
-
         return param
     
     def create_teacher_param(self, original):
@@ -114,12 +114,13 @@ class pretrainedxLSTM(nn.Module):
         out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         out = out[:, :-num_reg_tokens, :]
+        out = self.layer_norm(out)
 
         # reconstruct signal
         if reconstruct:
             rec, _ = self.reconstruction(out[:, :-1, :].clone().detach())
 
-        out = self.layer_norm(out)
+        # out = self.projector(out)
 
         cls = out[:, -1, :]
         patches = out[:, :-1, :]
@@ -339,8 +340,6 @@ class xLSTMClassification(pretrainedxLSTM):
         # config.dropout = 0.0  
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        self.norm = nn.LayerNorm(normalized_shape=config.embedding_size)
-
         self.fc = HeadModule(
             inp_size=config.embedding_size,
             hidden_size=config.embedding_size // 2,
@@ -358,7 +357,7 @@ class xLSTMClassification(pretrainedxLSTM):
         out = self.xlstm(x, need_expansion=False)# [:, -1, :]
         out = out[:, :-reg_tokens.shape[1], :]
 
-        out = self.norm(out[:, -1, :] )
+        out = self.layer_norm(out[:, -1, :] )
         cls = self.fc(out)
         return cls
     

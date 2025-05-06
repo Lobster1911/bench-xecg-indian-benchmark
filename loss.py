@@ -36,7 +36,6 @@ class KoLeoLoss(nn.Module):
             distances = torch.clamp(distances, min=eps)
             loss = -torch.log(distances + eps).mean()
         return loss
-    
 
 
 class MCRLoss(nn.Module):

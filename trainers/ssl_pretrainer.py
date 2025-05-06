@@ -1,5 +1,5 @@
 import lightning as L
-from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, embedding_cross_entropy_loss, vicreg_loss
+from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, embedding_cross_entropy_loss, masked_cosine_loss
 from torch.nn import functional as F
 from utils.plot_utils import plot_reconstruction, plot_generation
 import numpy as np
@@ -222,8 +222,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 cls_tokens_teacher = torch.cat([out_teacher['cls'], out2_teacher['cls']], dim=0)
 
                 # simplified dino uses only the mse between the embeddigns
-                cross_cls_loss = masked_mse_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', mask=None)
-                patch_loss = masked_mse_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
+                cross_cls_loss = masked_cosine_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', mask=None)
+                patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
             else:
                 stud_embeddings = torch.cat([out['patches_after_head'], out2['patches_after_head']], dim=0).flatten(0, 1)
                 teacher_embeddings = torch.cat([out_teacher['patches_after_head'], out2_teacher['patches_after_head']], dim=0).flatten(0, 1)

@@ -77,7 +77,18 @@ def sinkhorn_knopp_teacher(teacher_output, teacher_temp, n_iterations=3):
 
     Q *= B  # the columns must sum to 1 so that Q is an assignment
     return Q.t()
-    
+
+def masked_cosine_loss(input, target, reduction='mean', mask=None):
+    loss = F.cosine_similarity(target, input, dim=-1)
+    if mask is not None:
+        loss = loss[mask]
+
+    if reduction == "mean":
+        return 1 - loss.mean()
+    elif reduction == "sum":
+        return -loss.sum()
+    else:
+        return -loss
 
 def masked_mse_loss(input, target, reduction='mean', mask=None):
     out = (input - target)**2

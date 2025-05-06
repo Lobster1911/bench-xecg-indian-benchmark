@@ -70,8 +70,6 @@ labels_file_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_ic
 data_folder_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l
 labels_file_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv
 
-lambda_l2_regularization: 0.01
-
 # other
 debug: false
 
