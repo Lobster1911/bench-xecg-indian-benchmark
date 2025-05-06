@@ -36,6 +36,8 @@ patch_embedding: linear
 bidirectional: false
 strategy: next_token_prediction # masked_token_prediction
 mask_ratio: 0.5 # only for masked_token_prediction
+monitor_metric: val_nrmse
+
 
 # jepa like args
 use_teacher_student: false

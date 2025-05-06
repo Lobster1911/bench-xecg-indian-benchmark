@@ -67,9 +67,9 @@ def pretrain(config, run=None, wandb=False):
     else:
         model = PretrainedxLSTMNetwork(model=xlstm, len_train_dataset=len_train_dataset, config=config)
         
-    checkpoint_callback = ModelCheckpoint(monitor='val_nrmse')
+    checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric)
 
-    early_stopping = EarlyStopping(monitor='val_nrmse', patience=config.patience)
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience)
 
     if wandb:
         lr_monitor = LearningRateMonitor(logging_interval='step')
@@ -99,7 +99,7 @@ def pretrain(config, run=None, wandb=False):
 
     #test_dataset = mit_bih.ECGMITBIHDataset(config, split='test')
     #test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
-    # trainer.test(model=model, dataloaders=test_dataloader)
+    #trainer.test(model=model, dataloaders=test_dataloader)
 
 # if main
 if __name__ == '__main__':
