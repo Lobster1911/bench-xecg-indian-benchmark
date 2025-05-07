@@ -73,4 +73,5 @@ labels_file_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv
 # other
 debug: false
 
-
+n_local_view: 6
+n_global_view: 2

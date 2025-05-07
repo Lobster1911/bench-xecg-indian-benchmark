@@ -34,30 +34,57 @@ def pretrain(config, run=None, wandb=False):
 
     for dataset in config.pretrain_datasets:
         if dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='train', augmentations=get_transforms(config)))
+            datasets_pretrain.append(mimic.ECGMIMICDataset(
+                config, 
+                leads_to_use=config.leads, 
+                split='train', 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
         elif dataset == 'code15':
-            datasets_pretrain.append(code_15.ECGCODE15Dataset(config, leads_to_use=config.leads, augmentations=get_transforms(config)))
-        elif dataset == 'mit':
-            datasets_pretrain.append(mit_bih.ECGMITBIHDataset(config, split='train', augmentations=get_transforms(config)))       
+            datasets_pretrain.append(code_15.ECGCODE15Dataset(
+                config, 
+                leads_to_use=config.leads,                
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
         elif dataset == 'ptbxl':
-            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', augmentations=get_transforms(config)))
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
+                config, 
+                leads_to_use=config.leads, 
+                split='train', 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
-    val_dataset_1 = mimic.ECGMIMICDataset(config, leads_to_use=config.leads, split='val', augmentations=get_transforms(config))
-    val_dataset_2 = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', augmentations=get_transforms(config))
+    val_dataset_1 = mimic.ECGMIMICDataset(
+        config, 
+        leads_to_use=config.leads, 
+        split='val', 
+        global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+        local_augmentations=get_transforms(config, split='train', type='local')
+    )
+    val_dataset_2 = ptb_xl.ECGPTBXLDataset(
+        config, 
+        leads_to_use=config.leads, 
+        split='val', 
+        global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+        local_augmentations=get_transforms(config, split='train', type='local')
+    )
 
     val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
 
     train_dataset = ConcatDataset(datasets_pretrain)
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config.patch_size))
     len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
     # if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config.patch_size))
 
     xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))
     # xlstm = torch.compile(xlstm)

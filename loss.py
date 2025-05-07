@@ -49,8 +49,8 @@ class MCRLoss(nn.Module):
         """
         Expansion Loss and Compression Loss between features of the teacher and student networks.
         """
-        student_feat = student_feat.view(2, -1, student_feat.shape[-1])
-        teacher_feat = teacher_feat.view(2, -1, teacher_feat.shape[-1])
+        # student_feat = student_feat.view(2, -1, student_feat.shape[-1])
+        # teacher_feat = teacher_feat.view(2, -1, teacher_feat.shape[-1])
 
         student_feat = F.normalize(student_feat, p=2, dim=-1)
         teacher_feat = F.normalize(teacher_feat, p=2, dim=-1)

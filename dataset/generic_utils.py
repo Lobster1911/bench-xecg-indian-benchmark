@@ -7,19 +7,26 @@ from torchvision import transforms
 from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop
 
 
-def get_transforms(config, split='train'):
+def get_transforms(config, split='train', type=None):
+    """
+    """
     t = transforms.Compose([])
     if config.normalize:
         t.transforms.append(Normalize(mean=config.mean, std=config.std))
     if config.random_crop < 1. and split == 'train':
-        t.transforms.append(RandomCrop(config.random_crop))
+        if type == 'global':
+            t.transforms.append(RandomCrop(config.global_random_crop))
+        elif type == 'local':
+            t.transforms.append(RandomCrop(config.local_random_crop))
+        else:
+            t.transforms.append(RandomCrop(config.random_crop))
     if config.random_drop_leads > 0. and split == 'train':
         t.transforms.append(RandomDropLeads(config.random_drop_leads))
     if config.random_surrogate_prob > 0. and split == 'train':
         t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))
     if config.random_jitter_prob > 0. and split == 'train':  
         t.transforms.append(Jitter(sigma=0.1, prob=config.random_jitter_prob))
-    if config.random_resample > 0. and split == 'train':
+    if config.random_resample and split == 'train':
         t.transforms.append(RandomResample(360, max_freq_delta=10))
     return t
 
@@ -46,18 +53,37 @@ def find_records(folder, header_extension='.dat'):
     return records
 
 
-def collate_fn(batch):
-    signals = [item['signal'] for item in batch]
-    # pad the signals to the same length
-    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-    tortn = {
-        'signals': signals,
-    }
+def make_collate_fn(patch_size):
+    def collate_fn(batch):
+        # Pad and clean global signals
+        result = {
+            'global_signals': pad_multi_view_batch(batch, 'global_signals', patch_size),
+        }
 
-    if 'signal_2' in batch[0].keys() is not None:    
-        signals_2 = [item['signal_2'] for item in batch]
-        # pad the signals to the same length
-        signals_2 = torch.nn.utils.rnn.pad_sequence(signals_2, batch_first=True)
-        tortn['signals_2'] = signals_2
-    return tortn
+        # Optional: handle local signals if present
+        if 'local_signals' in batch[0] and batch[0]['local_signals'] is not None:
+            result['local_signals'] = pad_multi_view_batch(batch, 'local_signals', patch_size)
+
+        return result
+
+    return collate_fn
+
+def pad(x, patch_size):
+    if x.dim() == 2:
+        x = x.unsqueeze(-1)
+        
+    length = x.shape[1]
+    excess = length % patch_size
+    if excess != 0:
+        x = x[:, :-excess, :]
+    return x
+
+def pad_multi_view_batch(batch, key, patch_size):
+    signals = [sample[key] for sample in batch]
+    signals = list(map(list, zip(*signals)))
+    signals = [
+        pad(torch.nn.utils.rnn.pad_sequence(g_signal, batch_first=True), patch_size)
+        for g_signal in signals
+    ]
+    return signals

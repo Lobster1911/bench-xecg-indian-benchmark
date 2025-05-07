@@ -98,10 +98,13 @@ class ConvPatchEmbedding(nn.Module):
     
 class HeadModule(nn.Module):
     
-    def __init__(self, inp_size, hidden_size, out_size, dropout=0.1):
+    def __init__(self, inp_size, hidden_size, out_size, dropout=0.1, activation='relu'):
         super().__init__()
         self.head = nn.Sequential(
             nn.Linear(inp_size, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_size, out_size),

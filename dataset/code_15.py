@@ -9,12 +9,12 @@ from dataset.pretraining_dataset import PretrainDataset
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 class ECGCODE15Dataset(PretrainDataset):
-    def __init__(self, config, leads_to_use=leads, augmentations=None):
+    def __init__(self, config, leads_to_use=leads, global_augmentations=None, local_augmentations=None):
         """
         Args:
             records (list): List of records of ECG traces
         """
-        super().__init__(config, leads_to_use=leads_to_use, augmentations=augmentations)
+        super().__init__(config, leads_to_use=leads_to_use, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_code15
         self.labels_file = config.labels_file_code15
         self.load_tabular_data()

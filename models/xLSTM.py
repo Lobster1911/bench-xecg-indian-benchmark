@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from models.utils import get_activation_fn, get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head
+from models.utils import get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head
 from models.modules import HeadModule
 from models.SeriesDecomposition import SeriesDecomposition 
 from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
@@ -270,7 +270,6 @@ class pretrainedxLSTM(nn.Module):
         
         return self.parameters()
     
-
 class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
     def __init__(
             self, 
@@ -357,54 +356,21 @@ class xLSTMClassification(pretrainedxLSTM):
         out = self.xlstm(x, need_expansion=False)# [:, -1, :]
         out = out[:, :-reg_tokens.shape[1], :]
 
-        out = self.layer_norm(out[:, -1, :] )
-        cls = self.fc(out)
+        out = self.layer_norm(out)
+        # cls = self.fc(out.max(dim=1)[0])
+        cls = self.fc(out[:, -1, :])
         return cls
     
     def finetuning_params(self):
         params = []
         params.extend(self.xlstm.parameters())
         params.extend(self.patch_embedding.parameters())       
-        params.append(self.cls_token)
-        params.append(self.reg_token)
+        params.extend(self.layer_norm.parameters())
         return params
 
     def training_params(self):
         params = []
         params.extend(self.fc.parameters())
+        params.append(self.cls_token)
+        params.append(self.reg_token)
         return params
-
-
-class Centering(nn.Module):
-    def __init__(self, dim, momentum=0.9):
-        """
-        Args:
-            dim (int): Dimension of the embeddings to center.
-            momentum (float): EMA momentum for updating the center (e.g., 0.9 or 0.99).
-        """
-        super().__init__()
-        self.momentum = momentum
-        self.register_buffer('center', torch.zeros(1, dim))
-
-    @torch.no_grad()
-    def update_center(self, batch_output):
-        """
-        Update the running center with the current batch output.
-
-        Args:
-            batch_output (Tensor): Batch of teacher outputs [batch_size, dim].
-        """
-        batch_center = batch_output.mean(dim=0, keepdim=True)
-        self.center = self.center * self.momentum + batch_center * (1 - self.momentum)
-
-    def forward(self, teacher_output):
-        """
-        Center the teacher output by subtracting the running center.
-
-        Args:
-            teacher_output (Tensor): Teacher outputs [batch_size, dim].
-
-        Returns:
-            centered_output (Tensor): Centered teacher outputs.
-        """
-        return teacher_output - self.center

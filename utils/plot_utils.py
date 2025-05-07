@@ -13,7 +13,7 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, training_strategy, mask_ratio=0.5):
     with torch.no_grad():
 
-        x = sample['signal'].to(device).unsqueeze(0)
+        x = sample['global_signals'][0].to(device).unsqueeze(0)
         orig_signal = x.clone()
         x = F.pad(x, (0, 0, 0, patch_size - x.shape[1] % patch_size))
 
