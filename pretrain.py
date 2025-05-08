@@ -16,8 +16,11 @@ from dataset.generic_utils import get_transforms
 from utils.utils import get_least_used_gpu
 
 
+
 gpu_id = get_least_used_gpu()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 # argparse
 import argparse
