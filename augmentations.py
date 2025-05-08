@@ -86,13 +86,7 @@ class Jitter(object):
 
     def __call__(self, sample) -> Any:
         # 0. If the probability is 0, return the original sample.
-        if self.prob == 0.: return sample
-        
-        # 1. Generate a mask for applying jitter based on probability. This creates a boolean tensor where True indicates jitter should be applied.
-        mask = (torch.rand(sample.shape[0], device=sample.device) < self.prob).float()  # [batch_size]
-
-        # 2. Expand the mask to match the tensor dimensions. We need to broadcast the mask along all dimensions *except* the batch dimension.
-        mask = mask.view(mask.size(0), *([1] * (sample.ndim - 1)))  # [batch_size, 1, 1, 1, ...]
+        if self.prob == 0. or np.random.uniform() > self.prob: return sample
 
         # 3. Generate noise for the *entire* batch.
         noise = torch.randn_like(sample) * self.sigma
@@ -101,7 +95,7 @@ class Jitter(object):
         amplitude_scaling = self.amplitude * sample
 
         # 5. Apply the jitter only where the mask is True. This is done using element-wise multiplication and addition.
-        jittered_tensor = sample + mask * amplitude_scaling * noise
+        jittered_tensor = sample + amplitude_scaling * noise
 
         return jittered_tensor
 
