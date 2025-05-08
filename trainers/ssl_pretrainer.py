@@ -192,7 +192,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         global_out = [self.model(x, masking=True) for x in global_signals]
         global_out_teacher = [self.model.teacher_fwd(x) for x in global_signals]
-        local_out = [self.model(x, masking=False) for x in local_signals]
+        local_out = [self.model(x, masking=False, reconstruct=False) for x in local_signals]
 
         # compute the loss and use the gradients only when it is needed
         teacher_student_loss = None
@@ -210,8 +210,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
 
             cross_cls_loss = []
-            for t_out in global_out_teacher:
-                for s_g_out in global_out:
+            for i, t_out in enumerate(global_out_teacher):
+                for j, s_g_out in enumerate(global_out):
+                    if i == j: continue
                     cross_cls_loss.append(masked_cosine_loss(s_g_out['cls'], t_out['cls'], reduction='mean', mask=None))
                 
                 for s_l_out in local_out:
