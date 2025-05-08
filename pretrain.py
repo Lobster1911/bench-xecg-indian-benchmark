@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
 from utils.utils import get_least_used_gpu
 
+
 gpu_id = get_least_used_gpu()
 os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
@@ -75,8 +76,15 @@ def pretrain(config, run=None, wandb=False):
     )
 
     val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
-
     train_dataset = ConcatDataset(datasets_pretrain)
+
+    # knn datasets:
+    knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', global_augmentations=None, local_augmentations=None)
+    knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', global_augmentations=None, local_augmentations=None)
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config.patch_size), num_workers=config.num_workers)
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config.patch_size), num_workers=config.num_workers)
+
+    
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config.patch_size))
@@ -90,9 +98,22 @@ def pretrain(config, run=None, wandb=False):
     # xlstm = torch.compile(xlstm)
 
     if config.checkpoint != None:
-        model = PretrainedxLSTMNetwork.load_from_checkpoint(checkpoint_path=config.checkpoint, model=xlstm, len_train_dataset=len_train_dataset, config=config)
+        model = PretrainedxLSTMNetwork.load_from_checkpoint(
+            checkpoint_path=config.checkpoint,
+            model=xlstm, 
+            len_train_dataset=len_train_dataset, 
+            config=config, 
+            knn_train_dataloader=knn_train_dataloader, 
+            knn_val_dataloader=knn_val_dataloader
+        )
     else:
-        model = PretrainedxLSTMNetwork(model=xlstm, len_train_dataset=len_train_dataset, config=config)
+        model = PretrainedxLSTMNetwork(
+            model=xlstm, 
+            len_train_dataset=len_train_dataset,
+            config=config, 
+            knn_train_dataloader=knn_train_dataloader, 
+            knn_val_dataloader=knn_val_dataloader
+        )
         
     checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric)
 

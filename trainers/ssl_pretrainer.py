@@ -8,6 +8,12 @@ import lightning
 import trainers.common as common
 import torch.distributed
 from loss import KoLeoLoss, MCRLoss
+from skmultilearn.adapt import MLkNN
+from scipy.sparse import csr_matrix  # MLkNN requires sparse matrices
+from sklearn.metrics import f1_score, auc
+
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.multiclass import OneVsRestClassifier
 
 # define the LightningModule
 class PretrainedxLSTMNetwork(L.LightningModule):
@@ -15,7 +21,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self, 
             model, 
             len_train_dataset,
-            config
+            config,
+            knn_train_dataloader,
+            knn_val_dataloader
         ):
         super().__init__()
         self.lr = config.lr
@@ -57,6 +65,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self.model.init_teacher()
             self.automatic_optimization=False
 
+        self.knn_train_dataloader = knn_train_dataloader
+        self.knn_val_dataloader = knn_val_dataloader
+
         if not config.is_sweep:
             self.save_hyperparameters()
 
@@ -91,16 +102,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
         num_training_steps = steps_per_epoch * self.epochs
         beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
-
         self.update_module(self.model._teacher, self.model, beta)
-        #self.update_module(self.model.patch_embedding, self.model._patch_embedding_teacher, beta)
-        #self.update_param(self.model.cls_token, self.model._cls_token_teacher, beta)
-        #self.update_param(self.model.reg_token, self.model._reg_tokens_teacher, beta)
-
-        #if not self.use_sim_dino:
-        #    self.update_module(self.model.layer_norm, self.model._layer_norm_teacher, beta)
-        #    self.update_module(self.model.dino_head, self.model._dino_head_teacher, beta)
-        #    self.update_module(self.model.ibot_head, self.model._ibot_head_teacher, beta)
         
     def update_module(self, teacher_module, student_module, beta):
         for param_s, param_t in zip(student_module.parameters(), teacher_module.parameters()):
@@ -158,6 +160,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
+        self.knn_evaluation()
+
         if self.logger is None:
             return super().on_validation_epoch_end()
         
@@ -221,14 +225,20 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             cross_cls_loss = torch.stack(cross_cls_loss, dim=0).mean()
 
         else:
-            stud_embeddings = torch.cat([out['patches_after_head'], out2['patches_after_head']], dim=0).flatten(0, 1)
-            teacher_embeddings = torch.cat([out_teacher['patches_after_head'], out2_teacher['patches_after_head']], dim=0).flatten(0, 1)
+            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=0).flatten(0, 1)
+            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=0).flatten(0, 1)
             # i use first cls tokens of the second augmented signal to match the cls of the first augmented signal
-            cls_tokens_stud = torch.cat([out2['cls_after_head'], out['cls_after_head']], dim=0)
-            cls_tokens_teacher = torch.cat([out_teacher['cls_after_head'], out2_teacher['cls_after_head']], dim=0)
-
             patch_loss = embedding_cross_entropy_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
-            cross_cls_loss = embedding_cross_entropy_loss(cls_tokens_stud, cls_tokens_teacher, reduction='mean', centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
+
+            cross_cls_loss = []
+            for i, t_out in enumerate(global_out_teacher):
+                for j, s_g_out in enumerate(global_out):
+                    if i == j: continue
+                    cross_cls_loss.append(embedding_cross_entropy_loss(s_g_out['cls'], t_out['cls'], reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp))
+                for s_l_out in local_out:
+                    cross_cls_loss.append(embedding_cross_entropy_loss(s_l_out['cls'], t_out['cls'], reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp))
+
+            cross_cls_loss = torch.stack(cross_cls_loss, dim=0).mean()
 
         self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, batch_size=batch_size)
         self.log(f"{step}_cross_cls_loss", cross_cls_loss.item(), prog_bar=True, batch_size=batch_size)
@@ -247,8 +257,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             teacher_student_loss = teacher_student_loss + R_eps
         
         if self.use_koleo_regularization:
-            koleo_loss1 = self.koleo_reg(out['cls']) # on cls tokens
-            koleo_loss2 = self.koleo_reg(out2['cls'])
+            koleo_loss1 = self.koleo_reg(global_out[0]['cls']) # on cls tokens
+            koleo_loss2 = self.koleo_reg(global_out[1]['cls'])
             koleo_loss = (koleo_loss1 + koleo_loss2) / 2
             teacher_student_loss = teacher_student_loss + koleo_loss * 0.1
             self.log(f"{step}_koleo_loss", koleo_loss.item(), prog_bar=True, batch_size=batch_size)
@@ -365,8 +375,41 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         
         return x, reconstruction, None, None
     
+    @torch.no_grad()
+    def knn_evaluation(self):
+        self.model.eval()
+        all_features = []
+        all_labels = []
+        # loop the knn dataloader to get the embeddings
+        for sample in self.knn_train_dataloader:
+            out = self.model(sample["signals"].to(self.device), masking=False, reconstruct=False)
+            all_features.append(out['cls'].detach().cpu())
+            all_labels.append(sample['class_labels'].detach().cpu())
 
+        X_train = torch.cat(all_features).numpy()
+        y_train = torch.cat(all_labels).numpy()
+        
+        knn = KNeighborsClassifier(n_neighbors=5)
+        model = OneVsRestClassifier(knn)
 
+        model.fit(X_train, y_train)
+
+        # get the validation part
+        all_features_val = []
+        all_labels_val = []
+
+        for sample in self.knn_val_dataloader:
+            out = self.model(sample["signals"].to(self.device))
+            all_features_val.append(out['cls'].detach().cpu())
+            all_labels_val.append(sample['class_labels'].detach().cpu())
+
+        X_val = torch.cat(all_features_val).numpy()
+        y_val = torch.cat(all_labels_val).numpy()
+
+        y_pred = model.predict(X_val)
+
+        f1 = f1_score(y_val, y_pred, average='macro')
+        self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True)
     
     def get_params(self):
         return self.model.trainable_parameters()

@@ -4,6 +4,7 @@ import pandas as pd
 import wfdb
 import ast
 from dataset.pretraining_dataset import PretrainDataset
+from dataset.generic_utils import pad
 
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
@@ -88,26 +89,20 @@ class ECGPTBXLDataset(PretrainDataset):
         signal.update(class_info)
         return signal
 
-def collate_fn(batch):
-    signals = [item['global_signals'][0] for item in batch]
+def make_collate_fn(patch_size):
+    def collate_fn(batch):
+        signals = [item['global_signals'] for item in batch]
 
-    superclass_labels = [item['class_label'] for item in batch]
-    subclass_labels = [item['subclass_label'] for item in batch]
+        superclass_labels = [item['class_label'] for item in batch]
+        subclass_labels = [item['subclass_label'] for item in batch]
 
-    # pad the signals to the same length
-    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-
-    tortn = {
-        'signals': signals,
-        'class_labels': torch.stack(superclass_labels),
-        'subclass_labels': torch.stack(subclass_labels),
-    }
-
-    if 'signal_2' in batch[0].keys() is not None:    
-        signals_2 = [item['signal_2'] for item in batch]
-        signals_2 = torch.nn.utils.rnn.pad_sequence(signals_2, batch_first=True)
-        tortn['signals_2'] = signals_2
-
-    return tortn
+        # pad the signals to the same length
+        signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=patch_size)
+        return {
+            'signals': signals,
+            'class_labels': torch.stack(superclass_labels),
+            'subclass_labels': torch.stack(subclass_labels),
+        }
+    return collate_fn
 
     
