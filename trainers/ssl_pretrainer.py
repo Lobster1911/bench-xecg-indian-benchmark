@@ -8,9 +8,7 @@ import lightning
 import trainers.common as common
 import torch.distributed
 from loss import KoLeoLoss, MCRLoss
-from skmultilearn.adapt import MLkNN
-from scipy.sparse import csr_matrix  # MLkNN requires sparse matrices
-from sklearn.metrics import f1_score, auc
+from sklearn.metrics import f1_score
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multiclass import OneVsRestClassifier
