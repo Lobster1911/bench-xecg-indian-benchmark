@@ -130,7 +130,7 @@ def pretrain(config, run=None, wandb=False):
             max_epochs=config.epochs, 
             logger=wand_logger, 
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
-            gradient_clip_val=config.grad_clip,
+            gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
             devices=1,
             strategy='auto'
@@ -140,7 +140,7 @@ def pretrain(config, run=None, wandb=False):
             logger=False,
             max_epochs=config.epochs, 
             callbacks=[checkpoint_callback, early_stopping], 
-            gradient_clip_val=config.grad_clip,
+            gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
             devices=1,
             strategy='auto'

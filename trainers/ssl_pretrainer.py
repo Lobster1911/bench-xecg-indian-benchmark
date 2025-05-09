@@ -78,6 +78,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             
             opt_core.zero_grad()
             self.manual_backward(jepa_loss, retain_graph=train_head)
+            self.clip_gradients(opt_core, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
+
             opt_core.step()
             sched_core.step()
 
