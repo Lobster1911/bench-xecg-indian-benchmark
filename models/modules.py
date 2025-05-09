@@ -2,6 +2,7 @@ from torch import nn
 import torch 
 import numpy as np
 from torch.nn import functional as F
+from xlstm.xlstm_large.model import mLSTMStateType
 
 class LinearPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
@@ -156,29 +157,40 @@ class vanillaxLSTMWrapper(nn.Module):
      
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample (when applied in the main path of residual blocks)."""
-    def __init__(self, drop_path_prob=None):
+    def __init__(self, drop_path_prob=None, is_large_mlstm=False):
         super(DropPath, self).__init__()
         self.drop_path_prob = drop_path_prob
+        self.is_large_mlstm = is_large_mlstm
 
-    def forward(self, x, block):
+    def forward(self, x, block, state: mLSTMStateType | None = None):
         if self.drop_path_prob == 0. or not self.training:
-            return block(x)
+            if self.is_large_mlstm:
+                return block(x, state)
+            else:
+                return block(x)
         
         # indexes of the batch
         idxs = torch.randperm(x.shape[0])
         num_to_keep = int(np.ceil((1.0 - self.drop_path_prob) * x.shape[0]))
         idxs_to_keep = idxs[:num_to_keep]  # First N elements are kept
 
-        x[idxs_to_keep] = block(x[idxs_to_keep])
-        return x
+        if self.is_large_mlstm:
+            out, _ = block(x[idxs_to_keep], None)
+            x[idxs_to_keep] = out
+            # dont need to have a state in training
+            return x, None
+        else:
+            x[idxs_to_keep] = block(x[idxs_to_keep])
+            return x
 
 class mLSTMWrapper(nn.Module):
-    def __init__(self, xlstm, dropout=0.2, bidirectional=False, random_drop_back_pass=0.2):
+    def __init__(self, xlstm, dropout=0.2, bidirectional=False, drop_path=0.):
         super(mLSTMWrapper, self).__init__() 
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
-        self.random_drop_back_pass = random_drop_back_pass
+        self.drop_path = DropPath(drop_path, is_large_mlstm=True)
+
 
     def forward(self, x, need_expansion=True):
         len_seq = x.shape[1]
@@ -233,7 +245,9 @@ class mLSTMWrapper(nn.Module):
 
             block_state = state[i]
             x = self.dropout(x)
-            x, block_state_new = block(x, block_state)
+            
+            x, block_state_new = self.drop_path(x, block, block_state)
+            # x, block_state_new = block(x, block_state)
 
             if block_state is None:
                 state[i] = block_state_new

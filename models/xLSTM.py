@@ -30,11 +30,10 @@ class pretrainedxLSTM(nn.Module):
         self.use_sim_dino = config.use_sim_dino
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
-
         xlstm_emb_size = config.embedding_size
 
         if config.xlstm_type == 'large':
-            self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional)
+            self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional,  drop_path=config.drop_path_prob)
         else:
             self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)
 
