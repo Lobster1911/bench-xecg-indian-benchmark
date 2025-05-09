@@ -203,11 +203,11 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # patch based loss
         masks = [out['mask'] for out in global_out]
         patched_masks = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size) for m in masks]
-        combined_mask = torch.cat(patched_masks, dim=0).max(dim=-1)[0].flatten(0, 1)
+        combined_mask = torch.cat(patched_masks, dim=1).max(dim=-1)[0].flatten(0, 1)
 
         if self.use_sim_dino:
-            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=0).flatten(0, 1)
-            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=0).flatten(0, 1)
+            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
+            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
 
             # simplified dino uses only the mse between the embeddigns
             patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
@@ -224,8 +224,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             cross_cls_loss = torch.stack(cross_cls_loss, dim=0).mean()
 
         else:
-            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=0).flatten(0, 1)
-            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=0).flatten(0, 1)
+            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
+            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
             # i use first cls tokens of the second augmented signal to match the cls of the first augmented signal
             patch_loss = embedding_cross_entropy_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
 
