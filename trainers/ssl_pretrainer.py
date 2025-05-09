@@ -59,16 +59,12 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         if self.use_sim_dino: self.mcr_loss = MCRLoss(eps=0.05)
         if self.use_koleo_regularization: self.koleo_reg = KoLeoLoss()
 
-
         if self.model.use_teacher_student:
             self.model.init_teacher()
             self.automatic_optimization=False
 
         self.knn_train_dataloader = knn_train_dataloader
         self.knn_val_dataloader = knn_val_dataloader
-
-        if not config.is_sweep:
-            self.save_hyperparameters()
 
     def training_step(self, batch, _):
         losses = self.reconstruct_batch(batch, step='train')
