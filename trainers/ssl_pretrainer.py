@@ -307,7 +307,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     @torch.no_grad()
     def rank_me(self, tensor, eps=1e-8):
         try:
-            _, S, _ = torch.svd(tensor)  # shape: (min(N, D),)
+            _, S, _ = torch.linalg.svd(tensor, full_matrices=False)  # shape: (min(N, D),)
 
             # Normalize singular values to get a probability distribution
             S_norm = S / (S.sum() + eps)
@@ -403,10 +403,13 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             y_val = torch.cat(all_labels_val).numpy()
 
             y_pred = model.predict(X_val)
+            x_pred = model.predict(X_train)
 
             f1 = f1_score(y_val, y_pred, average='macro')
+            f1_train = f1_score(y_train, x_pred, average='macro')
             self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True)
-    
+            self.log('downstream_knn_ptbxl_f1_train', f1_train, prog_bar=False)
+
     def get_params(self):
         return self.model.trainable_parameters()
     
