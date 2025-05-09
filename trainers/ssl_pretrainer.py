@@ -8,6 +8,7 @@ import lightning
 import trainers.common as common
 import torch.distributed
 from loss import KoLeoLoss, MCRLoss
+from threadpoolctl import threadpool_limits
 from sklearn.metrics import f1_score
 
 from sklearn.neighbors import KNeighborsClassifier
@@ -390,24 +391,25 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         knn = KNeighborsClassifier(n_neighbors=5)
         model = OneVsRestClassifier(knn)
 
-        model.fit(X_train, y_train)
+        with threadpool_limits(limits=1, user_api='blas'):
+            model.fit(X_train, y_train)
 
-        # get the validation part
-        all_features_val = []
-        all_labels_val = []
+            # get the validation part
+            all_features_val = []
+            all_labels_val = []
 
-        for sample in self.knn_val_dataloader:
-            out = self.model(sample["signals"].to(self.device))
-            all_features_val.append(out['cls'].detach().cpu())
-            all_labels_val.append(sample['class_labels'].detach().cpu())
+            for sample in self.knn_val_dataloader:
+                out = self.model(sample["signals"].to(self.device))
+                all_features_val.append(out['cls'].detach().cpu())
+                all_labels_val.append(sample['class_labels'].detach().cpu())
 
-        X_val = torch.cat(all_features_val).numpy()
-        y_val = torch.cat(all_labels_val).numpy()
+            X_val = torch.cat(all_features_val).numpy()
+            y_val = torch.cat(all_labels_val).numpy()
 
-        y_pred = model.predict(X_val)
+            y_pred = model.predict(X_val)
 
-        f1 = f1_score(y_val, y_pred, average='macro')
-        self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True)
+            f1 = f1_score(y_val, y_pred, average='macro')
+            self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True)
     
     def get_params(self):
         return self.model.trainable_parameters()

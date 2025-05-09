@@ -84,8 +84,8 @@ def pretrain(config, run=None, wandb=False):
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config.patch_size), num_workers=config.num_workers)
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config.patch_size), num_workers=config.num_workers)
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config.patch_size))
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config.patch_size))
 
     
     # keep only 10% of the dataset
