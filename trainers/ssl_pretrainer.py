@@ -99,6 +99,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
         num_training_steps = steps_per_epoch * self.epochs
         beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
+        self.log('teacher_beta', beta, prog_bar=False)
         self.update_module(self.model._teacher, self.model, beta)
         
     def update_module(self, teacher_module, student_module, beta):
@@ -237,8 +238,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             cross_cls_loss = torch.stack(cross_cls_loss, dim=0).mean()
 
-        self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, batch_size=batch_size)
-        self.log(f"{step}_cross_cls_loss", cross_cls_loss.item(), prog_bar=True, batch_size=batch_size)
+        self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True)
+        self.log(f"{step}_cross_cls_loss", cross_cls_loss.item(), prog_bar=True)
 
         teacher_student_loss = patch_loss + cross_cls_loss
 
@@ -247,9 +248,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             cls_tok_teacher_g = torch.stack([g['cls'] for g in global_out_teacher], dim=0)
         
             R_eps, compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
-            self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, batch_size=batch_size)
-            self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, batch_size=batch_size)
-            self.log(f"{step}_R_eps", R_eps.item(), prog_bar=True, batch_size=batch_size)
+            self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False)
+            self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False)
+            self.log(f"{step}_R_eps", R_eps.item(), prog_bar=True)
 
             teacher_student_loss = teacher_student_loss + R_eps
         
@@ -258,14 +259,14 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             koleo_loss2 = self.koleo_reg(global_out[1]['cls'])
             koleo_loss = (koleo_loss1 + koleo_loss2) / 2
             teacher_student_loss = teacher_student_loss + koleo_loss * 0.1
-            self.log(f"{step}_koleo_loss", koleo_loss.item(), prog_bar=True, batch_size=batch_size)
+            self.log(f"{step}_koleo_loss", koleo_loss.item(), prog_bar=True)
 
-        self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, batch_size=batch_size)
+        self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True)
 
 
         rank_me1 = self.rank_me(global_out[0]['cls'])
         rank_me2 = self.rank_me(global_out[1]['cls'])
-        self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True, batch_size=batch_size)
+        self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True)
 
         # log norm of output
         with torch.no_grad():
@@ -274,13 +275,13 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             else: 
                 norm = torch.norm(global_out[0]['patches_after_head'], dim=-1)
             norm = norm.mean()
-            self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, batch_size=self.batch_size)
+            self.log(f"{step}_norm_emb", norm.item(), prog_bar=False)
 
             # log the mean cosine similarity between all samples in the batch
             cos_sim = torch.nn.functional.cosine_similarity(global_out[0]['cls'].unsqueeze(1), global_out[0]['cls'].unsqueeze(0), dim=-1)
             cos_sim2 = torch.nn.functional.cosine_similarity(global_out[1]['cls'].unsqueeze(1), global_out[1]['cls'].unsqueeze(0), dim=-1)
             cos_sim = (cos_sim.mean() + cos_sim2.mean()) / 2
-            self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False, batch_size=batch_size)
+            self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False)
         
         if self.pretraining_strategy == 'masked_token_prediction' and self.model.use_teacher_student:
             nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(global_out[0]['reconstruction'], global_signals[0], mask = None) #  out['mask'])
@@ -296,13 +297,13 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
         if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
 
-        self.log(f"{step}_loss", loss.item(), prog_bar=True, batch_size=batch_size)
-        self.log(f"{step}_mse", mse.item(), prog_bar=False, batch_size=batch_size)
-        self.log(f"{step}_mae", mae.item(), prog_bar=False, batch_size=batch_size)
-        self.log(f"{step}_grad", grad.item(), prog_bar=False, batch_size=batch_size)
-        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, batch_size=batch_size)
+        self.log(f"{step}_loss", loss.item(), prog_bar=True)
+        self.log(f"{step}_mse", mse.item(), prog_bar=False)
+        self.log(f"{step}_mae", mae.item(), prog_bar=False)
+        self.log(f"{step}_grad", grad.item(), prog_bar=False)
+        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False)
         
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, batch_size=batch_size)
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False)
 
         return {'reconstruction_loss': loss, 'teacher_student_loss': teacher_student_loss}
     
