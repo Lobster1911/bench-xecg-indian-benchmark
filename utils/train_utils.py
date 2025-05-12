@@ -86,9 +86,9 @@ def masked_cosine_loss(input, target, reduction='mean', mask=None):
     if reduction == "mean":
         return 1 - loss.mean()
     elif reduction == "sum":
-        return -loss.sum()
+        return (1-loss).sum()
     else:
-        return -loss
+        return 1-loss
 
 def masked_mse_loss(input, target, reduction='mean', mask=None):
     out = (input - target)**2

@@ -104,8 +104,6 @@ def get_training_class_weights_multilabel(train_dataset, label_key='label'):
     print('Class weights: ', class_weights)
     return class_weights
 
-
-
     
 import pynvml
 

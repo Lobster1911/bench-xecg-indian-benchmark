@@ -90,7 +90,7 @@ def pretrain(config, run=None, wandb=False):
     
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config.patch_size))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config.patch_size), drop_last=True)
     len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
