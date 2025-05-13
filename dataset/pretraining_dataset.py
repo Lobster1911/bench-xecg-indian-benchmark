@@ -26,6 +26,10 @@ class PretrainDataset(torch.utils.data.Dataset):
         record = str(self.records[idx])
 
         s, info = wfdb.rdsamp(os.path.join(self.data_folder, record))
+
+        # if nan fill
+        if np.isnan(s).any():
+            print("WARNING: Nan detected")
        
         # mapping leads in the correct position
         s = self.map_leads_and_clean(s, info)

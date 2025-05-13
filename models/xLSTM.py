@@ -28,6 +28,8 @@ class pretrainedxLSTM(nn.Module):
         self.mask_ratio = config.mask_ratio
         self.embedding_size = config.embedding_size
         self.use_sim_dino = config.use_sim_dino
+        self.cls_type = config.cls_type
+
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
         xlstm_emb_size = config.embedding_size
@@ -119,9 +121,14 @@ class pretrainedxLSTM(nn.Module):
         if reconstruct:
             rec, _ = self.reconstruction(out[:, :-1, :].clone().detach())
 
-        # out = self.projector(out)
 
-        cls = out[:, -1, :]
+        if self.cls_type == 'max':
+            cls = out.max(dim=1)[0]
+        elif self.cls_type == 'mean' or self.cls_type == 'avg':
+            cls = out.mean(dim=1)
+        else:
+            cls = out[:, -1, :]
+
         patches = out[:, :-1, :]
        
         tortn = {
@@ -143,76 +150,7 @@ class pretrainedxLSTM(nn.Module):
     @torch.no_grad()
     def teacher_fwd(self, x):
         return self._teacher(x, masking=False, reconstruct=False)
-        
-    def _forward(self, x):
-        if self.training_strategy == 'masked_token_prediction':
-            mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
-            # mask a rnadom number of patches
-            masked_x = x.masked_fill(mask, 0) # apply the mask
-            x_emb = self.patch_embedding(masked_x)
-
-            # set the elements to 0 with the mask token
-            batch_size, tokens_num, _ = x.shape
-            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
-            x_emb[patched_mask] = self.mask_token
-
-            # add the cls_token
-            cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-            reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
-            x_emb = torch.cat([x_emb, cls_token, reg_tokens], dim=1)
-        else:
-            mask = None
-            x_emb = self.patch_embedding(x)
-
-        num_reg_tokens = self.reg_token.shape[1]
-
-        need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
-        out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
-
-        rec, _ = self.reconstruction(out[:, :-(1 + num_reg_tokens), :].clone().detach())
-
-        if self.use_teacher_student:
-            # out = self.layer_norm(out)
-            student_cls = out[:, -(1 + num_reg_tokens), :]
-            student_patches = out[:, :-(1 + num_reg_tokens), :]
-
-            # student_cls_after_head = self.dino_head(student_cls)
-            # student_patches = self.ibot_head(student_patches)
-
-            with torch.no_grad():
-                if self.training_strategy == 'masked_token_prediction':
-                    x_emb_teacher = self._patch_embedding_teacher(masked_x)
-                    cls_token = self._cls_token_teacher.expand(x.shape[0], -1, -1)
-                    reg_tokens = self._reg_tokens_teacher.expand(x.shape[0], -1, -1)
-                    x_emb_teacher = torch.cat([x_emb_teacher, cls_token, reg_tokens], dim=1)
-                else: 
-                    x_emb_teacher = self._patch_embedding_teacher(x)
-                
-                out_teacher = self._xlstm_teacher(x_emb_teacher, need_expansion=need_expansion)
-                # out_teacher = self._layer_norm_teacher(out_teacher)
-
-                teacher_cls = out_teacher[:, -(1 + num_reg_tokens), :]
-                teacher_patches = out_teacher[:, :-(1 + num_reg_tokens), :]
-
-                # teacher_cls_after_head = self._dino_head_teacher(teacher_cls)
-                # teacher_patches = self._ibot_head_teacher(teacher_patches)
-
-            return {
-                'reconstruction': rec, 
-                'teacher_patches': teacher_patches,
-                'student_patches': student_patches,
-                'teacher_cls': teacher_cls,
-                'student_cls': student_cls,
-                # 'student_cls_after_head': student_cls_after_head,
-                # 'teacher_cls_after_head': teacher_cls_after_head,
-                'mask': mask,
-            }
-            
-        return {
-            'reconstruction': rec, 
-            'mask': mask,
-        }
-    
+         
     def get_random_mask(self, x):
         """
         Retutn a mask of the same shape as x, masked values are set to TRUE
@@ -338,12 +276,9 @@ class xLSTMClassification(pretrainedxLSTM):
         # config.dropout = 0.0  
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        self.fc = HeadModule(
-            inp_size=config.embedding_size,
-            hidden_size=config.embedding_size // 2,
-            out_size=num_classes,
-            dropout=dropout
-        )
+        self.fc = nn.Linear(config.embedding_size, num_classes)
+        
+        
 
     def forward(self, x):
         x = self.patch_embedding(x)
@@ -356,9 +291,16 @@ class xLSTMClassification(pretrainedxLSTM):
         out = out[:, :-reg_tokens.shape[1], :]
 
         out = self.layer_norm(out)
-        cls = self.fc(out[:, :-1, :].mean(dim=1))
-        # cls = self.fc(out[:, -1, :])
-        return cls
+
+        if self.cls_type == 'max':
+            cls = out.max(dim=1)[0]
+        elif self.cls_type == 'mean' or self.cls_type == 'avg':
+            cls = out.mean(dim=1)
+        else:
+            cls = out[:, -1, :]
+
+        res = self.fc(cls)
+        return res
     
     def finetuning_params(self):
         params = []
@@ -370,6 +312,6 @@ class xLSTMClassification(pretrainedxLSTM):
     def training_params(self):
         params = []
         params.extend(self.fc.parameters())
-        params.append(self.cls_token)
-        params.append(self.reg_token)
+        # params.append(self.cls_token)
+        # params.append(self.reg_token)
         return params

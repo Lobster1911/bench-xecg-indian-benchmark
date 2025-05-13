@@ -16,7 +16,7 @@ from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
 # CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
-# PTB-XL: 
+# PTB-XL: python prepare_dataset.py --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
 
 # MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic
 # CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
@@ -140,29 +140,40 @@ if __name__ == '__main__':
     # clean_and_create_directory(args.output_folder)
 
     if args.dataset == 'mimic':
-        records = pd.read_csv(os.path.join(args.data_folder, 'machine_measurements.csv'))
-        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_mimic)(sample) for i, sample in tqdm(records.iterrows()))
-        res = [r for r in res if r is not None]
-        process_csv_file_mimic(args.label_file, os.path.join(args.output_folder, 'records_w_diag_icd10_labelled.csv'), records_to_remove=res)
+        exams = pd.read_csv(args.label_file)
+        print(exams.head)
+        print(exams.columns)
+        print('initial count rows: ', len(exams))
+
+        exams['file_name'] = exams.parallel_apply(lambda row:  str(row['file_name']).replace('mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0/', ''), axis=1)
+        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
+        
+        exams = exams[exams['valid']]
+        exams.drop(columns=['valid'], inplace=True)
+
+        print(exams.head())
+        print('final count rows: ', len(exams))
+        exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))
+
 
     if args.dataset == 'code15':
         exams = pd.read_csv(args.label_file)
         print(exams.head)
         print(exams.columns)
+        print('initial count rows: ', len(exams))
 
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['exam_id']))), axis=1)
         exams = exams[exams['valid']]
         exams.drop(columns=['valid'], inplace=True)
 
-        exams['labelled'] = True
-
+        # exams['labelled'] = True
         # need to load all the samples not in the labelled
         # list all the files from the args.data_folder folder
-        file_list = os.listdir(args.data_folder)
-        file_list = [f for f in file_list if f.endswith('.hea')]
+        # file_list = os.listdir(args.data_folder)
+        # file_list = [f for f in file_list if f.endswith('.hea')]
 
         print(exams.head())
-        print('count rows: ', len(exams))
+        print('final count rows: ', len(exams))
         exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))
 
     if args.dataset == 'ptbxl':
@@ -177,4 +188,3 @@ if __name__ == '__main__':
         print(exams.head())
         print('final count rows: ', len(exams))
         exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))
-        print('saved to', os.path.join(args.data_folder, 'exams_filtered.csv'))

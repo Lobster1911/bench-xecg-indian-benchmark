@@ -189,6 +189,11 @@ def check_sample(record_path):
     if signal is None: 
         print(f"Record {record_path} is none - skipping")
         return False
+    
+    # if hasnan remove
+    if np.isnan(signal).any():
+        print(f"Record {record_path} has nan - skipping")
+        return False
 
     if len(signal) < 360:
         print(f"Record {record_path} has less than 360 samples - skipping")

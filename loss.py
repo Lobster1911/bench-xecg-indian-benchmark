@@ -85,11 +85,12 @@ class MCRLoss(nn.Module):
         cov_list = torch.einsum('nbc,nbd->ncd', feat_list, feat_list)
 
         scalar = p / (m * self.eps)
-        I = torch.eye(p, device=cov_list[0].device)
+        I = torch.eye(p, device=cov_list.device)
         loss:torch.Tensor = 0
         for i in range(num_views):
             loss += torch.linalg.cholesky_ex(I + scalar * cov_list[i])[0].diagonal().log().sum()
         loss /= num_views
         loss *= (p+m)/(p*m) # the balancing factor gamma, you can also use the next line. This is ultimately a heuristic, so feel free to experiment.
         # loss *= ((self.eps * N * m) ** 0.5 / p)
+        # self.eps*np.sqrt(m/(p*np.min([p, m])))
         return -loss

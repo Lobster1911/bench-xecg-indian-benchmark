@@ -89,9 +89,12 @@ class ECGPTBXLDataset(PretrainDataset):
         signal.update(class_info)
         return signal
 
-def make_collate_fn(patch_size):
+def make_collate_fn(patch_size, downstream=False):
     def collate_fn(batch):
-        signals = [item['global_signals'] for item in batch]
+        if downstream:
+            signals = [item['global_signals'][0] for item in batch]
+        else:
+            signals = [item['global_signals'] for item in batch]
 
         superclass_labels = [item['class_label'] for item in batch]
         subclass_labels = [item['subclass_label'] for item in batch]

@@ -118,9 +118,9 @@ def pretrain(config, run=None, wandb=False):
             knn_val_dataloader=knn_val_dataloader
         )
         
-    checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric)
+    checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
 
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience)
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
 
     if wandb:
         lr_monitor = LearningRateMonitor(logging_interval='step')

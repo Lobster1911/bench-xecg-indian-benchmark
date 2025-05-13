@@ -52,12 +52,14 @@ teacher_temp: 0.07
 
 # data and augmentations hyperparameters
 normalize: true
+nk_clean: true
+shift_baseline_wander_in_sample: true
+shuffle_baseline_wander_in_batch: false
 random_crop: 0.9
 random_drop_leads: 0
 random_surrogate_prob: 0
 random_jitter_prob: 0
 pretrain_datasets: ['code15', 'mimic', 'ptbxl']
-nk_clean: true
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
 # dataset folders
@@ -66,8 +68,8 @@ name: 'static'
 win_len: 1800
 data_folder_code15: /media/Volume/data/CODE15/processed/
 labels_file_code15: /media/Volume/data/CODE15/processed/exams_filtered.csv
-data_folder_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l
-labels_file_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_icd10_labelled.csv
+data_folder_mimic: /media/Volume/data/MIMIC_IV/
+labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
 data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
 labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
 
