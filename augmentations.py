@@ -11,16 +11,66 @@ from sklearn.utils import check_random_state
 
 from typing import Any
 import torch.nn as nn
-from scipy.signal import butter, lfilter, resample
+from scipy.signal import resample
+
+class RandomShiftBaselineWander(nn.Module):
+    """
+        Randomly shift the baseline wander.
+    """
+    def __init__(self, signal_fs=500, cutoff_freq=0.5):
+        super().__init__()
+        self.signal_fs = signal_fs
+        self.cutoff_freq = cutoff_freq
+
+    def forward(self, signal):
+        baseline_wander = self.extract_baseline_fft_torch(signal)
+        # get randint to shift the signal based on sig len
+        shift = np.random.randint(0, signal.shape[0] - 1)
+        baseline_shifted = torch.roll(baseline_wander, shifts=shift, dims=0)
+        signal = signal - baseline_wander + baseline_shifted
+        return signal
+
+        
+    def extract_baseline_fft_torch(self, ecg: torch.Tensor) -> torch.Tensor:
+        """
+        Efficient baseline wander extraction using FFT in pure PyTorch.
+
+        Args:
+            ecg: Tensor of shape [sig_len, num_leads]
+            fs: Sampling frequency in Hz (default: 500)
+            cutoff: Lowpass cutoff frequency in Hz (default: 0.5)
+
+        Returns:
+            baseline: Tensor of same shape as ecg, containing only the low-frequency components
+        """
+        sig_len, num_leads = ecg.shape
+        device = ecg.device
+
+        # Compute FFT
+        ecg_fft = torch.fft.rfft(ecg, dim=0)
+
+        # Compute frequency bins
+        freqs = torch.fft.rfftfreq(sig_len, d=1/self.signal_fs).to(device)  # Shape: [rfft_len]
+
+        # Create lowpass mask: freqs <= cutoff
+        mask = (freqs <= self.cutoff_freq).unsqueeze(1)  # Shape: [rfft_len, 1] to broadcast
+
+        # Apply lowpass filter
+        filtered_fft = ecg_fft * mask
+
+        # Inverse FFT to get baseline
+        baseline = torch.fft.irfft(filtered_fft, n=sig_len, dim=0)
+
+        return baseline
+
 
 class Normalize(nn.Module):
     """
         Normalize the signal.
     """
-    def __init__(self, mean=0.0, std=1.0):
+    def __init__(self):
         super(Normalize, self).__init__()
-        self.mean = mean
-        self.std = std
+
 
     def forward(self, signal):
         std = signal.std(axis=(0, -1))
@@ -46,7 +96,6 @@ class RandomCrop(nn.Module):
         return signal[start_idx:start_idx + target_length, ...]
 
 
-
 class RandomDropLeads(nn.Module):
     """
         Randomly drop leads from the signal.
@@ -65,8 +114,8 @@ class RandomDropLeads(nn.Module):
             leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
 
             # Ensure lead II (index 1 assuming standard 12-lead) is never removed
-            # if signal.shape[-1] > 1: # Check if there's more than one lead
-            #    leads_to_remove[1] = False
+            if signal.shape[-1] > 1: # Check if there's more than one lead
+                leads_to_remove[1] = False
 
             # Apply modification to the copy
             signal_out[..., leads_to_remove] = 0

@@ -64,12 +64,12 @@ leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6
 data_folder_mit: /media/Volume/data/MIT-BHI/data/
 name: 'static'
 win_len: 1800
-data_folder_code15: /media/Volume/data/CODE15/nkclean_360_12l
-labels_file_code15: /media/Volume/data/CODE15/nkclean_360_12l/exams_labelled.csv
+data_folder_code15: /media/Volume/data/CODE15/processed/
+labels_file_code15: /media/Volume/data/CODE15/processed/exams_filtered.csv
 data_folder_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l
 labels_file_mimic: /media/Volume/data/MIMIC_IV/nkclean_360_12l/records_w_diag_icd10_labelled.csv
-data_folder_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l
-labels_file_ptbxl: /media/Volume/data/PTB-XL/nkclean_360_12l/ptbxl_database.csv
+data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
+labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
 
 # other
 debug: false

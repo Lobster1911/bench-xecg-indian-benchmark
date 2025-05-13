@@ -22,6 +22,7 @@ class ECGCODE15Dataset(PretrainDataset):
 
     def load_records(self):
         self.records = self.tab_data.index.tolist()
+        print(f'sample path CODE15: {self.records[0]}')
         print(f'loaded {len(self.records)} records')
 
     def load_tabular_data(self):

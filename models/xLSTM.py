@@ -356,8 +356,8 @@ class xLSTMClassification(pretrainedxLSTM):
         out = out[:, :-reg_tokens.shape[1], :]
 
         out = self.layer_norm(out)
-        # cls = self.fc(out.max(dim=1)[0])
-        cls = self.fc(out[:, -1, :])
+        cls = self.fc(out[:, :-1, :].mean(dim=1))
+        # cls = self.fc(out[:, -1, :])
         return cls
     
     def finetuning_params(self):

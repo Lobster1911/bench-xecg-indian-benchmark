@@ -294,6 +294,8 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     
     @torch.no_grad()
     def rank_me(self, tensor, eps=1e-8):
+        if not torch.isfinite(tensor).all():
+            return torch.tensor(0.0, device=tensor.device)
         try:
             _, S, _ = torch.linalg.svd(tensor, full_matrices=False)  # shape: (min(N, D),)
 

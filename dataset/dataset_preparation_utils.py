@@ -176,6 +176,34 @@ def process_sample(signal, output_file_path, record_name, fs, desired_fs, nk_cle
     
     return signal
 
+def check_sample(record_path):
+    # if record exists
+    if not os.path.exists(f'{record_path}.hea'):
+        print(f"Record {record_path} does not exist - skipping")
+        return False
+    
+    record = wfdb.rdrecord(record_path)
+    signal = record.p_signal
+    signal = unpad_signal(signal)
+
+    if signal is None: 
+        print(f"Record {record_path} is none - skipping")
+        return False
+
+    if len(signal) < 360:
+        print(f"Record {record_path} has less than 360 samples - skipping")
+        return False
+
+    # skip record with too big variance and high values
+    if np.var(signal) > 10 and (np.max(signal) >= 15 or np.min(signal) < -15):
+        print(f"Record {record_path} has too high variance - skipping")
+        return False
+    if np.var(signal) < 0.0001:
+        print(f"Record {record_path} has too low variance - skipping")
+        return False
+    
+    return True
+
 def resample_and_save_record_wfdb(record_path, desired_fs, output_file_path, nk_clean=False):
     record = wfdb.rdrecord(record_path)
 
@@ -184,25 +212,25 @@ def resample_and_save_record_wfdb(record_path, desired_fs, output_file_path, nk_
     if isinstance(signal, str):
         return signal
 
-    try:
-        wfdb.wrsamp(
-            record.record_name,
-            fs=desired_fs,
-            units=record.units, 
-            sig_name=record.sig_name, 
-            samps_per_frame=record.samps_per_frame,
-            p_signal=signal, 
-            fmt=record.fmt, 
-            adc_gain=record.adc_gain, 
-            baseline=record.baseline, 
-            comments=record.comments,
-            base_date=record.base_date,
-            base_time=record.base_time,
-            write_dir=output_file_path, # output here
-        )
-    except Exception as e:
-        print(f"Error in record {record.record_name}: {e}")
-        return record.record_name
+    #try:
+    #    wfdb.wrsamp(
+    #        record.record_name,
+    #        fs=desired_fs,
+    #        units=record.units, 
+    #        sig_name=record.sig_name, 
+    #        samps_per_frame=record.samps_per_frame,
+    #        p_signal=signal, 
+    #        fmt=record.fmt, 
+    #        adc_gain=record.adc_gain, 
+    #        baseline=record.baseline, 
+    #        comments=record.comments,
+    #        base_date=record.base_date,
+    #        base_time=record.base_time,
+    #        write_dir=output_file_path, # output here
+    #    )
+    # except Exception as e:
+    #    print(f"Error in record {record.record_name}: {e}")
+    #
 
     return None
 

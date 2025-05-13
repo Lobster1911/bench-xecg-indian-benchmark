@@ -49,7 +49,7 @@ def train(config, run=None, wandb=False):
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config.patch_size))
 
     test_dataset = ptbxl.ECGPTBXLDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptbxl.collate_fn, num_workers=config.num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptbxl.make_collate_fn(config.patch_size), num_workers=config.num_workers)
 
     xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
@@ -60,7 +60,7 @@ def train(config, run=None, wandb=False):
         return key
 
     if config.checkpoint is not None and config.checkpoint != '':   
-        checkpoint = torch.load(config.checkpoint)
+        checkpoint = torch.load(config.checkpoint, weights_only=False)
         new_state_dict = {format_keys(k): v for k, v in checkpoint['state_dict'].items()}
         # remove the fc layer
         new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}

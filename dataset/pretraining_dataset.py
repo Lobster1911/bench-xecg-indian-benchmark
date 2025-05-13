@@ -2,18 +2,22 @@ import torch
 import os
 import pandas as pd
 import wfdb
+import neurokit2 as nk
+import numpy as np
 
-leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+leads = ['i', 'ii', 'iii', 'avR', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
 
 class PretrainDataset(torch.utils.data.Dataset):
     def __init__(self, config, leads_to_use=leads, split='train', global_augmentations=None, local_augmentations=None):
-        self.leads = leads if leads_to_use == ['*'] else leads_to_use
+        self.leads = leads if leads_to_use == ['*'] else [l.lower() for l in leads_to_use]
         self.patch_size = config.patch_size
         self.split = split
         self.global_augmentations = global_augmentations
         self.local_augmentations = local_augmentations
         self.n_global_view = config.n_global_view
         self.n_local_view = config.n_local_view
+        self.sampling_freq = config.sampling_freq
+        self.nk_clean = config.nk_clean
 
     def __len__(self):
         return len(self.records)
@@ -21,12 +25,15 @@ class PretrainDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         record = str(self.records[idx])
 
-        s, _ = wfdb.rdsamp(os.path.join(self.data_folder, record, record))
-        s = torch.tensor(s, dtype=torch.float32)
+        s, info = wfdb.rdsamp(os.path.join(self.data_folder, record))
+       
+        # mapping leads in the correct position
+        s = self.map_leads_and_clean(s, info)
 
-        if self.leads != leads:
-            # keep the selected leads
-            s = s[:, [leads.index(lead) for lead in self.leads]].squeeze()
+        if self.sampling_freq != info['fs']:
+            s = nk.signal_resample(s, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')
+        
+        s = torch.tensor(s, dtype=torch.float32)
 
         if self.global_augmentations is not None:
             global_signals = [ self.global_augmentations(s) for _ in range(self.n_global_view)]
@@ -42,3 +49,16 @@ class PretrainDataset(torch.utils.data.Dataset):
             'global_signals': global_signals,
             'local_signals': local_signals,
         }
+    
+    def map_leads_and_clean(self, signal, info):
+        s = np.zeros((len(signal), len(self.leads)))
+        for lead in info['sig_name']:
+            l = lead.lower()
+            if l in self.leads:
+                if self.nk_clean:
+                    s[:, self.leads.index(l)] = nk.ecg_clean(signal[:, info['sig_name'].index(lead)], sampling_rate=info['fs']).copy()
+                else:
+                    s[:, self.leads.index(l)] = signal[:, info['sig_name'].index(lead)]
+        return s
+                
+

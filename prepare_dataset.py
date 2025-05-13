@@ -15,8 +15,11 @@ from pandarallel import pandarallel
 from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
+# CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
+# PTB-XL: 
+
 # MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic
-# CODE:  python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/CODE15/nkclean_360_12l/ --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
+# CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
 # PTB-XL: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/PTB-XL/nkclean_360_12l/ --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
 
 # CLUSTER:
@@ -28,7 +31,6 @@ parser = argparse.ArgumentParser(description='Create dataset for MIT-BIH')
 parser.add_argument('--data_folder', type=str, default='/media/Volume/data/MIMIC_IV/', help='Path to raw data folder')
 parser.add_argument('--label_file', type=str, default='/media/Volume/data/MIMIC_IV/records_w_diag_icd10.csv', help='Path to the label file')
 parser.add_argument('--nk_clean', action='store_true', help='Use NeuroKit2 to clean the data')
-parser.add_argument('--output_folder', type=str, required=True, help='the name of the output directory')
 parser.add_argument('--dataset', type=str, required=True, help='the name of the dataset: mimic, code 15 or ptbxl')
 args = parser.parse_args()
 
@@ -108,24 +110,6 @@ def process_csv_file_mimic(csv_file, out_csv_file, records_to_remove=None):
     exams.parallel_apply(lambda row: str(row['study_id']).split('/')[0], axis=1)
     exams.to_csv(out_csv_file)
 
-def process_csv_file_code15(csv_file, out_csv_file, records_to_remove=None):
-    """
-    Remove the records from the csv file that are in the records_to_remove list, these records contain useless ECG signals
-
-    :param csv_file: the path to the csv file
-    :param out_csv_file: the path to the output csv file
-    :param records_to_remove: the list of records to remove
-    :return:
-    """
-    exams = pd.read_csv(csv_file)
-    records_to_remove = [int(r) for r in records_to_remove]
-
-    print(f'Removing {len(records_to_remove)} records ({records_to_remove[0]}, ...)')
-    print(f'Original length: {len(exams)}')
-    exams = exams[~exams['exam_id'].isin(records_to_remove)]
-    print(f'New length: {len(exams)}')
-
-    exams.to_csv(out_csv_file)    
 
 def process_csv_file_ptbxl(csv_file, out_csv_file, records_to_remove=None):
     """
@@ -146,10 +130,14 @@ def process_csv_file_ptbxl(csv_file, out_csv_file, records_to_remove=None):
     print(f'New length: {len(exams)}')
     exams.to_csv(out_csv_file)
 
+def debug(row):
+    print(type(row))
+    print(row)
+    return True
 
 if __name__ == '__main__':
     # make directory for the output
-    clean_and_create_directory(args.output_folder)
+    # clean_and_create_directory(args.output_folder)
 
     if args.dataset == 'mimic':
         records = pd.read_csv(os.path.join(args.data_folder, 'machine_measurements.csv'))
@@ -159,12 +147,34 @@ if __name__ == '__main__':
 
     if args.dataset == 'code15':
         exams = pd.read_csv(args.label_file)
-        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_code15)(exam) for exam in tqdm(exams.iterrows()))
-        res = [r for r in res if r is not None]
-        process_csv_file_code15(args.label_file, os.path.join(args.output_folder, 'exams_labelled.csv'), records_to_remove=res)
+        print(exams.head)
+        print(exams.columns)
+
+        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['exam_id']))), axis=1)
+        exams = exams[exams['valid']]
+        exams.drop(columns=['valid'], inplace=True)
+
+        exams['labelled'] = True
+
+        # need to load all the samples not in the labelled
+        # list all the files from the args.data_folder folder
+        file_list = os.listdir(args.data_folder)
+        file_list = [f for f in file_list if f.endswith('.hea')]
+
+        print(exams.head())
+        print('count rows: ', len(exams))
+        exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))
 
     if args.dataset == 'ptbxl':
         exams = pd.read_csv(args.label_file)
-        res = Parallel(n_jobs=get_max_n_jobs())(delayed(process_sample_ptbxl)(sample) for i, sample in tqdm(exams.iterrows()))
-        res = [r for r in res if r is not None]
-        process_csv_file_ptbxl(args.label_file, os.path.join(args.output_folder, 'ptbxl_database.csv'), records_to_remove=res)
+        print(exams.head)
+        print('initial count rows: ', len(exams))
+
+        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['filename_hr']))), axis=1)
+        exams = exams[exams['valid']]
+        exams.drop(columns=['valid'], inplace=True)
+
+        print(exams.head())
+        print('final count rows: ', len(exams))
+        exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))
+        print('saved to', os.path.join(args.data_folder, 'exams_filtered.csv'))

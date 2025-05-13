@@ -35,6 +35,7 @@ def pretrain(config, run=None, wandb=False):
     if config.deterministic: L.seed_everything(42)
 
     datasets_pretrain = []
+    val_datasets = []
 
     for dataset in config.pretrain_datasets:
         if dataset == 'mimic':
@@ -43,6 +44,13 @@ def pretrain(config, run=None, wandb=False):
                 leads_to_use=config.leads, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+            val_datasets.append(mimic.ECGMIMICDataset(
+                config, 
+                leads_to_use=config.leads, 
+                split='val', 
+                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'code15':
@@ -60,25 +68,17 @@ def pretrain(config, run=None, wandb=False):
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
+            val_datasets.append(ptb_xl.ECGPTBXLDataset(
+                config, 
+                leads_to_use=config.leads, 
+                split='val', 
+                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
-    val_dataset_1 = mimic.ECGMIMICDataset(
-        config, 
-        leads_to_use=config.leads, 
-        split='val', 
-        global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
-        local_augmentations=get_transforms(config, split='train', type='local')
-    )
-    val_dataset_2 = ptb_xl.ECGPTBXLDataset(
-        config, 
-        leads_to_use=config.leads, 
-        split='val', 
-        global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
-        local_augmentations=get_transforms(config, split='train', type='local')
-    )
-
-    val_dataset = ConcatDataset([val_dataset_1, val_dataset_2])
+    val_dataset = ConcatDataset(val_datasets)
     train_dataset = ConcatDataset(datasets_pretrain)
 
     # knn datasets:

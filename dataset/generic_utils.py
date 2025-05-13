@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from joblib import Parallel, delayed
 from torchvision import transforms
-from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop
+from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop, RandomShiftBaselineWander
 
 
 def get_transforms(config, split='train', type=None):
@@ -12,14 +12,14 @@ def get_transforms(config, split='train', type=None):
     """
     t = transforms.Compose([])
     if config.normalize:
-        t.transforms.append(Normalize(mean=config.mean, std=config.std))
+        t.transforms.append(Normalize())
+
     if config.random_crop < 1. and split == 'train':
-        if type == 'global':
-            t.transforms.append(RandomCrop(config.global_random_crop))
-        elif type == 'local':
-            t.transforms.append(RandomCrop(config.local_random_crop))
-        else:
-            t.transforms.append(RandomCrop(config.random_crop))
+        t.transforms.append(RandomCrop(config.global_random_crop if type == 'global' else  config.local_random_crop if type == 'local' else config.random_crop))
+
+    if config.shift_baseline_wander_in_sample and split == 'train':
+        t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
+
     if config.random_drop_leads > 0. and split == 'train':
         t.transforms.append(RandomDropLeads(config.random_drop_leads))
     if config.random_surrogate_prob > 0. and split == 'train':
