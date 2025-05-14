@@ -2,7 +2,9 @@ import numpy as np
 from torch import optim
 from optimizers.lamb import Lamb
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
-from pytorch_lightning.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint
+from typing_extensions import override
+
 
 def configure_optimizers(trainer):
     if trainer.optimizer == 'adam':
@@ -96,6 +98,7 @@ class DelayedCheckpoint(ModelCheckpoint):
         super().__init__(*args, **kwargs)
         self.delay_epochs = delay_epochs
 
+    @override
     def on_train_epoch_end(self, trainer, pl_module):
         if trainer.current_epoch >= self.delay_epochs:
             super().on_train_epoch_end(trainer, pl_module)
