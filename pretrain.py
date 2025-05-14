@@ -13,6 +13,7 @@ import utils.utils as utils
 import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
+from trainers.common import DelayedCheckpoint
 # from utils.utils import get_least_used_gpu
 
 # gpu_id = get_least_used_gpu()
@@ -116,7 +117,7 @@ def pretrain(config, run=None, wandb=False):
             knn_val_dataloader=knn_val_dataloader
         )
         
-    checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
+    checkpoint_callback = DelayedCheckpoint(delay_epochs=config.monitor_delay_epochs, monitor=config.monitor_metric, mode=config.monitor_mode)
 
     early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
 

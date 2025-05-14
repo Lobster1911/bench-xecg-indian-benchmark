@@ -38,6 +38,7 @@ bidirectional: false
 strategy: next_token_prediction # masked_token_prediction
 mask_ratio: 0.5 # only for masked_token_prediction
 monitor_metric: val_nrmse
+monitor_delay_epochs: 2
 
 
 # jepa like args
