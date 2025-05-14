@@ -13,12 +13,10 @@ import utils.utils as utils
 import torch
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.generic_utils import get_transforms
-from utils.utils import get_least_used_gpu
+# from utils.utils import get_least_used_gpu
 
-
-
-gpu_id = get_least_used_gpu()
-os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
+# gpu_id = get_least_used_gpu()
+# os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
 
 # torch.multiprocessing.set_sharing_strategy('file_system')
 
