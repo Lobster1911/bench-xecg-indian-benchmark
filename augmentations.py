@@ -121,7 +121,6 @@ class RandomCrop(nn.Module):
         self.crop_size = crop_size
 
     def forward(self, signal):
-        print(f"Signal shape: {signal.shape}")
         # Get the size of the signal
         signal_length = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
         # Calculate the target length
