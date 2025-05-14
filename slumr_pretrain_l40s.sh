@@ -16,5 +16,4 @@ echo $CUDA_VISIBLE_DEVICES
 #conda activate xlstm_pretrained
 
 # run script from above
-srun ~/.conda/envs/xlstm_pretrained/bin/python 
--u pretrain.py
+srun ~/.conda/envs/xlstm_pretrained/bin/python -u pretrain.py
