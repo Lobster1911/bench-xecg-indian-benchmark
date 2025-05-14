@@ -15,7 +15,7 @@ from pandarallel import pandarallel
 from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
-# CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
+# CODE:  python prepare_dataset.py --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
 # PTB-XL: python prepare_dataset.py --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
 
 # MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic

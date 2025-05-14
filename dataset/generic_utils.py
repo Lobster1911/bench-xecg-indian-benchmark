@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from joblib import Parallel, delayed
 from torchvision import transforms
-from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop, RandomShiftBaselineWander
+from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop, RandomShiftBaselineWander, RandomSwitchtBaselineWanderBatched
 
 
 def get_transforms(config, split='train', type=None):
@@ -54,16 +54,28 @@ def find_records(folder, header_extension='.dat'):
 
 
 
-def make_collate_fn(patch_size):
+def make_collate_fn(config):
+
+    if config.shuffle_baseline_wander_in_batch:
+        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+    
     def collate_fn(batch):
         # Pad and clean global signals
         result = {
-            'global_signals': pad_multi_view_batch(batch, 'global_signals', patch_size),
+            'global_signals': pad_multi_view_batch(batch, 'global_signals', config.patch_size),
         }
+
+        if config.shuffle_baseline_wander_in_batch:
+            # Apply baseline shuffling to the global signals
+            result['global_signals'] = [baseline_shuffler(signal) for signal in result['global_signals']]
 
         # Optional: handle local signals if present
         if 'local_signals' in batch[0] and batch[0]['local_signals'] is not None:
-            result['local_signals'] = pad_multi_view_batch(batch, 'local_signals', patch_size)
+            result['local_signals'] = pad_multi_view_batch(batch, 'local_signals', config.patch_size)
+
+            if config.shuffle_baseline_wander_in_batch:
+                # Apply baseline shuffling to the local signals
+                result['local_signals'] = [baseline_shuffler(signal) for signal in result['local_signals']]
 
         return result
 

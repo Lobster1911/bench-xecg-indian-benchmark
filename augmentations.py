@@ -13,6 +13,13 @@ from typing import Any
 import torch.nn as nn
 from scipy.signal import resample
 
+def get_padding_mask(signal):
+    """
+        Get the padding mask for the signal.
+        The mask is True for the padded values and False for the actual values.
+    """
+    return (signal != 0.).flip(1).cumsum(dim=1).flip(1) == 0
+
 class RandomShiftBaselineWander(nn.Module):
     """
         Randomly shift the baseline wander.
@@ -23,45 +30,73 @@ class RandomShiftBaselineWander(nn.Module):
         self.cutoff_freq = cutoff_freq
 
     def forward(self, signal):
-        baseline_wander = self.extract_baseline_fft_torch(signal)
+        baseline_wander = extract_baseline_fft_torch(signal, self.cutoff_freq, self.signal_fs).squeeze()
         # get randint to shift the signal based on sig len
         shift = np.random.randint(0, signal.shape[0] - 1)
         baseline_shifted = torch.roll(baseline_wander, shifts=shift, dims=0)
         signal = signal - baseline_wander + baseline_shifted
         return signal
 
-        
-    def extract_baseline_fft_torch(self, ecg: torch.Tensor) -> torch.Tensor:
-        """
-        Efficient baseline wander extraction using FFT in pure PyTorch.
+class RandomSwitchtBaselineWanderBatched(nn.Module):
+    """
+        Randomly switch the baseline wander in a batch of signals.
+    """
+    def __init__(self, signal_fs=500, cutoff_freq=0.5):
+        super().__init__()
+        self.signal_fs = signal_fs
+        self.cutoff_freq = cutoff_freq
 
-        Args:
-            ecg: Tensor of shape [sig_len, num_leads]
-            fs: Sampling frequency in Hz (default: 500)
-            cutoff: Lowpass cutoff frequency in Hz (default: 0.5)
+    def forward(self, signals):
+        # get the baseline wander
+        baseline_wander = extract_baseline_fft_torch(signals, self.cutoff_freq, self.signal_fs)
+        # get the batch size
+        batch_size = signals.shape[0]
+        # get the random index to switch the baseline wander
+        rand_idxs = torch.randperm(batch_size, device=signals.device)
+        # switch the baseline wander
+        zeroed_mask = (signals == 0).all(dim=1, keepdim=True)  # Mask for any zeroed-out channels
+        padding_mask = get_padding_mask(signals)
+        mask = ~padding_mask & ~zeroed_mask
 
-        Returns:
-            baseline: Tensor of same shape as ecg, containing only the low-frequency components
-        """
-        sig_len, num_leads = ecg.shape
-        device = ecg.device
+        signals_without_baseline = signals - baseline_wander + baseline_wander[rand_idxs]
+        signals = signals_without_baseline * mask
+        return signals
+         
+def extract_baseline_fft_torch(ecg: torch.Tensor, cutoff_freq=0.5, signal_fs=500) -> torch.Tensor:
+    """
+    Efficient baseline wander extraction using FFT in pure PyTorch.
 
-        # Compute FFT
-        ecg_fft = torch.fft.rfft(ecg, dim=0)
+    Args:
+        ecg: Tensor of shape [sig_len, num_leads]
+        fs: Sampling frequency in Hz (default: 500)
+        cutoff: Lowpass cutoff frequency in Hz (default: 0.5)
 
-        # Compute frequency bins
-        freqs = torch.fft.rfftfreq(sig_len, d=1/self.signal_fs).to(device)  # Shape: [rfft_len]
+    Returns:
+        baseline: Tensor of same shape as ecg, containing only the low-frequency components
+    """
+    if len(ecg.shape) == 2:
+        # batched data
+        ecg = ecg.unsqueeze(0)  # Add batch dimension
 
-        # Create lowpass mask: freqs <= cutoff
-        mask = (freqs <= self.cutoff_freq).unsqueeze(1)  # Shape: [rfft_len, 1] to broadcast
+    _, sig_len, _ = ecg.shape
+    device = ecg.device
 
-        # Apply lowpass filter
-        filtered_fft = ecg_fft * mask
+    # Compute FFT
+    ecg_fft = torch.fft.rfft(ecg, dim=1)
 
-        # Inverse FFT to get baseline
-        baseline = torch.fft.irfft(filtered_fft, n=sig_len, dim=0)
+    # Compute frequency bins
+    freqs = torch.fft.rfftfreq(sig_len, d=1/signal_fs).to(device)  # Shape: [rfft_len]
 
-        return baseline
+    # Create lowpass mask: freqs <= cutoff
+    mask = (freqs <= cutoff_freq).unsqueeze(0).unsqueeze(2)  # Shape: [rfft_len, 1] to broadcast
+
+    # Apply lowpass filter
+    filtered_fft = ecg_fft * mask
+
+    # Inverse FFT to get baseline
+    baseline = torch.fft.irfft(filtered_fft, n=sig_len, dim=1)
+
+    return baseline
 
 
 class Normalize(nn.Module):
@@ -86,10 +121,11 @@ class RandomCrop(nn.Module):
         self.crop_size = crop_size
 
     def forward(self, signal):
+        print(f"Signal shape: {signal.shape}")
         # Get the size of the signal
-        signal_length = signal.shape[0]
+        signal_length = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
         # Calculate the target length
-        target_length = int(signal_length * self.crop_size)
+        target_length = int(torch.floor(signal_length * self.crop_size).numpy())
         # Randomly sample the starting point for the cropping (cut-off)
         start_idx = np.random.randint(low=0, high=signal_length - target_length)
         # Crop the signal

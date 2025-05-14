@@ -25,7 +25,7 @@ sched_decay_factor: 0.8
 patience: 10
 
 # model hyperparameters
-patch_size: 64
+patch_size: 32
 embedding_size: 512
 activation_fn: relu
 xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
@@ -53,8 +53,8 @@ teacher_temp: 0.07
 # data and augmentations hyperparameters
 normalize: true
 nk_clean: true
-shift_baseline_wander_in_sample: true
-shuffle_baseline_wander_in_batch: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: true
 random_crop: 0.9
 random_drop_leads: 0
 random_surrogate_prob: 0
@@ -79,6 +79,6 @@ debug: false
 n_local_view: 6
 n_global_view: 2
 
-sampling_freq: 500
+sampling_freq: 100
 nk_clean: true
 use_sim_dino: true

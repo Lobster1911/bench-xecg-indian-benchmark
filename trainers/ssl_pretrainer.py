@@ -190,7 +190,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     def reconstruct_batch(self, batch, step):
         global_signals = batch["global_signals"]
         local_signals = batch["local_signals"]
-        batch_size, _, _ = global_signals[0].shape
+        batch_size, seq_len, num_leads = global_signals[0].shape
 
         global_out = [self.model(x, masking=True) for x in global_signals]
         global_out_teacher = [self.model.teacher_fwd(x) for x in global_signals]
@@ -201,8 +201,16 @@ class PretrainedxLSTMNetwork(L.LightningModule):
        
         # patch based loss
         masks = [out['mask'] for out in global_out]
+
+        padding_masks = [(sig != 0.).flip(1).cumsum(dim=1).flip(1) == 0 for sig in global_signals]
+        padding_masks_patched = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size, num_leads) for m in padding_masks]
+        padding_masks_patched = [m.max(dim=-1)[0] for m in padding_masks_patched]
+        combined_padding_mask = torch.cat(padding_masks_patched, dim=1).max(dim=-1)[0].flatten(0, 1)
+
         patched_masks = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size) for m in masks]
         combined_mask = torch.cat(patched_masks, dim=1).max(dim=-1)[0].flatten(0, 1)
+        # i do not want to predict where masking is applied to masked tokens
+        combined_mask = combined_mask * combined_padding_mask
 
         if self.use_sim_dino:
             cls_tok_stud_g = torch.stack([g['cls'] for g in global_out] + [l['cls'] for l in local_out], dim=0)
@@ -263,16 +271,21 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             self.log(f"{step}_norm_emb", norm.item(), prog_bar=False)
 
             # log the mean cosine similarity between all samples in the batch
-            cos_sim = torch.nn.functional.cosine_similarity(global_out[0]['cls'].unsqueeze(1), global_out[0]['cls'].unsqueeze(0), dim=-1)
-            cos_sim2 = torch.nn.functional.cosine_similarity(global_out[1]['cls'].unsqueeze(1), global_out[1]['cls'].unsqueeze(0), dim=-1)
-            cos_sim = (cos_sim.mean() + cos_sim2.mean()) / 2
-            self.log(f"{step}_cos_sim", cos_sim.item(), prog_bar=False)
+            cos_sim = torch.nn.functional.cosine_similarity(global_out[0]['cls'].unsqueeze(1), global_out[1]['cls'].unsqueeze(0), dim=-1)
+            # zero the diagonal
+            cos_sim2 = torch.nn.functional.cosine_similarity(global_out[1]['cls'].unsqueeze(1), global_out[0]['cls'].unsqueeze(0), dim=-1)
+            mask = torch.eye(cos_sim.shape[0], device=cos_sim.device).bool()
+            cos_sim_diff = (cos_sim[~mask].mean() + cos_sim2[~mask].mean()) / 2
+            cos_sim_same = (cos_sim2[mask].mean() + cos_sim[mask].mean()) / 2
+            self.log(f"{step}_cos_sim_different_samples", cos_sim_diff.item(), prog_bar=False)
+            self.log(f"{step}_cos_sim_same_samples", cos_sim_same.mean().item(), prog_bar=False)
         
         if self.pretraining_strategy == 'masked_token_prediction' and self.model.use_teacher_student:
             nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(global_out[0]['reconstruction'], global_signals[0], mask = None) #  out['mask'])
             nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(global_out[1]['reconstruction'], global_signals[1], mask=None) #, out2['mask'])
             nrmse, mse, mae, grad, min_max = (nrmse + nrmse2) / 2, (mse + mse2) / 2, (mae + mae2) / 2, (grad + grad2) / 2, (min_max + min_max2) / 2
         else:
+            raise ValueError(f"Pretraining strategy {self.pretraining_strategy} still to be implemented completely")
             nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(out['reconstruction'], x, out['mask'])
 
         loss = torch.tensor(0.0, device=self.device)
