@@ -202,15 +202,15 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # patch based loss
         masks = [out['mask'] for out in global_out]
 
+        # true for the value padded
         padding_masks = [(sig != 0.).flip(1).cumsum(dim=1).flip(1) == 0 for sig in global_signals]
-        padding_masks_patched = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size, num_leads) for m in padding_masks]
-        padding_masks_patched = [m.max(dim=-1)[0] for m in padding_masks_patched]
+        padding_masks_patched = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size, num_leads).sum(dim=-1) == num_leads for m in padding_masks]
         combined_padding_mask = torch.cat(padding_masks_patched, dim=1).max(dim=-1)[0].flatten(0, 1)
 
         patched_masks = [m.view(batch_size, m.shape[1] // self.patch_size, self.patch_size) for m in masks]
         combined_mask = torch.cat(patched_masks, dim=1).max(dim=-1)[0].flatten(0, 1)
         # i do not want to predict where masking is applied to masked tokens
-        combined_mask = combined_mask * combined_padding_mask
+        combined_mask = combined_mask * ~combined_padding_mask
 
         if self.use_sim_dino:
             cls_tok_stud_g = torch.stack([g['cls'] for g in global_out] + [l['cls'] for l in local_out], dim=0)
