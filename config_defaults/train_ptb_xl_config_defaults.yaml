@@ -47,7 +47,7 @@ classification_taksk: 'diagnosis_superclass'
 num_classes: 5
 
 strategy: masked_token_prediction
-num_reg_token: 4
+num_reg_token: 0
 
 n_global_view: 1
 n_local_view: 0

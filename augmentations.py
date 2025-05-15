@@ -288,10 +288,10 @@ class FTSurrogate(object):
              return sample
 
 class RandomResample(torch.nn.Module):
-    def __init__(self, current_freq=360, max_freq_delta=15):
+    def __init__(self, current_freq=360, max_freq_delta_ratio=0.05):
         super().__init__()
         self.current_freq = current_freq
-        self.max_freq_delta = max_freq_delta
+        self.max_freq_delta = int(current_freq * max_freq_delta_ratio)
 
     def forward(self, signal):
         freq_delta = torch.randint(-self.max_freq_delta, self.max_freq_delta + 1, (1,)).item()

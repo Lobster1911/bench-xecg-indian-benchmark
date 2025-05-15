@@ -27,7 +27,7 @@ def get_transforms(config, split='train', type=None):
     if config.random_jitter_prob > 0. and split == 'train':  
         t.transforms.append(Jitter(sigma=0.1, prob=config.random_jitter_prob))
     if config.random_resample and split == 'train':
-        t.transforms.append(RandomResample(360, max_freq_delta=10))
+        t.transforms.append(RandomResample(config.sampling_freq, 0.03))
     return t
 
 

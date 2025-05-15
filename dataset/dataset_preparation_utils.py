@@ -182,9 +182,13 @@ def check_sample(record_path):
         print(f"Record {record_path} does not exist - skipping")
         return False
     
-    record = wfdb.rdrecord(record_path)
-    signal = record.p_signal
-    signal = unpad_signal(signal)
+    try:
+        record = wfdb.rdrecord(record_path)
+        signal = record.p_signal
+        signal = unpad_signal(signal)
+    except Exception as e:
+        print(f"Error in record {record_path}: {e}")
+        return False
 
     if signal is None: 
         print(f"Record {record_path} is none - skipping")

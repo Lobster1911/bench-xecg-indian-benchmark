@@ -6,6 +6,7 @@ import dataset.mit_bih as mit_bih
 import dataset.code_15 as code_15
 import dataset.mimic_iv as mimic
 import dataset.ptb_xl as ptb_xl
+import dataset.chapman as chapman
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
@@ -40,14 +41,12 @@ def pretrain(config, run=None, wandb=False):
         if dataset == 'mimic':
             datasets_pretrain.append(mimic.ECGMIMICDataset(
                 config, 
-                leads_to_use=config.leads, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
             val_datasets.append(mimic.ECGMIMICDataset(
                 config, 
-                leads_to_use=config.leads, 
                 split='val', 
                 global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
                 local_augmentations=get_transforms(config, split='train', type='local')
@@ -55,23 +54,26 @@ def pretrain(config, run=None, wandb=False):
         elif dataset == 'code15':
             datasets_pretrain.append(code_15.ECGCODE15Dataset(
                 config, 
-                leads_to_use=config.leads,                
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'ptbxl':
             datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
                 config, 
-                leads_to_use=config.leads, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
             val_datasets.append(ptb_xl.ECGPTBXLDataset(
                 config, 
-                leads_to_use=config.leads, 
                 split='val', 
                 global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+        elif dataset == 'chapman':
+            datasets_pretrain.append(chapman.ECGChapmanDataset(
+                config, 
+                global_augmentations=get_transforms(config, split='train', type='global'),
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         else:
@@ -81,8 +83,8 @@ def pretrain(config, run=None, wandb=False):
     train_dataset = ConcatDataset(datasets_pretrain)
 
     # knn datasets:
-    knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='train', global_augmentations=None, local_augmentations=None)
-    knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, leads_to_use=config.leads, split='val', global_augmentations=None, local_augmentations=None)
+    knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
+    knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
     knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config.patch_size))
     knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config.patch_size))
 

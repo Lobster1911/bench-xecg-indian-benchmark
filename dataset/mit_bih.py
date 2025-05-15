@@ -59,7 +59,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.split_val_by_patient = config.split_val_by_patient
         self.augmentations = augmentations
 
-        self.leads_to_use = leads if config.leads == ['*'] else config.leads
+        self.leads_to_use = leads
 
         # self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
         # ensure no Nan values

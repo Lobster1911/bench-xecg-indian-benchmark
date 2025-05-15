@@ -112,16 +112,14 @@ class pretrainedxLSTM(nn.Module):
 
         # add reg tokens
         if self.num_reg_tokens > 0:
-            reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
-            half = self.num_reg_tokens // 2
-            x_emb = torch.cat([reg_tokens[:, :half, :], x_emb, cls_token, reg_tokens[:, half:, :]], dim=1)
+            x_emb = self.add_reg_tokens(x_emb)
 
         # pass to xlstm
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
         out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         if self.num_reg_tokens > 0:
-            out = out[:, half:-(self.num_reg_tokens - half), :]
+            out = self.remove_reg_tokens(out)
             
         out = self.layer_norm(out)
 
@@ -159,6 +157,16 @@ class pretrainedxLSTM(nn.Module):
     def teacher_fwd(self, x):
         return self._teacher(x, masking=False, reconstruct=False)
          
+    def add_reg_tokens(self, x):
+        reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
+        half = self.num_reg_tokens // 2
+        return torch.cat([reg_tokens[:, :half, :], x, reg_tokens[:, half:, :]], dim=1)
+    
+    def remove_reg_tokens(self, x):
+        half = self.num_reg_tokens // 2
+        return x[:, half:-(self.num_reg_tokens - half), :]
+    
+
     def get_random_mask(self, x):
         """
         Retutn a mask of the same shape as x, masked values are set to TRUE
@@ -281,10 +289,17 @@ class xLSTMClassification(pretrainedxLSTM):
             num_channels
         ): 
         dropout = config.dropout
-        # config.dropout = 0.0  
+
+        if config.linear_probing:
+            config.dropout = 0.0  
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        self.fc = nn.Linear(config.embedding_size, num_classes)
+        self.fc = nn.Sequential(
+            nn.Linear(config.embedding_size, config.embedding_size // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(config.embedding_size // 2, num_classes)
+        )
         
         
 
@@ -292,11 +307,15 @@ class xLSTMClassification(pretrainedxLSTM):
         x = self.patch_embedding(x)
 
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-        reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
-        x = torch.cat([x, cls_token, reg_tokens], dim=1)
+        x = torch.cat([x, cls_token], dim=1)
+
+        if self.num_reg_tokens > 0:
+            x = self.add_reg_tokens(x)
 
         out = self.xlstm(x, need_expansion=False)# [:, -1, :]
-        out = out[:, :-reg_tokens.shape[1], :]
+
+        if self.num_reg_tokens > 0:
+            out = self.remove_reg_tokens(out)
 
         out = self.layer_norm(out)
 

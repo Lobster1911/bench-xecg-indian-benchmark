@@ -8,8 +8,8 @@ import numpy as np
 leads = ['i', 'ii', 'iii', 'avR', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
 
 class PretrainDataset(torch.utils.data.Dataset):
-    def __init__(self, config, leads_to_use=leads, split='train', global_augmentations=None, local_augmentations=None):
-        self.leads = leads if leads_to_use == ['*'] else [l.lower() for l in leads_to_use]
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        self.leads = leads
         self.patch_size = config.patch_size
         self.split = split
         self.global_augmentations = global_augmentations

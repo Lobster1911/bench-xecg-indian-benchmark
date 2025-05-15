@@ -12,3 +12,10 @@ Removing 1080 records (1460876, ...)
 Original length: 345779
 New length: 344699
 
+## Observation on hyperparameters
+
+- *ema_0*: 0.99 seems to work well, need to understand if higher values leads to better result (currently running)
+- *lr*: in combination with 0.99 ema_0 is good but need to understan if higher values are better (lower are not)
+- *drop_path*: smaller values seems to work better
+
+THE PARAMETERS ABOVE ARE GOOD FOR TRAINING BUT FOR THE KNN THESE OBSERVATION ARE USELESS
