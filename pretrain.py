@@ -52,11 +52,17 @@ def pretrain(config, run=None, wandb=False):
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'code15':
-            datasets_pretrain.append(code_15.ECGCODE15Dataset(
+            code15 = code_15.ECGCODE15Dataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
-            ))
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(code15))
+            train_code15, val_code15 = Subset(code15, range(0, train_size)), Subset(code15, range(train_size, len(code15)))
+            datasets_pretrain.append(train_code15)
+            val_datasets.append(val_code15)
+
         elif dataset == 'ptbxl':
             datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
                 config, 
@@ -71,11 +77,17 @@ def pretrain(config, run=None, wandb=False):
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'chapman':
-            datasets_pretrain.append(chapman.ECGChapmanDataset(
+            chapman_dataset = chapman.ECGChapmanDataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'),
                 local_augmentations=get_transforms(config, split='train', type='local')
-            ))
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(chapman_dataset))
+            train_chapman, val_chapman = Subset(chapman_dataset, range(0, train_size)), Subset(chapman_dataset, range(train_size, len(chapman_dataset)))
+            datasets_pretrain.append(train_chapman)
+            val_datasets.append(val_chapman)
+
         else:
             raise ValueError(f"Dataset {dataset} not found")
 
