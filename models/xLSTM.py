@@ -42,7 +42,10 @@ class pretrainedxLSTM(nn.Module):
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-            self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
+            
+            self.num_reg_tokens = config.num_reg_token
+            if config.num_reg_token > 0:
+                self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
 
         if self.use_teacher_student:   
@@ -90,8 +93,6 @@ class pretrainedxLSTM(nn.Module):
         return param
     
     def forward(self, x, masking=True, reconstruct=True):
-        num_reg_tokens = self.reg_token.shape[1]
-
         if masking:   # masking
             mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
             x = x.masked_fill(mask, 0) # apply the mask
@@ -107,14 +108,21 @@ class pretrainedxLSTM(nn.Module):
 
         # add the [cls] and [reg] tokens
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-        reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
-        x_emb = torch.cat([x_emb, cls_token, reg_tokens], dim=1)
+        x_emb = torch.cat([x_emb, cls_token], dim=1)
+
+        # add reg tokens
+        if self.num_reg_tokens > 0:
+            reg_tokens = self.reg_token.expand(x.shape[0], -1, -1)
+            half = self.num_reg_tokens // 2
+            x_emb = torch.cat([reg_tokens[:, :half, :], x_emb, cls_token, reg_tokens[:, half:, :]], dim=1)
 
         # pass to xlstm
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
         out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
-        out = out[:, :-num_reg_tokens, :]
+        if self.num_reg_tokens > 0:
+            out = out[:, half:-(self.num_reg_tokens - half), :]
+            
         out = self.layer_norm(out)
 
         # reconstruct signal
