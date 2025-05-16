@@ -22,6 +22,7 @@ def get_transforms(config, split='train', type=None):
 
     if config.random_drop_leads > 0. and split == 'train':
         t.transforms.append(RandomDropLeads(config.random_drop_leads))
+
     if config.random_surrogate_prob > 0. and split == 'train':
         t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))
     if config.random_jitter_prob > 0. and split == 'train':  

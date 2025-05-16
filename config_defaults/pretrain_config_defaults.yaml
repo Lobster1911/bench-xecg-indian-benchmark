@@ -73,6 +73,8 @@ data_folder_mimic: /media/Volume/data/MIMIC_IV/
 labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
 data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
 labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
+data_folder_chapman: /media/Volume/data/ChapmanNingbo/1.0.0/
+labels_file_chapman: /media/Volume/data/ChapmanNingbo/1.0.0/exams_filtered.csv
 
 # other
 debug: false
@@ -83,3 +85,4 @@ n_global_view: 2
 sampling_freq: 100
 nk_clean: true
 use_sim_dino: true
+lambda_code_rate: 0.1

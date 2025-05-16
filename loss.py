@@ -3,6 +3,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 class KoLeoLoss(nn.Module):
     """Kozachenko-Leonenko entropic loss regularizer from Sablayrolles et al. - 2018 - Spreading vectors for similarity search"""
@@ -90,7 +91,7 @@ class MCRLoss(nn.Module):
         for i in range(num_views):
             loss += torch.linalg.cholesky_ex(I + scalar * cov_list[i])[0].diagonal().log().sum()
         loss /= num_views
-        loss *= (p+m)/(p*m) # the balancing factor gamma, you can also use the next line. This is ultimately a heuristic, so feel free to experiment.
-        # loss *= ((self.eps * N * m) ** 0.5 / p)
-        # self.eps*np.sqrt(m/(p*np.min([p, m])))
+        # loss *= (p+m)/(p*m) # the balancing factor gamma, you can also use the next line. This is ultimately a heuristic, so feel free to experiment.
+        # loss *= ((self.eps * m) ** 0.5 / p)
+        loss *= self.eps * np.sqrt(m/(p*np.min([p, m])))
         return -loss

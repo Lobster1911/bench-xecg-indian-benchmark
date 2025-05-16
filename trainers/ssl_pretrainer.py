@@ -45,6 +45,9 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.pretraining_strategy = config.strategy
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
+        self.lambda_code_rate =  config.lambda_code_rate
+
+
 
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
@@ -227,7 +230,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
             self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True)
 
-            teacher_student_loss = compression_term + expansion_term + patch_loss
+            teacher_student_loss = compression_term + self.lambda_code_rate * expansion_term + patch_loss
 
         else:
             stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
