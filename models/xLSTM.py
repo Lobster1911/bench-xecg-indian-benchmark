@@ -288,22 +288,15 @@ class xLSTMClassification(pretrainedxLSTM):
             num_classes,
             num_channels
         ): 
-        dropout = config.dropout
-
-        if config.linear_probing:
-            config.dropout = 0.0  
+        self.linear_probing = config.linear_probing
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
         self.fc = nn.Sequential(
-            nn.Linear(config.embedding_size, config.embedding_size // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(config.embedding_size // 2, num_classes)
+            nn.Dropout(config.dropout),
+            nn.Linear(config.embedding_size, num_classes)
         )
-        
-        
 
-    def forward(self, x):
+    def get_cls_token(self, x):
         x = self.patch_embedding(x)
 
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
@@ -326,15 +319,25 @@ class xLSTMClassification(pretrainedxLSTM):
         else:
             cls = out[:, -1, :]
 
+        return cls
+
+    def forward(self, x):
+        if self.linear_probing:
+            with torch.no_grad():
+                cls = self.get_cls_token(x)
+        else:  
+            cls = self.get_cls_token(x)
+
         res = self.fc(cls)
         return res
     
     def finetuning_params(self):
-        params = []
-        params.extend(self.xlstm.parameters())
-        params.extend(self.patch_embedding.parameters())       
-        params.extend(self.layer_norm.parameters())
+        params = [param for name, param in self.named_parameters() if 'fc' not in name]
         return params
+    
+    def set_eval_linear_probing(self):
+        self.eval()
+        self.fc.train()
 
     def training_params(self):
         params = []

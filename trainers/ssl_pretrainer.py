@@ -47,8 +47,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
         self.lambda_code_rate =  config.lambda_code_rate
 
-
-
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
@@ -100,8 +98,11 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     @torch.no_grad()
     def update_teacher(self):
         steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
-        num_training_steps = steps_per_epoch * self.epochs
+        # with teacher-student, the number of training steps is counted twice because of two grad steps
+        # so i have to divide the global_step by two
+        num_training_steps = steps_per_epoch * self.epochs / 2 
         beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
+        beta = min(max(beta, 0.0), 1.0) # bound to max 1.0
         self.log('teacher_beta', beta, prog_bar=False)
         self.update_module(self.model._teacher, self.model, beta)
         

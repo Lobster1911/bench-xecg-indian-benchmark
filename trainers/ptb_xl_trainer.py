@@ -196,6 +196,9 @@ class TrainingPTB_XL(L.LightningModule):
         targets = batch['class_labels']
         # get one hot encoding
 
+        if self.linear_probing: 
+            self.model.set_eval_linear_probing()
+
         logits = self.model(x)
         preds = (torch.sigmoid(logits) > 0.5).float()
 
