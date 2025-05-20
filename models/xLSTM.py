@@ -138,7 +138,7 @@ class pretrainedxLSTM(nn.Module):
 
         # reconstruct signal
         if reconstruct:
-            rec, _ = self.reconstruction(out[:, :-1, :].clone().detach())
+            rec, _ = self.reconstruction(out.clone().detach())
 
         tortn = {
             'patches': out,

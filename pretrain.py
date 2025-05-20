@@ -97,8 +97,8 @@ def pretrain(config, run=None, wandb=False):
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val'))
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val'))
 
     
     # keep only 10% of the dataset
@@ -111,7 +111,6 @@ def pretrain(config, run=None, wandb=False):
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config))
 
     xlstm = pretrainedxLSTM(config=config, num_channels=len(config.leads))
-    # xlstm = torch.compile(xlstm)
 
     if config.checkpoint != None:
         model = PretrainedxLSTMNetwork.load_from_checkpoint(
