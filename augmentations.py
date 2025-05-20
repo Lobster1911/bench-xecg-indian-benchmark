@@ -53,6 +53,9 @@ class RandomSwitchtBaselineWanderBatched(nn.Module):
         
         # get the baseline wander
         baseline_wander = extract_baseline_fft_torch(signals, self.cutoff_freq, self.signal_fs)
+        shift = np.random.randint(0, signals.shape[1] - 1)
+        baseline_shifted = torch.roll(baseline_wander, shifts=shift, dims=1)
+
         # get the batch size
         batch_size = signals.shape[0]
         # get the random index to switch the baseline wander
@@ -62,7 +65,7 @@ class RandomSwitchtBaselineWanderBatched(nn.Module):
         padding_mask = get_padding_mask(signals)
         mask = ~padding_mask & ~zeroed_mask
 
-        signals_without_baseline = signals - baseline_wander + baseline_wander[rand_idxs]
+        signals_without_baseline = signals - baseline_wander + baseline_shifted[rand_idxs]
         signals = signals_without_baseline * mask
         return signals
          
