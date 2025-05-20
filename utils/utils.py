@@ -11,6 +11,18 @@ import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
 import yaml
+from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
+from torch.utils.data import Subset
+import numpy as np
+
+def split_dataset_preserve_labels(dataset, split_ratio=0.1):
+    print(f"Splitting dataset with {split_ratio} training data")
+    multilabels = np.array([dataset[i]['class_label'] for i in range(len(dataset))])  # get multilabels
+    splitter = MultilabelStratifiedShuffleSplit(n_splits=1, test_size=1 - split_ratio)
+    train_idx, _ = next(splitter.split(np.zeros(len(multilabels)), multilabels))
+    balanced_train_dataset = Subset(dataset, train_idx)
+    print(f"Train dataset size: {len(balanced_train_dataset)}")
+    return balanced_train_dataset
 
 def format_keys(key):
     if key.startswith('model.'):

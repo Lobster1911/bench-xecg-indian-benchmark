@@ -30,6 +30,7 @@ class pretrainedxLSTM(nn.Module):
         self.use_sim_dino = config.use_sim_dino
         self.cls_type = config.cls_type
         self.use_final_layer_norm = config.use_final_layer_norm
+        self.masking_type = config.masking_type
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
         xlstm_emb_size = config.embedding_size
@@ -97,29 +98,16 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
     
-    def forward(self, x, masking=True, reconstruct=True):
-        if masking:   # masking
-            mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
-            x = x.masked_fill(mask, 0) # apply the mask
-
-        # patching
-        x_emb = self.patch_embedding(x)
-
-        # adding mask tokens
-        if masking:
-            batch_size, tokens_num, _ = x.shape
-            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
-            x_emb[patched_mask] = self.mask_token
-
+    def forward_xlstm(self, x):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
-            x_emb = self.add_cls_token(x_emb)
+            x = self.add_cls_token(x)
         if self.num_reg_tokens > 0:
-            x_emb = self.add_reg_tokens(x_emb)
+            x = self.add_reg_tokens(x)
 
         # pass to xlstm
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
-        out = self.xlstm(x_emb, need_expansion = need_expansion) # [batch_size, embedding_dim]
+        out = self.xlstm(x, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
@@ -135,6 +123,25 @@ class pretrainedxLSTM(nn.Module):
         else:
             cls = out[:, -1, :]
             out = out[:, :-1, :]
+
+        return cls, out
+    
+    def forward(self, x, masking=True, reconstruct=True):
+        if masking:   # masking
+            mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
+            x = x.masked_fill(mask, 0) # apply the mask
+
+        # patching
+        x_emb = self.patch_embedding(x)
+
+        # adding mask tokens
+        if masking:
+            batch_size, tokens_num, _ = x.shape
+            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
+            x_emb[patched_mask] = self.mask_token
+
+        
+        cls, out = self.forward_xlstm(x_emb)
 
         # reconstruct signal
         if reconstruct:
@@ -173,21 +180,31 @@ class pretrainedxLSTM(nn.Module):
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
         return torch.cat([cls_token, x], dim=1)
     
+
     def get_random_mask(self, x):
         """
         Retutn a mask of the same shape as x, masked values are set to TRUE
         """
-        # masking the signal
-        num_patches = x.shape[1] // self.patch_size
-        rand = torch.rand(x.shape[0], num_patches, device=x.device)
-        mask = (rand < self.mask_ratio) # this is true for masked
-        # repeat the mask to num_patches * patch_size
-        mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
         # check when the x was all 0 and set the mask to 0
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
-        #print('padding mask', padding_mask.shape)
-        #print('mask', mask.shape)
-        return mask | padding_mask
+        num_patches = x.shape[1] // self.patch_size
+
+        if self.masking_type == 'random':
+            # masking the signal
+            rand = torch.rand(x.shape[0], num_patches, device=x.device)
+            mask = (rand < self.mask_ratio) # this is true for masked
+            # repeat the mask to num_patches * patch_size
+            mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
+        elif self.masking_type == 'block':
+            rand = torch.rand(x.shape[0], num_patches, device=x.device)
+            mask = (rand < self.mask_ratio / 4) # this is true for masked
+            # after a masked patch, the next 3 patches are masked
+            for i in range(1, 4):
+                mask = mask | mask.roll(-1, dims=1)
+            # repeat the mask to num_patches * patch_size
+            mask = mask.repeat_interleave(self.patch_size, dim=1).unsqueeze(-1)
+
+        return mask & ~padding_mask
     
     def generate(self, x, length=10):
         if self.training_strategy != 'next_token_prediction':

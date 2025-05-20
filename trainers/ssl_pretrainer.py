@@ -100,7 +100,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
         # with teacher-student, the number of training steps is counted twice because of two grad steps
         # so i have to divide the global_step by two
-        num_training_steps = steps_per_epoch * self.epochs / 2 
+        num_training_steps = steps_per_epoch * self.epochs * 2 
         beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
         beta = min(max(beta, 0.0), 1.0) # bound to max 1.0
         self.log('teacher_beta', beta, prog_bar=False)

@@ -16,8 +16,10 @@ def configure_optimizers(trainer):
         optimizer = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'lamb':
         optimizer = Lamb(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-    else:
+    elif trainer.optimizer == 'momentum':
         optimizer = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
+    elif trainer.optimizer == 'sgd':
+        optimizer = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0., weight_decay=trainer.wd)
 
     if trainer.use_scheduler: 
         steps_per_epoch = np.ceil(trainer.len_train_dataset / trainer.batch_size)

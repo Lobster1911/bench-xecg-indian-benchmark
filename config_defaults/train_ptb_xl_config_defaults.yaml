@@ -12,6 +12,7 @@ is_sweep: false
 grad_clip: 0.5
 weight_tying: false
 label_smoothing: 0.0
+training_pct: 1.
 
 optimizer: "adamw"
 use_scheduler: true

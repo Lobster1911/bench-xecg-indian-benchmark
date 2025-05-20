@@ -17,37 +17,15 @@ class xLSTMClassification(pretrainedxLSTM):
             nn.Linear(config.embedding_size, num_classes)
         )
 
-    def get_cls_token(self, x):
-        x = self.patch_embedding(x)
-
-        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-        x = torch.cat([x, cls_token], dim=1)
-
-        if self.num_reg_tokens > 0:
-            x = self.add_reg_tokens(x)
-
-        out = self.xlstm(x, need_expansion=False)# [:, -1, :]
-
-        if self.num_reg_tokens > 0:
-            out = self.remove_reg_tokens(out)
-
-        out = self.layer_norm(out)
-
-        if self.cls_type == 'max':
-            cls = out.max(dim=1)[0]
-        elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            cls = out.mean(dim=1)
-        else:
-            cls = out[:, -1, :]
-
-        return cls
 
     def forward(self, x):
         if self.linear_probing:
             with torch.no_grad():
-                cls = self.get_cls_token(x)
+                x = self.patch_embedding(x)
+                cls, _ = self.forward_xlstm(x)
         else:  
-            cls = self.get_cls_token(x)
+            x = self.patch_embedding(x)
+            cls, _ = self.forward_xlstm(x)
 
         res = self.fc(cls)
         return res
