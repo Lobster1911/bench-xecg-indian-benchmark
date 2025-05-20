@@ -39,7 +39,7 @@ strategy: next_token_prediction # masked_token_prediction
 mask_ratio: 0.5 # only for masked_token_prediction
 monitor_metric: val_nrmse
 monitor_delay_epochs: 2
-
+use_final_layer_norm: true
 
 # jepa like args
 use_teacher_student: false

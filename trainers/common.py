@@ -6,6 +6,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from typing_extensions import override
 
 
+
 def configure_optimizers(trainer):
     if trainer.optimizer == 'adam':
         optimizer = optim.Adam(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)

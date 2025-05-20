@@ -7,6 +7,9 @@ import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 import neurokit2 as nk
+from dataset.generic_utils import RandomSwitchtBaselineWanderBatched
+
+
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
     'MLII' : 'II',
@@ -58,19 +61,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.bidirectional = config.bidirectional
         self.split_val_by_patient = config.split_val_by_patient
         self.augmentations = augmentations
-
+        self.sampling_freq = config.sampling_freq
         self.leads_to_use = leads
-
-        # self.samples = pd.read_csv(os.path.join(self.data_folder, self.name, f'labels_{subset}.csv'))
-        # ensure no Nan values
-        # self.samples['extra_annotations'] = self.samples['extra_annotations'].fillna('')
-
-        # if config.num_classes == 3:
-            # keep only the classes N, S and V
-        #    self.samples = self.samples[self.samples['label'].isin(['N', 'S', 'V'])]
-        
-        # print(self.samples.head())  
-        # get all the different values for column patient
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -114,6 +106,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
 
         for patient, signal, header, annotations, r_peaks, labels_orig, labels in results:
+            if self.sampling_freq != header.fs:
+                signal = nk.signal_resample(signal, sampling_rate=header.fs, desired_sampling_rate=self.sampling_freq, method='FFT')
+                # I should interpolate the r_peak annotations to the new sampling rate
+                r_peaks = [(int(r_peak * self.sampling_freq / header.fs), label) for r_peak, label in r_peaks]
+
             self.signals[patient] = signal
             self.headers[patient] = header
             self.annotations[patient] = annotations
@@ -141,22 +138,22 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
                     last_class = sample_class
             else:
-                for n in range(0, len(signal), self.win_len * 2):
-                    around_r_peaks = [(r, l) for r, l in r_peaks if n - self.win_len < r <= n + self.win_len]
-                    samples.append({
-                        'patient': patient,
-                        'r_peak': n,
-                        'around_r_peaks': around_r_peaks,
-                    })
+                #for n in range(0, len(signal), self.win_len * 2):
+                #    around_r_peaks = [(r, l) for r, l in r_peaks if n - self.win_len < r <= n + self.win_len]
+                samples.append({
+                    'patient': patient,
+                    'r_peak': -1,
+                    'around_r_peaks': r_peaks,
+                })
 
-                missing = len(signal) % (self.win_len * 2)
-                if missing != 0:
-                    around_r_peaks = [(r, l) for r, l in r_peaks if r > len(signal) - missing]
-                    samples.append({
-                        'patient': patient,
-                        'r_peak': len(signal) - missing // 2,
-                        'around_r_peaks': around_r_peaks,
-                    })
+               #  missing = len(signal) % (self.win_len * 2)
+                #if missing != 0:
+                #    around_r_peaks = [(r, l) for r, l in r_peaks if r > len(signal) - missing]
+                #    samples.append({
+                #        'patient': patient,
+                #        'r_peak': len(signal) - missing // 2,
+                #        'around_r_peaks': around_r_peaks,
+                #    })
                 # maybe some samples are issing at the end? 
             return samples
 
@@ -190,21 +187,19 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         around_r_peaks = sample['around_r_peaks']
         len_signal = signal.shape[0]
 
-        if self.random_shift:
+        if self.random_shift and self.split == 'train':
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start = max(0, r_peak - self.win_len + shift)
             window_end = min(r_peak + self.win_len + shift, len_signal)
-        else:
+        elif self.split == 'train':
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
+        else:
+            window_start = 0
+            window_end = len_signal
 
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
-
-        if self.normalize:
-            std = window_signal.std(axis=(0, -1))
-            std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-            window_signal = (window_signal - window_signal.mean(axis=(0, -1))) / std
 
         if self.augmentations is not None:
             signal = self.augmentations(signal)
@@ -256,21 +251,33 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         return signal_to_return
 
 
-def collate_fn(batch):
-    signals = [item['signal'] for item in batch]
-    patients = [item['patient_id'] for item in batch]
-    r_peaks = [item['r_peaks'] for item in batch]
-    labels = [item['label'] for item in batch]
 
-    # pad to same length and pad to match the patch size module
-    signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
-    r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
-    labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
+def make_collate_fn(config):
 
-    return {
-        'signal': signals,
-        'label': labels,
-        'patient_ids': torch.tensor(patients),
-        'r_peak': r_peaks,
-        'labels': labels,
-    }
+    if config.shuffle_baseline_wander_in_batch:
+        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+    
+    def collate_fn(batch):
+        signals = [item['signal'] for item in batch]
+        patients = [item['patient_id'] for item in batch]
+        r_peaks = [item['r_peaks'] for item in batch]
+        labels = [item['label'] for item in batch]
+
+        # pad to same length and pad to match the patch size module
+        if config.shuffle_baseline_wander_in_batch:
+            signals = baseline_shuffler(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True))
+        else:
+            signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
+            
+        r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
+        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
+
+        return {
+            'signal': signals,
+            'label': labels,
+            'patient_ids': torch.tensor(patients),
+            'r_peak': r_peaks,
+            'labels': labels,
+        }
+
+    return collate_fn

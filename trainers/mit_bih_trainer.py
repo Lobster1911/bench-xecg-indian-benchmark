@@ -29,15 +29,16 @@ class TrainingMIT_BIH(L.LightningModule):
         self.epochs = config.epochs
         self.r_peaks_lambda = config.r_peaks_lambda
         self.use_focal_loss = config.use_focal_loss
+        self.linear_probing = config.linear_probing
 
         self.num_classes = config.num_classes
-        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
-        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, top_k=1, average=None, ignore_index=-1)
+        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
+        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
+        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
+        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average='macro', ignore_index=-1)
+        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average='macro', ignore_index=-1)
+        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average=None, ignore_index=-1)
         self.train_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)  
         self.valid_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
         self.test_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
@@ -240,6 +241,9 @@ class TrainingMIT_BIH(L.LightningModule):
         targets = batch['label'].unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
         # get one hot encoding
 
+        if self.linear_probing:
+            self.model.set_eval_linear_probing()
+
         r_peaks = batch['r_peak'] # [bs, seq_len]
         cls, r_peak_pos = self.model(x)
         r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
@@ -261,7 +265,7 @@ class TrainingMIT_BIH(L.LightningModule):
         r_peaks = r_peaks[:, :r_peak_pos.shape[1]]
         loss_r_peak_pos = nn.functional.binary_cross_entropy_with_logits(r_peak_pos, r_peaks)
 
-        # return the masket target and cls
+        # return the masked target and cls
         mask = targets != -1
         targets = targets[mask]
         cls = cls[mask]
@@ -270,10 +274,13 @@ class TrainingMIT_BIH(L.LightningModule):
         return loss_cls, loss_r_peak_pos, preds, targets, cls, r_peak_pos, r_peaks
 
     def get_params(self):
-        return [
-            {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
-        ]
+        if self.linear_probing:
+            return [{'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd}]
+        else:
+            return [
+                {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
+                {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
+            ]
         
     def get_lr(self):
         return self.lr_head

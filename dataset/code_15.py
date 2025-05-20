@@ -6,8 +6,6 @@ import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
 
-leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-
 class ECGCODE15Dataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
         """

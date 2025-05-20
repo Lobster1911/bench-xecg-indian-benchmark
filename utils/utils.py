@@ -12,6 +12,12 @@ from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
 import yaml
 
+def format_keys(key):
+    if key.startswith('model.'):
+        key = key[6:]
+        
+    return key
+
 class ConfigDict(dict):
     def __getitem__(self, key):
         return self.get(key, None)

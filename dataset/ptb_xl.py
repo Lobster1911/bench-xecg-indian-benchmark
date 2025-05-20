@@ -4,7 +4,7 @@ import pandas as pd
 import wfdb
 import ast
 from dataset.pretraining_dataset import PretrainDataset
-from dataset.generic_utils import pad
+from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
 
 
 class ECGPTBXLDataset(PretrainDataset):
@@ -87,7 +87,11 @@ class ECGPTBXLDataset(PretrainDataset):
         signal.update(class_info)
         return signal
 
-def make_collate_fn(patch_size, downstream=False):
+def make_collate_fn(config, downstream=False, split='train'):
+
+    if config.shuffle_baseline_wander_in_batch:
+        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+
     def collate_fn(batch):
         if downstream:
             signals = [item['global_signals'][0] for item in batch]
@@ -98,7 +102,11 @@ def make_collate_fn(patch_size, downstream=False):
         subclass_labels = [item['subclass_label'] for item in batch]
 
         # pad the signals to the same length
-        signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=patch_size)
+        if split == 'train' and config.shuffle_baseline_wander_in_batch:
+            signals = baseline_shuffler(pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size))
+        else:
+            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+            
         return {
             'signals': signals,
             'class_labels': torch.stack(superclass_labels),

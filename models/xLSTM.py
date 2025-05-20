@@ -29,7 +29,7 @@ class pretrainedxLSTM(nn.Module):
         self.embedding_size = config.embedding_size
         self.use_sim_dino = config.use_sim_dino
         self.cls_type = config.cls_type
-
+        self.use_final_layer_norm = config.use_final_layer_norm
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
         xlstm_emb_size = config.embedding_size
@@ -41,12 +41,17 @@ class pretrainedxLSTM(nn.Module):
 
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+        
+        if self.cls_type == 'token':
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-            
-            self.num_reg_tokens = config.num_reg_token
-            if config.num_reg_token > 0:
-                self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
+            
+        self.num_reg_tokens = config.num_reg_token
+        if config.num_reg_token > 0:
+            self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
+            nn.init.xavier_uniform_(self.reg_token, gain=1.0)
+            
+
 
         if self.use_teacher_student:   
             if not self.use_sim_dino:
@@ -107,10 +112,8 @@ class pretrainedxLSTM(nn.Module):
             x_emb[patched_mask] = self.mask_token
 
         # add the [cls] and [reg] tokens
-        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-        x_emb = torch.cat([x_emb, cls_token], dim=1)
-
-        # add reg tokens
+        if self.cls_type == 'token':
+            x_emb = self.add_cls_token(x_emb)
         if self.num_reg_tokens > 0:
             x_emb = self.add_reg_tokens(x_emb)
 
@@ -120,25 +123,25 @@ class pretrainedxLSTM(nn.Module):
 
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
-            
-        out = self.layer_norm(out)
+           
+        if self.use_final_layer_norm:
+            out = self.layer_norm(out)
+
+        if self.cls_type == 'max':
+            cls = out.max(dim=1)[0]
+
+        elif self.cls_type == 'mean' or self.cls_type == 'avg':
+            cls = out.mean(dim=1)
+        else:
+            cls = out[:, -1, :]
+            out = out[:, :-1, :]
 
         # reconstruct signal
         if reconstruct:
             rec, _ = self.reconstruction(out[:, :-1, :].clone().detach())
 
-
-        if self.cls_type == 'max':
-            cls = out.max(dim=1)[0]
-        elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            cls = out.mean(dim=1)
-        else:
-            cls = out[:, -1, :]
-
-        patches = out[:, :-1, :]
-       
         tortn = {
-            'patches': patches,
+            'patches': out,
             'cls': cls,
         }
         
@@ -147,7 +150,7 @@ class pretrainedxLSTM(nn.Module):
         
         if not self.use_sim_dino:
             cls_after_head = self.dino_head(cls)
-            patches_after_head = self.ibot_head(patches)
+            patches_after_head = self.ibot_head(out)
             tortn['cls_after_head'] = cls_after_head
             tortn['patches_after_head'] = patches_after_head
         
@@ -166,7 +169,10 @@ class pretrainedxLSTM(nn.Module):
         half = self.num_reg_tokens // 2
         return x[:, half:-(self.num_reg_tokens - half), :]
     
-
+    def add_cls_token(self, x):
+        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
+        return torch.cat([cls_token, x], dim=1)
+    
     def get_random_mask(self, x):
         """
         Retutn a mask of the same shape as x, masked values are set to TRUE
@@ -222,126 +228,3 @@ class pretrainedxLSTM(nn.Module):
             return [param for name, param in self.named_parameters() if "teacher" not in name and 'reconstruction' not in name]
         
         return self.parameters()
-    
-class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
-    def __init__(
-            self, 
-            config,
-            num_classes,
-            num_channels
-        ): 
-
-        dropout = config.dropout
-        config.dropout = 0.0  
-        super(xLSTMClassificationMIT_BIH, self).__init__(num_channels, config, reconstruction=False)
-
-        self.use_start_token = config.use_start_token
-        if self.use_start_token:
-            self.start_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
-
-        self.fc = HeadModule(
-            inp_size=config.embedding_size,
-            hidden_size=config.embedding_size // 2,
-            out_size=num_classes,
-            dropout=dropout
-        )
-
-        self.r_peak_pos_fc = HeadModule(
-            inp_size=config.embedding_size,
-            hidden_size=config.embedding_size // 2,
-            out_size=self.patch_size,
-            dropout=dropout
-        )
-
-    def forward(self, x):
-        x = self.patch_embedding(x)
-
-        if self.use_start_token:
-            start_token = self.start_token.expand(x.shape[0], -1, -1)
-            x = torch.cat([start_token, x], dim=1)
-
-        out = self.xlstm(x, need_expansion=False) # [batch_size, embedding_dim]
-        if self.use_start_token: out = out[:, self.start_token.shape[1]:, :] # remove the start tokens
-
-        cls = self.fc(out)
-        r_peak_pos = self.r_peak_pos_fc(out)
-        return cls, r_peak_pos
-
-    def finetuning_params(self):
-        params = []
-        params.extend(self.xlstm.parameters())
-        params.extend(self.patch_embedding.parameters())
-        return params
-
-    def training_params(self):
-        params = []
-        if self.use_start_token:
-            params.append(self.start_token)
-        params.extend(self.fc.parameters())
-        params.extend(self.r_peak_pos_fc.parameters())
-        return params
-
-class xLSTMClassification(pretrainedxLSTM):
-    def __init__(
-            self, 
-            config,
-            num_classes,
-            num_channels
-        ): 
-        self.linear_probing = config.linear_probing
-        super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
-
-        self.fc = nn.Sequential(
-            nn.Dropout(config.dropout),
-            nn.Linear(config.embedding_size, num_classes)
-        )
-
-    def get_cls_token(self, x):
-        x = self.patch_embedding(x)
-
-        cls_token = self.cls_token.expand(x.shape[0], -1, -1)
-        x = torch.cat([x, cls_token], dim=1)
-
-        if self.num_reg_tokens > 0:
-            x = self.add_reg_tokens(x)
-
-        out = self.xlstm(x, need_expansion=False)# [:, -1, :]
-
-        if self.num_reg_tokens > 0:
-            out = self.remove_reg_tokens(out)
-
-        out = self.layer_norm(out)
-
-        if self.cls_type == 'max':
-            cls = out.max(dim=1)[0]
-        elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            cls = out.mean(dim=1)
-        else:
-            cls = out[:, -1, :]
-
-        return cls
-
-    def forward(self, x):
-        if self.linear_probing:
-            with torch.no_grad():
-                cls = self.get_cls_token(x)
-        else:  
-            cls = self.get_cls_token(x)
-
-        res = self.fc(cls)
-        return res
-    
-    def finetuning_params(self):
-        params = [param for name, param in self.named_parameters() if 'fc' not in name]
-        return params
-    
-    def set_eval_linear_probing(self):
-        self.eval()
-        self.fc.train()
-
-    def training_params(self):
-        params = []
-        params.extend(self.fc.parameters())
-        # params.append(self.cls_token)
-        # params.append(self.reg_token)
-        return params

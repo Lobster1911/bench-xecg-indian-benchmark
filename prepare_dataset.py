@@ -33,6 +33,11 @@ parser.add_argument('--label_file', type=str, default='/media/Volume/data/MIMIC_
 parser.add_argument('--dataset', type=str, required=True, help='the name of the dataset: mimic, code 15 or ptbxl')
 args = parser.parse_args()
 
+def extract_diagnosis_code(file_name):
+    record = wfdb.rdheader(file_name)
+    for comment in record.comments:
+        if comment.startswith('Dx:'):
+            return comment.split(': ')[1]
 
 if __name__ == '__main__':
 
@@ -52,6 +57,17 @@ if __name__ == '__main__':
     else:
         exams = pd.read_csv(args.label_file)
 
+    if args.dataset == 'cpsc2018':
+        # list only the directory names in the data folder
+        all_dirs = [d for d in os.listdir(args.data_folder) if os.path.isdir(os.path.join(args.data_folder, d))]
+        exams = pd.DataFrame()
+        all_files = []
+        for d in all_dirs:
+            with open(os.path.join(args.data_folder, d, 'RECORDS'), 'r') as f:
+                lines = f.readlines()
+            all_files += [os.path.join(d, line.strip()) for line in lines]
+        exams['file_name'] = all_files
+
     print(exams.head)
     print(exams.columns)
     print('initial count rows: ', len(exams))
@@ -65,9 +81,17 @@ if __name__ == '__main__':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['filename_hr']))), axis=1)
     elif args.dataset == 'chapman':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
+    elif args.dataset == 'cpsc2018':
+        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
 
     exams = exams[exams['valid']]
     exams.drop(columns=['valid'], inplace=True)
+
+
+    # get the labels from the label file on cspc2018
+    if args.dataset == 'cpsc2018':
+        exams['diagnosis_code'] = exams.parallel_apply(lambda row: extract_diagnosis_code(os.path.join(args.data_folder,row['file_name'])), axis=1)
+
 
     print(exams.head())
     print('final count rows: ', len(exams))

@@ -4,11 +4,12 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from models.classification import xLSTMClassification
 
-import dataset.ptb_xl as ptbxl
+import dataset.cpsc2018 as cpsc2018
+
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
-from trainers.ptb_xl_trainer import TrainingPTB_XL
+from trainers.cpsc_2018_trainer import TrainingCPSC_2018
 import torch
 import argparse
 import os
@@ -24,34 +25,35 @@ from dataset.generic_utils import get_transforms
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
-parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run_config.yaml', help='Path to the config file')
+parser.add_argument('--config_file', type=str, default='configs/train_cpsc2018_run_config.yaml', help='Path to the config file')
 
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
     
-    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train', global_augmentations=get_transforms(config))
+    train_dataset =  cpsc2018.ECGCPSC2018Dataset(config, split='train', global_augmentations=get_transforms(config))
     print(f"Train dataset size: {len(train_dataset)}")
-    val_dataset = ptbxl.ECGPTBXLDataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
+    val_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
     if config.use_class_weights:
-        if config.num_classes == 5:
+        if config.num_classes == 9:
             print('Using class weights for 5 classes')
-            # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-            weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
+            weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
+            # weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
         else:
             weights = None # TODO
     else:
         weights = None
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='train'))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='val'))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='train'))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='val'))
 
-    test_dataset = ptbxl.ECGPTBXLDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='test'), num_workers=config.num_workers)
+    test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
 
     xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+
 
     if config.checkpoint is not None and config.checkpoint != '':   
         checkpoint = torch.load(config.checkpoint, weights_only=False)
@@ -61,7 +63,7 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    model = TrainingCPSC_2018(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
@@ -69,7 +71,7 @@ def train(config, run=None, wandb=False):
 
     if wandb:
         checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
-        prj = f'train-ptbxl-{config.classification_taksk}'
+        prj = f'train-cpsc2018'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=20)
@@ -85,6 +87,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_ptb_xl_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'config_defaults/train_cpsc2018_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

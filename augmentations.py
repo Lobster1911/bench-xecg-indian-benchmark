@@ -47,6 +47,10 @@ class RandomSwitchtBaselineWanderBatched(nn.Module):
         self.cutoff_freq = cutoff_freq
 
     def forward(self, signals):
+        if signals.shape[0] == 1:
+            # if the batch size is 1, just return the signal
+            return signals
+        
         # get the baseline wander
         baseline_wander = extract_baseline_fft_torch(signals, self.cutoff_freq, self.signal_fs)
         # get the batch size

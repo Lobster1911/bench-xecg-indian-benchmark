@@ -34,13 +34,14 @@ class TrainingPTB_XL(L.LightningModule):
 
         self.num_classes = 23 if self.classification_taksk == 'diagnosis_subclass' else 5
 
-        self.train_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, top_k=1, average='micro', ignore_index=-1)
-        self.test_acc_no_avg = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, top_k=1, average=None, ignore_index=-1)
-        self.train_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.valid_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, top_k=1, average='macro', ignore_index=-1)
-        self.test_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, top_k=1, average=None, ignore_index=-1)
+        self.train_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
+        self.valid_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
+        self.test_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
+        self.test_acc_no_avg = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes,  average=None, ignore_index=-1)
+        self.train_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
+        self.valid_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
+        self.test_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average=None, ignore_index=-1)
+        self.test_f1_macro = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
         self.train_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step=False, ignore_index=-1)  
         self.valid_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step=False, ignore_index=-1)
         self.test_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step=False, ignore_index=-1)
@@ -65,15 +66,15 @@ class TrainingPTB_XL(L.LightningModule):
         self.train_f1 = self.train_f1.to(preds.device)
         self.train_f1(preds, targets)
 
-        self.log('train_loss', loss.detach().item(), prog_bar=True, batch_size=self.batch_size)
-        self.log('train_acc', self.train_acc, prog_bar=True, batch_size=self.batch_size)
-        self.log('train_f1', self.train_f1, prog_bar=True, batch_size=self.batch_size)
+        self.log('train_loss', loss.detach().item(), prog_bar=True)
+        self.log('train_acc', self.train_acc, prog_bar=True)
+        self.log('train_f1', self.train_f1, prog_bar=True)
 
         # auroc
         # self.train_auroc = self.train_auroc.cpu()
         self.train_auroc = self.train_auroc.to(logits.device)
         self.train_auroc(logits, targets)
-        self.log("train_auroc", self.train_auroc, batch_size=self.batch_size)
+        self.log("train_auroc", self.train_auroc)
 
         return loss
     
@@ -86,41 +87,41 @@ class TrainingPTB_XL(L.LightningModule):
         self.valid_f1 = self.valid_f1.to(preds.device)
         self.valid_f1(preds, targets)
 
-        self.log('val_loss', loss.detach().item(), prog_bar=True, batch_size=self.batch_size)
-        self.log('val_acc', self.valid_acc, prog_bar=True, batch_size=self.batch_size)
-        self.log('val_f1', self.valid_f1, prog_bar=True, batch_size=self.batch_size)
+        self.log('val_loss', loss.detach().item(), prog_bar=True)
+        self.log('val_acc', self.valid_acc, prog_bar=True)
+        self.log('val_f1', self.valid_f1, prog_bar=True)
 
         # specificity
         self.val_spec = self.val_spec.to(preds.device)
         self.val_spec(preds, targets)
-        self.log('val_specificity/STTC', self.val_spec[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/NORM', self.val_spec[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/MI', self.val_spec[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/HYP', self.val_spec[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
-        self.log('val_specificity/CD', self.val_spec[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_spec')
+        self.log('val_specificity/STTC', self.val_spec[0], prog_bar=False, metric_attribute='val_spec')
+        self.log('val_specificity/NORM', self.val_spec[1], prog_bar=False, metric_attribute='val_spec')
+        self.log('val_specificity/MI', self.val_spec[2], prog_bar=False, metric_attribute='val_spec')
+        self.log('val_specificity/HYP', self.val_spec[3], prog_bar=False, metric_attribute='val_spec')
+        self.log('val_specificity/CD', self.val_spec[4], prog_bar=False, metric_attribute='val_spec')
 
         # sensitivity
         self.val_recall = self.val_recall.to(preds.device)
         self.val_recall(preds, targets)
-        self.log('val_sensitivity/STTC', self.val_recall[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/NORM', self.val_recall[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/MI', self.val_recall[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/HYP', self.val_recall[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
-        self.log('val_sensitivity/CD', self.val_recall[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_recall')
+        self.log('val_sensitivity/STTC', self.val_recall[0], prog_bar=False, metric_attribute='val_recall')
+        self.log('val_sensitivity/NORM', self.val_recall[1], prog_bar=False, metric_attribute='val_recall')
+        self.log('val_sensitivity/MI', self.val_recall[2], prog_bar=False, metric_attribute='val_recall')
+        self.log('val_sensitivity/HYP', self.val_recall[3], prog_bar=False, metric_attribute='val_recall')
+        self.log('val_sensitivity/CD', self.val_recall[4], prog_bar=False, metric_attribute='val_recall')
 
         # ppv
         self.val_precision = self.val_precision.to(preds.device)
         self.val_precision(preds, targets)
-        self.log('val_ppv/STTC', self.val_precision[0], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/NORM', self.val_precision[1], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/MI', self.val_precision[2], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/HYP', self.val_precision[3], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
-        self.log('val_ppv/CD', self.val_precision[4], prog_bar=False, batch_size=self.batch_size, metric_attribute='val_precision')
+        self.log('val_ppv/STTC', self.val_precision[0], prog_bar=False, metric_attribute='val_precision')
+        self.log('val_ppv/NORM', self.val_precision[1], prog_bar=False, metric_attribute='val_precision')
+        self.log('val_ppv/MI', self.val_precision[2], prog_bar=False, metric_attribute='val_precision')
+        self.log('val_ppv/HYP', self.val_precision[3], prog_bar=False, metric_attribute='val_precision')
+        self.log('val_ppv/CD', self.val_precision[4], prog_bar=False, metric_attribute='val_precision')
 
         # auroc
         self.valid_auroc = self.valid_auroc.to(logits.device)
         self.valid_auroc(logits, targets)
-        self.log('val_auroc', self.valid_auroc, prog_bar=True, batch_size=self.batch_size)
+        self.log('val_auroc', self.valid_auroc, prog_bar=True)
 
         return loss
             
@@ -136,57 +137,60 @@ class TrainingPTB_XL(L.LightningModule):
 
         self.test_f1 = self.test_f1.to(preds.device)
         self.test_f1(preds, targets)
+        self.test_f1_macro = self.test_f1_macro.to(preds.device)
+        self.test_f1_macro(preds, targets)
 
-        self.log("test_loss", loss.detach().item(), batch_size=self.batch_size)
+        self.log("test_loss", loss.detach().item())
 
-        self.log("test_acc", self.test_acc, batch_size=self.batch_size)
+        self.log("test_acc", self.test_acc)
+        self.log("test_f1", self.test_f1_macro)
 
         # accuracy
-        self.log("test_acc/STTC", self.test_acc_no_avg[0], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/NORM", self.test_acc_no_avg[1], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/MI", self.test_acc_no_avg[2], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/HYP", self.test_acc_no_avg[3], batch_size=self.batch_size, metric_attribute='test_acc')
-        self.log("test_acc/CD", self.test_acc_no_avg[4], batch_size=self.batch_size, metric_attribute='test_acc')
+        self.log("test_acc/STTC", self.test_acc_no_avg[0], metric_attribute='test_acc')
+        self.log("test_acc/NORM", self.test_acc_no_avg[1], metric_attribute='test_acc')
+        self.log("test_acc/MI", self.test_acc_no_avg[2], metric_attribute='test_acc')
+        self.log("test_acc/HYP", self.test_acc_no_avg[3], metric_attribute='test_acc')
+        self.log("test_acc/CD", self.test_acc_no_avg[4], metric_attribute='test_acc')
 
         # f1
-        self.log("test_f1/STTC", self.test_f1[0], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/NORM", self.test_f1[1], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/MI", self.test_f1[2], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/HYP", self.test_f1[3], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/CD", self.test_f1[4], batch_size=self.batch_size, metric_attribute='test_f1')
-        self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2] + self.test_f1[3] + self.test_f1[4]) / 5, batch_size=self.batch_size, metric_attribute='test_f1')
+        self.log("test_f1/STTC", self.test_f1[0], metric_attribute='test_f1')
+        self.log("test_f1/NORM", self.test_f1[1], metric_attribute='test_f1')
+        self.log("test_f1/MI", self.test_f1[2], metric_attribute='test_f1')
+        self.log("test_f1/HYP", self.test_f1[3], metric_attribute='test_f1')
+        self.log("test_f1/CD", self.test_f1[4], metric_attribute='test_f1')
+        self.log("test_f1/mean", (self.test_f1[0] + self.test_f1[1] + self.test_f1[2] + self.test_f1[3] + self.test_f1[4]) / 5, metric_attribute='test_f1')
 
         # specificity
         self.test_spec = self.test_spec.to(preds.device)
         self.test_spec(preds, targets)
-        self.log("test_specificity/STTC", self.test_spec[0], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/NORM", self.test_spec[1], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/MI", self.test_spec[2], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/HYP", self.test_spec[3], batch_size=self.batch_size, metric_attribute='test_spec')
-        self.log("test_specificity/CD", self.test_spec[4], batch_size=self.batch_size, metric_attribute='test_spec')
+        self.log("test_specificity/STTC", self.test_spec[0], metric_attribute='test_spec')
+        self.log("test_specificity/NORM", self.test_spec[1], metric_attribute='test_spec')
+        self.log("test_specificity/MI", self.test_spec[2], metric_attribute='test_spec')
+        self.log("test_specificity/HYP", self.test_spec[3], metric_attribute='test_spec')
+        self.log("test_specificity/CD", self.test_spec[4], metric_attribute='test_spec')
 
         # sensitivity
         self.test_recall = self.test_recall.to(preds.device)
         self.test_recall(preds, targets)
-        self.log("test_sensitivity/STTC", self.test_recall[0], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/NORM", self.test_recall[1], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/MI", self.test_recall[2], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/HYP", self.test_recall[3], batch_size=self.batch_size, metric_attribute='test_recall')
-        self.log("test_sensitivity/CD", self.test_recall[4], batch_size=self.batch_size, metric_attribute='test_recall')
+        self.log("test_sensitivity/STTC", self.test_recall[0], metric_attribute='test_recall')
+        self.log("test_sensitivity/NORM", self.test_recall[1], metric_attribute='test_recall')
+        self.log("test_sensitivity/MI", self.test_recall[2], metric_attribute='test_recall')
+        self.log("test_sensitivity/HYP", self.test_recall[3], metric_attribute='test_recall')
+        self.log("test_sensitivity/CD", self.test_recall[4], metric_attribute='test_recall')
 
         # ppv
         self.test_precision = self.test_precision.to(preds.device)
         self.test_precision(preds, targets)
-        self.log("test_ppv/STTC", self.test_precision[0], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/NORM", self.test_precision[1], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/MI", self.test_precision[2], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/HYP", self.test_precision[3], batch_size=self.batch_size, metric_attribute='test_precision')
-        self.log("test_ppv/CD", self.test_precision[4], batch_size=self.batch_size, metric_attribute='test_precision')
+        self.log("test_ppv/STTC", self.test_precision[0], metric_attribute='test_precision')
+        self.log("test_ppv/NORM", self.test_precision[1], metric_attribute='test_precision')
+        self.log("test_ppv/MI", self.test_precision[2], metric_attribute='test_precision')
+        self.log("test_ppv/HYP", self.test_precision[3], metric_attribute='test_precision')
+        self.log("test_ppv/CD", self.test_precision[4], metric_attribute='test_precision')
 
         # auroc  
         self.test_auroc = self.test_auroc.to(logits.device)
         self.test_auroc(logits, targets)
-        self.log("test_auroc", self.test_auroc, batch_size=self.batch_size)
+        self.log("test_auroc", self.test_auroc)
 
         return loss
             
