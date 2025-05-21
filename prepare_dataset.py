@@ -64,7 +64,7 @@ if __name__ == '__main__':
                 lines = f.readlines()
             all_files += [os.path.join(d, line.strip()) for line in lines]
         exams['file_name'] = all_files
-    elif args.dataset == 'CODE':
+    elif args.dataset == 'code':
         with open(os.path.join(args.data_folder, 'RECORDS.txt'), 'r') as f:
             paths = f.readlines()
         
