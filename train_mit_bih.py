@@ -51,10 +51,10 @@ def train(config, run=None, wandb=False):
         weights = None
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1, collate_fn=mit_bih.make_collate_fn(config))
+    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
 
     test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=1)
+    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
 
     xlstm = xLSTMClassificationMIT_BIH(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 

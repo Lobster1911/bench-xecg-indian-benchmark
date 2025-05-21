@@ -120,7 +120,9 @@ class vanillaxLSTMWrapper(nn.Module):
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
-        self.drop_path = DropPath(drop_path)
+        self.drop_path = DropPath()
+        self.dropout_rates = [x.item() for x in torch.linspace(0, drop_path, len(self.model.blocks))]
+
 
     def step(self, x, state=None):
         return self.model.step(x, state=state)
@@ -142,7 +144,7 @@ class vanillaxLSTMWrapper(nn.Module):
                 if i > 0:
                     x = x.flip(1)
 
-            x = self.drop_path(x, block)
+            x = self.drop_path(x, block, self.dropout_rates[i])
             # x = block(x)
 
         if self.bidirectional and expanded:
@@ -157,13 +159,12 @@ class vanillaxLSTMWrapper(nn.Module):
      
 class DropPath(nn.Module):
     """Drop paths (Stochastic Depth) per sample (when applied in the main path of residual blocks)."""
-    def __init__(self, drop_path_prob=None, is_large_mlstm=False):
+    def __init__(self, is_large_mlstm=False):
         super(DropPath, self).__init__()
-        self.drop_path_prob = drop_path_prob
         self.is_large_mlstm = is_large_mlstm
 
-    def forward(self, x, block, state: mLSTMStateType | None = None):
-        if self.drop_path_prob == 0. or not self.training:
+    def forward(self, x, block, drop_path_prob, state: mLSTMStateType | None = None):
+        if drop_path_prob == 0. or not self.training:
             if self.is_large_mlstm:
                 return block(x, state)
             else:
@@ -171,7 +172,7 @@ class DropPath(nn.Module):
         
         # indexes of the batch
         idxs = torch.randperm(x.shape[0])
-        num_to_keep = int(np.ceil((1.0 - self.drop_path_prob) * x.shape[0]))
+        num_to_keep = int(np.ceil((1.0 - drop_path_prob) * x.shape[0]))
         idxs_to_keep = idxs[:num_to_keep]  # First N elements are kept
 
         if self.is_large_mlstm:
@@ -190,6 +191,7 @@ class mLSTMWrapper(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
         self.drop_path = DropPath(drop_path, is_large_mlstm=True)
+        self.dropout_rates = [x.item() for x in torch.linspace(0, drop_path, len(self.model.blocks))]
 
 
     def forward(self, x, need_expansion=True):
@@ -246,7 +248,7 @@ class mLSTMWrapper(nn.Module):
             block_state = state[i]
             x = self.dropout(x)
             
-            x, block_state_new = self.drop_path(x, block, block_state)
+            x, block_state_new = self.drop_path(x, block, block_state, self.dropout_rates[i])
             # x, block_state_new = block(x, block_state)
 
             if block_state is None:

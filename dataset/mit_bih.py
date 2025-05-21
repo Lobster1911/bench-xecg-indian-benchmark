@@ -44,8 +44,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         """
         Args:
             config: configuration object
-            subset: 'train' or 'test'
-            name: name of the labels folder, default is 't_wave_split' so here the in the labels csv file the heartbeats will be divided by the t wave
+            split: 'train', 'val'or 'test'
         """
         
         self.data_folder = config.data_folder_mit
@@ -252,7 +251,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
 
 
-def make_collate_fn(config):
+def make_collate_fn(config, split='train'):
 
     if config.shuffle_baseline_wander_in_batch:
         baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
@@ -264,7 +263,7 @@ def make_collate_fn(config):
         labels = [item['label'] for item in batch]
 
         # pad to same length and pad to match the patch size module
-        if config.shuffle_baseline_wander_in_batch:
+        if config.shuffle_baseline_wander_in_batch and split == 'train':
             signals = baseline_shuffler(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True))
         else:
             signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)

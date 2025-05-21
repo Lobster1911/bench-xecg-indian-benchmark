@@ -9,30 +9,11 @@ import numpy as np
 import torch
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
 import trainers.common as common
+from trainers.common_trainer import CommonTrainerDownstream
 
-class TrainingCPSC_2018(L.LightningModule):
+class TrainingCPSC_2018(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
-        super().__init__()
-        self.lr_head = config.lr_head
-        self.lr_xlstm = config.lr_xlstm
-        self.wd = config.wd
-        self.model = model
-        self.batch_size = config.batch_size
-        self.optimizer = config.optimizer
-        self.weights = weights
-        self.use_scheduler = config.use_scheduler
-        self.len_train_dataset = len_train_dataset
-        self.num_epochs_warmup = config.num_epochs_warmup
-        self.sched_decay_factor = config.sched_decay_factor
-        self.num_epochs_warm_restart = config.num_epochs_warm_restart
-        self.label_smoothing = config.label_smoothing
-        self.epochs = config.epochs
-        self.use_focal_loss = config.use_focal_loss
-        self.linear_probing = config.linear_probing
-
-        self.classification_taksk = config.classification_task
-
-        self.num_classes = config.num_classes
+        super().__init__(model, config,  len_train_dataset, weights)
 
         self.train_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
         self.valid_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
@@ -46,8 +27,6 @@ class TrainingCPSC_2018(L.LightningModule):
         self.valid_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step='macro', ignore_index=-1)
         self.test_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step='macro', ignore_index=-1)
 
-        if not config.is_sweep:
-            self.save_hyperparameters()
 
     def training_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)
@@ -132,20 +111,3 @@ class TrainingCPSC_2018(L.LightningModule):
             loss_cls = (alpha * (1-pt)**gamma * loss_cls)
         
         return loss_cls, logits, preds, targets
-
-    def get_params(self):
-        if self.linear_probing:
-            return [
-                {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            ]
-
-        return [
-            {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
-        ]
-    
-    def get_lr(self):
-        return self.lr_head
-        
-    def configure_optimizers(self):
-        return common.configure_optimizers(self)
