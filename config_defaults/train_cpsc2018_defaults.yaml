@@ -22,6 +22,7 @@ sched_decay_factor: 0.8
 random_surrogate_prob: 0.0
 random_jitter_prob: 0.0
 random_drop_leads: 0.0
+random_change_amplitude: 0.
 patience: 15
 num_reg_token: 0
 

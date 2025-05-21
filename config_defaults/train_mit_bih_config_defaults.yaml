@@ -20,6 +20,8 @@ num_epochs_warm_restart: 15
 sched_decay_factor: 0.8
 random_surrogate_prob: 0.0
 random_jitter_prob: 0.0
+random_change_amplitude: 0.
+
 num_classes: 5
 win_len: 5400
 patience: 15

@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
 import trainers.common as common
+from optimizers.lamb import Lamb
 
 class CommonTrainerDownstream(L.LightningModule):
     def __init__(self, model, config,  len_train_dataset, weights=None):
@@ -30,21 +31,74 @@ class CommonTrainerDownstream(L.LightningModule):
         self.use_focal_loss = config.use_focal_loss
         self.linear_probing = config.linear_probing
         self.num_classes = config.num_classes
-
+        self.patch_size = config.patch_size
+        self.layerwise_lr_decay = config.layerwise_lr_decay
+        
 
     def get_params(self):
         if self.linear_probing:
-            return [
-                {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            ]
+            params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]
+        elif self.layerwise_lr_decay > 0.:
+            params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]    
+            num_layers = len(self.model.xlstm.model.blocks) + 1
 
-        return [
-            {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-            {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
-        ]
+            # Assign learning rates to each transformer layer
+            for i, layer in enumerate(self.model.xlstm.model.blocks):
+                layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** (num_layers - i - 1))  # Earlier layers get smaller LR
+                layer_params = layer.parameters()
+                params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
+
+            layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** num_layers)
+            params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
+            params.append({'params': self.model.layer_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln1'})
+
+            if self.model.xlstm_type =='large':
+                params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+            else:
+                params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+
+        else:
+            params = [
+                {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
+                {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
+            ]
+        return params
     
     def get_lr(self):
         return self.lr_head
         
     def configure_optimizers(self):
-        return common.configure_optimizers(self)
+        if self.optimizer == 'adam':
+            optimizer = optim.Adam(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
+        elif self.optimizer == 'adamw':
+            optimizer = optim.AdamW(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
+        elif self.optimizer == 'adafactor':
+            optimizer = optim.Adafactor(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
+        elif self.optimizer == 'lamb':
+            optimizer = Lamb(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
+        elif self.optimizer == 'momentum':
+            optimizer = optim.SGD(self.get_params(), lr=self.get_lr(), momentum=0.9, weight_decay=self.wd)
+        elif self.optimizer == 'sgd':
+            optimizer = optim.SGD(self.get_params(), lr=self.get_lr(), momentum=0., weight_decay=self.wd)
+
+        if self.use_scheduler: 
+            steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
+            num_training_steps = steps_per_epoch * self.epochs
+            warmup_steps = steps_per_epoch * self.num_epochs_warmup
+
+            sched = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
+                optimizer, 
+                num_warmup_steps = warmup_steps, 
+                num_training_steps = num_training_steps, 
+                num_cycles = (num_training_steps // warmup_steps) / self.num_epochs_warm_restart,
+                decay_factor=self.sched_decay_factor
+            )
+
+            scheduler = {
+                'scheduler': sched,
+                'interval': 'step', # or 'epoch' 
+                'frequency': 1,
+            }
+            return [optimizer], [scheduler]
+        else:
+            return [optimizer]

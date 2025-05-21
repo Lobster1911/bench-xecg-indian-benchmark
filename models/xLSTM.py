@@ -31,6 +31,8 @@ class pretrainedxLSTM(nn.Module):
         self.cls_type = config.cls_type
         self.use_final_layer_norm = config.use_final_layer_norm
         self.masking_type = config.masking_type
+        self.xlstm_type = config.xlstm_type
+
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
         xlstm_emb_size = config.embedding_size
@@ -52,7 +54,6 @@ class pretrainedxLSTM(nn.Module):
             self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.reg_token, gain=1.0)
             
-
 
         if self.use_teacher_student:   
             if not self.use_sim_dino:

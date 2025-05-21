@@ -10,6 +10,8 @@ import torch
 from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
+from utils.train_utils import focal_loss
+
 
 
 class TrainingPTB_XL(CommonTrainerDownstream):
@@ -187,12 +189,11 @@ class TrainingPTB_XL(CommonTrainerDownstream):
         logits = self.model(x)
         preds = (torch.sigmoid(logits) > 0.5).float()
 
-        loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights)
 
         if self.use_focal_loss:
-            pt = torch.exp(-loss_cls)
-            alpha = 2.
-            gamma = .25
-            loss_cls = (alpha * (1-pt)**gamma * loss_cls)
-        
-        return loss_cls, logits, preds, targets
+            loss = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights, reduction='none')
+            loss = focal_loss(loss)
+        else:
+            loss = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights)
+
+        return loss, logits, preds, targets

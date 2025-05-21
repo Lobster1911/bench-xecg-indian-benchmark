@@ -20,6 +20,22 @@ def get_padding_mask(signal):
     """
     return (signal != 0.).flip(1).cumsum(dim=1).flip(1) == 0
 
+class RandomChangeAmplitude(nn.Module):
+    """
+        Randomly change the amplitude of the signal.
+    """
+    def __init__(self, amplitude_range=0.2, prob=1.0):
+        super(RandomChangeAmplitude, self).__init__()
+        self.amplitude_range = amplitude_range
+        self.prob = prob
+
+    def forward(self, signal):
+        if self.prob == 0.: return signal
+        
+        scale = np.random.rand() * self.amplitude_range + 1
+        return signal * scale
+        
+
 class RandomShiftBaselineWander(nn.Module):
     """
         Randomly shift the baseline wander.

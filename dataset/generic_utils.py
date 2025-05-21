@@ -4,7 +4,7 @@ from tqdm import tqdm
 import torch
 from joblib import Parallel, delayed
 from torchvision import transforms
-from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample, Normalize, RandomCrop, RandomShiftBaselineWander, RandomSwitchtBaselineWanderBatched
+from augmentations import *
 
 
 def get_transforms(config, split='train', type=None):
@@ -13,22 +13,27 @@ def get_transforms(config, split='train', type=None):
     t = transforms.Compose([])
     if config.normalize:
         t.transforms.append(Normalize())
+    
+    if split != 'train': return t
 
-    if config.random_crop < 1. and split == 'train':
+    if config.random_crop < 1.:
         t.transforms.append(RandomCrop(config.global_random_crop if type == 'global' else  config.local_random_crop if type == 'local' else config.random_crop))
 
-    if config.shift_baseline_wander_in_sample and split == 'train':
+    if config.shift_baseline_wander_in_sample:
         t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
 
-    if config.random_drop_leads > 0. and split == 'train':
+    if config.random_drop_leads > 0.:
         t.transforms.append(RandomDropLeads(config.random_drop_leads))
 
-    if config.random_surrogate_prob > 0. and split == 'train':
+    if config.random_surrogate_prob > 0.:
         t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))
-    if config.random_jitter_prob > 0. and split == 'train':  
+    if config.random_jitter_prob > 0.:  
         t.transforms.append(Jitter(sigma=0.1, prob=config.random_jitter_prob))
-    if config.random_resample and split == 'train':
+    if config.random_resample:
         t.transforms.append(RandomResample(config.sampling_freq, 0.03))
+    
+    if config.random_change_amplitude > 0.:
+        t.transforms.append(RandomChangeAmplitude(amplitude_range=0.2, prob=config.random_change_amplitude))
     return t
 
 

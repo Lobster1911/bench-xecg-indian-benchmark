@@ -16,7 +16,10 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_sleep_apnea
         self.split = split
         self.patch_size = config.patch_size
-        self.window_size = config.window_size
+        if self.split == 'train':
+            self.window_size = config.window_size_train
+        else:
+            self.window_size = config.window_size_val
         self.augmentations = augmentations
         self.segment_size = 6000
 
@@ -122,9 +125,6 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
         ann = self.annotations[idx]
-        ann_onehot = torch.zeros(ann.shape[0], 2)
-        ann_onehot[:, 0] = ann
-        ann_onehot[:, 1] = 1 - ann
 
         # map to the correct lead
         tensor = torch.zeros(sample.shape[0], 12)
@@ -136,7 +136,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 
         return {
             'signal': tensor,
-            'annotation': ann_onehot
+            'annotation': ann,
         }
     
 

@@ -68,6 +68,13 @@ if __name__ == '__main__':
             all_files += [os.path.join(d, line.strip()) for line in lines]
         exams['file_name'] = all_files
 
+    if args.dataset == 'CODE':
+        with open(os.path.join(args.data_folder, 'RECORDS.txt'), 'r') as f:
+            paths = f.readlines()
+        
+        exams = pd.DataFrame()
+        exams['file_name'] = paths
+
     print(exams.head)
     print(exams.columns)
     print('initial count rows: ', len(exams))
@@ -79,9 +86,7 @@ if __name__ == '__main__':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['exam_id']))), axis=1)
     elif args.dataset == 'ptbxl':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['filename_hr']))), axis=1)
-    elif args.dataset == 'chapman':
-        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
-    elif args.dataset == 'cpsc2018':
+    elif args.dataset in ['chapman', 'cpsc2018', 'code']:
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
 
     exams = exams[exams['valid']]

@@ -2,6 +2,13 @@ import torch
 import torch.nn.functional as F
 from torchmetrics.regression import ConcordanceCorrCoef
 
+def focal_loss(loss):
+    pt = torch.exp(-loss)
+    alpha = 2.
+    gamma = .25
+    loss = (alpha * (1-pt)**gamma * loss)
+    return loss.mean()
+        
 
 def off_diagonal(x):
     n, m = x.shape
