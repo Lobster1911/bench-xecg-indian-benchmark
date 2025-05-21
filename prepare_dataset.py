@@ -54,10 +54,7 @@ if __name__ == '__main__':
             all_files += [os.path.join(path.strip(), line.strip()) for line in lines]
 
         exams['file_name'] = all_files
-    else:
-        exams = pd.read_csv(args.label_file)
-
-    if args.dataset == 'cpsc2018':
+    elif args.dataset == 'cpsc2018':
         # list only the directory names in the data folder
         all_dirs = [d for d in os.listdir(args.data_folder) if os.path.isdir(os.path.join(args.data_folder, d))]
         exams = pd.DataFrame()
@@ -67,13 +64,17 @@ if __name__ == '__main__':
                 lines = f.readlines()
             all_files += [os.path.join(d, line.strip()) for line in lines]
         exams['file_name'] = all_files
-
-    if args.dataset == 'CODE':
+    elif args.dataset == 'CODE':
         with open(os.path.join(args.data_folder, 'RECORDS.txt'), 'r') as f:
             paths = f.readlines()
         
         exams = pd.DataFrame()
         exams['file_name'] = paths
+    else:
+        exams = pd.read_csv(args.label_file)
+
+
+
 
     print(exams.head)
     print(exams.columns)
