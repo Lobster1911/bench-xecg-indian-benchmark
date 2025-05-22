@@ -52,12 +52,12 @@ def train(config, run=None, wandb=False):
 
     model = TrainingSleepApnea(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=None)
 
-    early_stopping = EarlyStopping(monitor='val_feature_acc', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor='val_feature_acc', mode='max')
+        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
         prj = f'train-sleep-apnea'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')

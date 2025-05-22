@@ -154,7 +154,7 @@ class vanillaxLSTMWrapper(nn.Module):
             x = torch.diagonal(x, dim1=1, dim2=2).transpose(1,2)
             # print('x shape after diagonal', x.shape)
 
-        x = self.model.post_blocks_norm(x)
+        # x = self.model.post_blocks_norm(x)
         return x
      
 class DropPath(nn.Module):

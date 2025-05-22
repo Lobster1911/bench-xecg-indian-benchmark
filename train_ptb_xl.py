@@ -66,12 +66,12 @@ def train(config, run=None, wandb=False):
 
     model = TrainingPTB_XL(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
+        checkpoint_callback = ModelCheckpoint(monitor='val_auroc', mode='max')
         prj = f'train-ptbxl-{config.classification_taksk}'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')

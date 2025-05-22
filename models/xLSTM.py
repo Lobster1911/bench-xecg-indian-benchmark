@@ -29,18 +29,15 @@ class pretrainedxLSTM(nn.Module):
         self.embedding_size = config.embedding_size
         self.use_sim_dino = config.use_sim_dino
         self.cls_type = config.cls_type
-        self.use_final_layer_norm = config.use_final_layer_norm
         self.masking_type = config.masking_type
         self.xlstm_type = config.xlstm_type
 
-
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
-        xlstm_emb_size = config.embedding_size
 
         if config.xlstm_type == 'large':
-            self.xlstm = get_large_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional,  drop_path=config.drop_path_prob)
+            self.xlstm = get_large_xlstm(config)
         else:
-            self.xlstm = get_xlstm(xlstm_emb_size, dropout=config.dropout, blocks=config.xlstm_config, num_heads=config.num_heads, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)
+            self.xlstm = get_xlstm(config)
 
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
@@ -54,7 +51,6 @@ class pretrainedxLSTM(nn.Module):
             self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.reg_token, gain=1.0)
             
-
         if self.use_teacher_student:   
             if not self.use_sim_dino:
                 self.dino_head = HeadModule(
@@ -72,7 +68,6 @@ class pretrainedxLSTM(nn.Module):
                 )
 
 
-        self.layer_norm = nn.LayerNorm(config.embedding_size)
                           
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -112,9 +107,6 @@ class pretrainedxLSTM(nn.Module):
 
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
-           
-        if self.use_final_layer_norm:
-            out = self.layer_norm(out)
 
         if self.cls_type == 'max':
             cls = out.max(dim=1)[0]

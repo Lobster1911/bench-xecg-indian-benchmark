@@ -51,62 +51,50 @@ def get_pooling(pooling, kernel_size=2):
         raise ValueError(f"Pooling {pooling} not supported")
 
 
-def get_xlstm(
-        embedding_dim, 
-        dropout=0.2, 
-        blocks=['m', 's', 'm', 'm', 'm', 'm', 'm'],
-        num_heads=4,
-        bidirectional=False,
-        drop_path=0.
-    ):
-    print(f"Using xLSTM with blocks: {blocks}")
-    print([1 if b == 's' else 0 for b in blocks])
+def get_xlstm(config):
     cfg = xLSTMBlockStackConfig(
         mlstm_block=mLSTMBlockConfig(
             mlstm=mLSTMLayerConfig(
                 conv1d_kernel_size=4, 
-                qkv_proj_blocksize=num_heads, 
-                num_heads=num_heads,
+                qkv_proj_blocksize=config.num_heads, 
+                num_heads=config.num_heads,
                 proj_factor=2
             )
         ),
         slstm_block=sLSTMBlockConfig(
             slstm=sLSTMLayerConfig(
                 backend="cuda",
-                num_heads=num_heads,
+                num_heads=config.num_heads,
                 conv1d_kernel_size=4,
                 bias_init="powerlaw_blockdependent",
             ),
             feedforward=FeedForwardConfig(proj_factor=1.3, act_fn="gelu"),
         ),
         context_length=7000,
-        num_blocks=len(blocks),
-        embedding_dim=embedding_dim,
-        slstm_at=[idx if b == 's' else 0 for idx, b in enumerate(blocks)],
-        dropout=dropout,
+        num_blocks=len(config.xlstm_config),
+        embedding_dim=config.embedding_size,
+        slstm_at=[idx if b == 's' else 0 for idx, b in enumerate(config.xlstm_config)],
+        dropout=config.dropout,
+        add_post_blocks_norm=config.use_final_layer_norm
     )
     blocks = xLSTMBlockStack(cfg)
-    return vanillaxLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional, drop_path=drop_path)
+    return vanillaxLSTMWrapper(blocks, dropout=config.dropout, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)
 
-def get_large_xlstm(       
-        embedding_dim, 
-        dropout=0.2, 
-        blocks=['m', 'm', 'm', 'm', 'm', 'm', 'm'],
-        num_heads=4,
-        bidirectional=False,
-        drop_path=0.2
+def get_large_xlstm(     
+        config,
     ):
     xlstm_config = xLSTMLargeConfig(
-        embedding_dim=embedding_dim,
-        num_heads=num_heads,
-        num_blocks=len(blocks),
+        embedding_dim=config.embedding_size,
+        num_heads=config.num_heads,
+        num_blocks=len(config.xlstm_config),
         vocab_size=0,
         return_last_states=True,
         mode="train",
         chunkwise_kernel="chunkwise--triton_xl_chunk", # xl_chunk == TFLA kernels
         sequence_kernel="native_sequence__triton",
         step_kernel="triton",
+        add_out_norm=config.use_final_layer_norm
     )
 
     blocks = xLSTMLargeBlockStack(xlstm_config)
-    return mLSTMWrapper(blocks, dropout=dropout, bidirectional=bidirectional, drop_path=drop_path)
+    return mLSTMWrapper(blocks, dropout=config.dropout, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)

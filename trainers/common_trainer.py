@@ -50,7 +50,6 @@ class CommonTrainerDownstream(L.LightningModule):
 
             layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** num_layers)
             params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
-            params.append({'params': self.model.layer_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln1'})
 
             if self.model.xlstm_type =='large':
                 params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})

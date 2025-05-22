@@ -381,41 +381,65 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     def knn_evaluation(self):
         self.model.eval()
         all_features = []
+        all_features_teacher = []
         all_labels = []
         # loop the knn dataloader to get the embeddings
         for sample in self.knn_train_dataloader:
             out = self.model(sample["signals"].to(self.device), masking=False, reconstruct=False)
+            out_teacher = self.model.teacher_fwd(sample["signals"].to(self.device))
+
+            all_features_teacher.append(out_teacher['cls'].detach().cpu())
             all_features.append(out['cls'].detach().cpu())
+
             all_labels.append(sample['class_labels'].detach().cpu())
 
         X_train = torch.cat(all_features).numpy()
+        X_train_teacher = torch.cat(all_features_teacher).numpy()
+
         y_train = torch.cat(all_labels).numpy()
         
         knn = KNeighborsClassifier(n_neighbors=5)
+        knn_teacher = KNeighborsClassifier(n_neighbors=5)
         model = OneVsRestClassifier(knn)
+        model_teacher = OneVsRestClassifier(knn_teacher)
 
         with threadpool_limits(limits=1):
             model.fit(X_train, y_train)
+            model_teacher.fit(X_train_teacher, y_train)
 
             # get the validation part
             all_features_val = []
+            all_features_teacher_val = []
             all_labels_val = []
+
 
             for sample in self.knn_val_dataloader:
                 out = self.model(sample["signals"].to(self.device))
+                out_teacher = self.model.teacher_fwd(sample["signals"].to(self.device))
+
                 all_features_val.append(out['cls'].detach().cpu())
                 all_labels_val.append(sample['class_labels'].detach().cpu())
+                all_features_teacher_val.append(out_teacher['cls'].detach().cpu())
 
             X_val = torch.cat(all_features_val).numpy()
+            X_val_teacher = torch.cat(all_features_teacher_val).numpy()
             y_val = torch.cat(all_labels_val).numpy()
 
             y_pred = model.predict(X_val)
+            y_pred_teacher = model_teacher.predict(X_val_teacher)
             x_pred = model.predict(X_train)
+            x_pred_teacher = model_teacher.predict(X_train_teacher)
 
             f1 = f1_score(y_val, y_pred, average='macro')
             f1_train = f1_score(y_train, x_pred, average='macro')
+
+            f1_teacher = f1_score(y_val, y_pred_teacher, average='macro')
+            f1_train_teacher = f1_score(y_train, x_pred_teacher, average='macro')
+
             self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True)
             self.log('downstream_knn_ptbxl_f1_train', f1_train, prog_bar=False)
+            self.log('downstream_knn_ptbxl_f1_teacher', f1_teacher, prog_bar=True)
+            self.log('downstream_knn_ptbxl_f1_train_teacher', f1_train_teacher, prog_bar=False)
 
     def get_params(self):
         return self.model.trainable_parameters()
