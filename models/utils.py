@@ -7,7 +7,6 @@ from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
 from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
 import os
-from models.kan import KAN
 
 def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':

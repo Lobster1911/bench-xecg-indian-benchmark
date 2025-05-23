@@ -1,7 +1,7 @@
 import numpy as np
 from torch import optim
 from optimizers.lamb import Lamb
-from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
+from schedulers import get_cosine_schedule_with_warmup
 from lightning.pytorch.callbacks import ModelCheckpoint
 from typing_extensions import override
 
@@ -24,12 +24,10 @@ def configure_optimizers(trainer):
         num_training_steps = steps_per_epoch * trainer.epochs
         warmup_steps = steps_per_epoch * trainer.num_epochs_warmup
 
-        sched = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
+        sched = get_cosine_schedule_with_warmup(
             optimizer, 
             num_warmup_steps = warmup_steps, 
             num_training_steps = num_training_steps, 
-            num_cycles = (num_training_steps // warmup_steps) / trainer.num_epochs_warm_restart,
-            decay_factor=trainer.sched_decay_factor
         )
 
         scheduler = {
@@ -63,20 +61,16 @@ def configure_optimizer_teacher_student(trainer):
         num_training_steps = steps_per_epoch * trainer.epochs
         warmup_steps = steps_per_epoch * trainer.num_epochs_warmup
 
-        sched1 = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
+        sched1 = get_cosine_schedule_with_warmup(
             optimizer1, 
             num_warmup_steps = warmup_steps, 
             num_training_steps = num_training_steps, 
-            num_cycles = (num_training_steps // warmup_steps) // trainer.num_epochs_warm_restart,
-            decay_factor=trainer.sched_decay_factor
         )
 
-        sched2 = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
+        sched2 = get_cosine_schedule_with_warmup(
             optimizer2, 
             num_warmup_steps = warmup_steps, 
             num_training_steps = num_training_steps, 
-            num_cycles = (num_training_steps // warmup_steps) // trainer.num_epochs_warm_restart,
-            decay_factor=trainer.sched_decay_factor
         )
 
         scheduler1 = {

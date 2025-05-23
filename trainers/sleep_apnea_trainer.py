@@ -3,16 +3,8 @@ import lightning as L
 import torchmetrics
 import torchmetrics.classification
 import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
-import numpy as np
 import torch
-from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
-import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-from torchmetrics import Metric, StatScores
-from torch import Tensor
-
  
 
 class TrainingSleepApnea(CommonTrainerDownstream):

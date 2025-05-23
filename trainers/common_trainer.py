@@ -7,7 +7,7 @@ import torchmetrics.classification.precision_recall
 import torchmetrics.classification.specificity
 import numpy as np
 import torch
-from schedulers import get_cosine_with_hard_restarts_schedule_with_warmup_and_decay
+from schedulers import get_cosine_schedule_with_warmup
 import trainers.common as common
 from optimizers.lamb import Lamb
 
@@ -85,12 +85,10 @@ class CommonTrainerDownstream(L.LightningModule):
             num_training_steps = steps_per_epoch * self.epochs
             warmup_steps = steps_per_epoch * self.num_epochs_warmup
 
-            sched = get_cosine_with_hard_restarts_schedule_with_warmup_and_decay(
+            sched = get_cosine_schedule_with_warmup(
                 optimizer, 
                 num_warmup_steps = warmup_steps, 
                 num_training_steps = num_training_steps, 
-                num_cycles = (num_training_steps // warmup_steps) / self.num_epochs_warm_restart,
-                decay_factor=self.sched_decay_factor
             )
 
             scheduler = {

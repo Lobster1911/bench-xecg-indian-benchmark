@@ -10,6 +10,7 @@ import torch.nn.functional as F
 import copy
 from models.normalizations import DINOCentering
 import torch.distributed as dist
+from models.pooling import AttentionPooling
 
 class pretrainedxLSTM(nn.Module):
     def __init__(
@@ -45,6 +46,8 @@ class pretrainedxLSTM(nn.Module):
         if self.cls_type == 'token':
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
+        elif self.cls_type == 'attn_pool':
+            self.attn_pool = AttentionPooling(config.embedding_size, config.num_heads)
             
         self.num_reg_tokens = config.num_reg_token
         if config.num_reg_token > 0:
@@ -66,9 +69,7 @@ class pretrainedxLSTM(nn.Module):
                     out_size=config.n_prototypes,
                     dropout=config.dropout
                 )
-
-
-                          
+          
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
 
@@ -94,6 +95,18 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
     
+    def pooling(self, out):
+        if self.cls_type == 'max':
+            cls = out.max(dim=1)[0]
+        elif self.cls_type == 'mean' or self.cls_type == 'avg':
+            cls = out.mean(dim=1)
+        elif self.cls_type == 'token':
+            cls = out[:, -1, :]
+            out = out[:, :-1, :]
+        elif self.cls_type == 'attn_pool':
+            cls = self.attn_pool(out).squeeze()      
+        return cls, out
+    
     def forward_xlstm(self, x):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
@@ -108,15 +121,7 @@ class pretrainedxLSTM(nn.Module):
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
 
-        if self.cls_type == 'max':
-            cls = out.max(dim=1)[0]
-
-        elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            cls = out.mean(dim=1)
-        else:
-            cls = out[:, -1, :]
-            out = out[:, :-1, :]
-
+        cls, out = self.pooling(out)
         return cls, out
     
     def forward(self, x, masking=True, reconstruct=True):

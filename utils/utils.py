@@ -6,7 +6,6 @@ import numpy as np
 import random
 from collections import Counter
 from models.simple_LSTM import ECG_LSTM, ECG_CONV1D_LSTM
-from models.seq2seq import Seq2SeqModel
 import torch.nn.functional as F
 from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
