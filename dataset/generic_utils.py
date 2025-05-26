@@ -17,7 +17,10 @@ def get_transforms(config, split='train', type=None):
     if split != 'train': return t
 
     if config.random_crop < 1. and config.random_crop > 0.:
-        t.transforms.append(RandomCrop(config.global_random_crop if type == 'global' else  config.local_random_crop if type == 'local' else config.random_crop))
+        t.transforms.append(RandomCrop(
+            config.global_random_crop if type == 'global' else  config.local_random_crop if type == 'local' else config.random_crop,
+            max_length=config.sampling_freq * 15
+        ))
 
     if config.shift_baseline_wander_in_sample:
         t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
