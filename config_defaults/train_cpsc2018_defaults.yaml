@@ -25,6 +25,7 @@ random_drop_leads: 0.0
 random_change_amplitude: 0.
 patience: 15
 num_reg_token: 0
+max_length_signal: 50
 
 activation_fn: "relu"
 xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
