@@ -57,14 +57,14 @@ def load_datasets(config):
             datasets_pretrain.append(train_code15)
             val_datasets.append(val_code15)
         elif dataset == 'code':
-            code = code.ECGCODEDataset(
+            _code = code.ECGCODEDataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             )
             # split the dataset into train and val
-            train_size = int(0.9 * len(code))
-            train_code, val_code = Subset(code, range(0, train_size)), Subset(code15, range(train_size, len(code15)))
+            train_size = int(0.9 * len(_code))
+            train_code, val_code = Subset(_code, range(0, train_size)), Subset(_code, range(train_size, len(code15)))
             datasets_pretrain.append(train_code)
             val_datasets.append(val_code)
         elif dataset == 'ptbxl':
