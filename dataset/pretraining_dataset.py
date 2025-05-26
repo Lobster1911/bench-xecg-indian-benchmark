@@ -5,7 +5,9 @@ import wfdb
 import neurokit2 as nk
 import numpy as np
 
-leads = ['i', 'ii', 'iii', 'avR', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
+leads = ['i', 'ii', 'iii', 'avr', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
+
+mappings = { 'di': 'i', 'dii': 'ii', 'diii': 'iii' }
 
 class PretrainDataset(torch.utils.data.Dataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
@@ -43,7 +45,7 @@ class PretrainDataset(torch.utils.data.Dataset):
         if self.local_augmentations is not None and self.n_local_view > 0:
             local_signals = [ self.local_augmentations(s) for _ in range(self.n_local_view)]
         else:
-            local_signals = None
+            local_signals = []
 
         return  {
             'global_signals': global_signals,
@@ -54,6 +56,8 @@ class PretrainDataset(torch.utils.data.Dataset):
         s = np.zeros((len(signal), len(self.leads)))
         for lead in info['sig_name']:
             l = lead.lower()
+            if l in mappings:
+                l = mappings[l]
             if l in self.leads:
                 if self.nk_clean:
                     s[:, self.leads.index(l)] = nk.ecg_clean(signal[:, info['sig_name'].index(lead)], sampling_rate=info['fs']).copy()

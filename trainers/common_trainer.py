@@ -61,7 +61,7 @@ class CommonTrainerDownstream(L.LightningModule):
             elif self.model.cls_type == 'attn_pool':
                 params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
 
-            if self.mode.num_reg_token > 0:
+            if self.model.num_reg_tokens > 0:
                 params.append({'params': self.reg_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'reg_tokens'})
 
         else:
