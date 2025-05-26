@@ -72,7 +72,7 @@ def train(config, run=None, wandb=False):
 
     if wandb:
         checkpoint_callback = ModelCheckpoint(monitor='val_auroc', mode='max')
-        prj = f'train-ptbxl-{config.classification_taksk}'
+        prj = f'train-ptbxl-{config.classification_taksk}-{config.task}'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=1)

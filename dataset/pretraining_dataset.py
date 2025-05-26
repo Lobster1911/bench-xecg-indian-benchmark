@@ -33,11 +33,7 @@ class PretrainDataset(torch.utils.data.Dataset):
        
         # mapping leads in the correct position
         s = self.map_leads_and_clean(s, info)
-
-        if self.sampling_freq != info['fs']:
-            s = nk.signal_resample(s, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')
-        
-        s = torch.tensor(s, dtype=torch.float32)
+        s = self.resample_if_needed(s, info)
 
         if self.global_augmentations is not None:
             global_signals = [ self.global_augmentations(s) for _ in range(self.n_global_view)]
@@ -64,5 +60,12 @@ class PretrainDataset(torch.utils.data.Dataset):
                 else:
                     s[:, self.leads.index(l)] = signal[:, info['sig_name'].index(lead)]
         return s
+    
+    def resample_if_needed(self, signal, info):
+        if self.sampling_freq != info['fs']:
+            signal = nk.signal_resample(signal, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')
+        
+        signal = torch.tensor(signal, dtype=torch.float32)
+        return signal
                 
 

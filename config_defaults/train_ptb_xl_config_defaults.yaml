@@ -1,4 +1,4 @@
-lr_head: 0.001
+lr_head: 0.01
 lr_xlstm: 0.00001
 wd: 0.01
 batch_size: 64

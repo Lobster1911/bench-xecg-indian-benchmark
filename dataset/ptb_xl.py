@@ -5,32 +5,38 @@ import wfdb
 import ast
 from dataset.pretraining_dataset import PretrainDataset
 from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
-
+from pandarallel import pandarallel
+from dataset.generic_utils import get_max_n_jobs
+pandarallel.initialize(progress_bar=True)
 
 class ECGPTBXLDataset(PretrainDataset):
-
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_ptbxl
         self.labels_file = config.labels_file_ptbxl
+        self.task = config.task
         self.load_tabular_data()
-        self.load_records(split)
+        self.load_records(split, task=config.task)
 
-    def load_records(self, split):
+    def load_records(self, split, task='multilabel'):
         # fold 19 is for testing, while fold 18 is for validation
         if split == 'train':
             # get all the tab data index where the fold is not 18 or 19
-            self.records = self.tab_data[self.tab_data['strat_fold'] != 9][self.tab_data['strat_fold'] != 10]['filename_hr'].values.tolist()
             self.tab_data = self.tab_data[self.tab_data['strat_fold'] != 9][self.tab_data['strat_fold'] != 10]
         elif split == 'val':
             # get all the tab data index where the fold is 18
-            self.records = self.tab_data[self.tab_data['strat_fold'] == 9]['filename_hr'].values.tolist()
             self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 9]
         elif split == 'test':
             # get all the tab data index where the fold is 19
-            self.records = self.tab_data[self.tab_data['strat_fold'] == 10]['filename_hr'].values.tolist()
             self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 10]
 
+
+        if task == 'multiclass':
+            self.tab_data['num_labels'] = self.tab_data.T.parallel_apply(lambda row: sum([1 if label in row['diagnostic_superclass'] else 0 for label in self.classes]))
+            # keep only the records with sum == 1
+            self.tab_data = self.tab_data[self.tab_data['num_labels'] == 1]
+        
+        self.records = self.tab_data['filename_hr'].values.tolist()
         self.records = [os.path.join(self.data_folder, record.split('/')[1], record.split('/')[2]) for record in self.records]
 
     def load_tabular_data(self):

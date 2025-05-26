@@ -76,6 +76,7 @@ data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
 labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
 data_folder_chapman: /media/Volume/data/ChapmanNingbo/1.0.0/
 labels_file_chapman: /media/Volume/data/ChapmanNingbo/1.0.0/exams_filtered.csv
+data_folder_incart: /media/Volume/data/incart/
 
 # other
 debug: false

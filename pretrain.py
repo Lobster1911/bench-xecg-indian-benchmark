@@ -2,18 +2,14 @@ import os
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from models.xLSTM import pretrainedxLSTM
-import dataset.mit_bih as mit_bih
-import dataset.code_15 as code_15
-import dataset.mimic_iv as mimic
-import dataset.ptb_xl as ptb_xl
-import dataset.chapman as chapman
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from trainers.ssl_pretrainer import PretrainedxLSTMNetwork
 import utils.utils as utils
 import torch
+import dataset.ptb_xl as ptb_xl
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from dataset.generic_utils import get_transforms
+from dataset.generic_utils import load_datasets
 from trainers.common import DelayedCheckpoint
 # from utils.utils import get_least_used_gpu
 
@@ -34,72 +30,13 @@ def pretrain(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
 
-    datasets_pretrain = []
-    val_datasets = []
-
-    for dataset in config.pretrain_datasets:
-        if dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(
-                config, 
-                split='train', 
-                global_augmentations=get_transforms(config, split='train', type='global'), 
-                local_augmentations=get_transforms(config, split='train', type='local')
-            ))
-            val_datasets.append(mimic.ECGMIMICDataset(
-                config, 
-                split='val', 
-                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
-                local_augmentations=get_transforms(config, split='train', type='local')
-            ))
-        elif dataset == 'code15':
-            code15 = code_15.ECGCODE15Dataset(
-                config, 
-                global_augmentations=get_transforms(config, split='train', type='global'), 
-                local_augmentations=get_transforms(config, split='train', type='local')
-            )
-            # split the dataset into train and val
-            train_size = int(0.9 * len(code15))
-            train_code15, val_code15 = Subset(code15, range(0, train_size)), Subset(code15, range(train_size, len(code15)))
-            datasets_pretrain.append(train_code15)
-            val_datasets.append(val_code15)
-
-        elif dataset == 'ptbxl':
-            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
-                config, 
-                split='train', 
-                global_augmentations=get_transforms(config, split='train', type='global'), 
-                local_augmentations=get_transforms(config, split='train', type='local')
-            ))
-            val_datasets.append(ptb_xl.ECGPTBXLDataset(
-                config, 
-                split='val', 
-                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
-                local_augmentations=get_transforms(config, split='train', type='local')
-            ))
-        elif dataset == 'chapman':
-            chapman_dataset = chapman.ECGChapmanDataset(
-                config, 
-                global_augmentations=get_transforms(config, split='train', type='global'),
-                local_augmentations=get_transforms(config, split='train', type='local')
-            )
-            # split the dataset into train and val
-            train_size = int(0.9 * len(chapman_dataset))
-            train_chapman, val_chapman = Subset(chapman_dataset, range(0, train_size)), Subset(chapman_dataset, range(train_size, len(chapman_dataset)))
-            datasets_pretrain.append(train_chapman)
-            val_datasets.append(val_chapman)
-
-        else:
-            raise ValueError(f"Dataset {dataset} not found")
-
-    val_dataset = ConcatDataset(val_datasets)
-    train_dataset = ConcatDataset(datasets_pretrain)
+    train_dataset,val_dataset = load_datasets(config)
 
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
     knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val'))
     knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val'))
-
     
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))

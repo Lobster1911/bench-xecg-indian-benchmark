@@ -33,6 +33,7 @@ class CommonTrainerDownstream(L.LightningModule):
         self.num_classes = config.num_classes
         self.patch_size = config.patch_size
         self.layerwise_lr_decay = config.layerwise_lr_decay
+        self.task = config.task
         
 
     def get_params(self):
@@ -55,6 +56,14 @@ class CommonTrainerDownstream(L.LightningModule):
                 params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
             else:
                 params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+
+            if self.model.cls_type == 'token':
+                params.append({'params': self.model.cls_token.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+            elif self.model.cls_type == 'attn_pool':
+                params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+
+            if self.mode.num_reg_token > 0:
+                params.append({'params': self.reg_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'reg_tokens'})
 
         else:
             params = [

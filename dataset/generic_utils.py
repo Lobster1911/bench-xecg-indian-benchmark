@@ -5,6 +5,97 @@ import torch
 from joblib import Parallel, delayed
 from torchvision import transforms
 from augmentations import *
+import dataset.mit_bih as mit_bih
+import dataset.code as code
+import dataset.mimic_iv as mimic
+import dataset.ptb_xl as ptb_xl
+import dataset.chapman as chapman
+import dataset.incart as incart
+from torch.utils.data import Subset, ConcatDataset
+
+def load_datasets(config):
+
+    datasets_pretrain = []
+    val_datasets = []
+
+    for dataset in config.pretrain_datasets:
+        if dataset == 'mimic':
+            datasets_pretrain.append(mimic.ECGMIMICDataset(
+                config, 
+                split='train', 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+            val_datasets.append(mimic.ECGMIMICDataset(
+                config, 
+                split='val', 
+                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+        elif dataset == 'incart':
+            # only training because small sample size
+            incart_dataset = incart.ECGIncartDataset(
+                config, 
+                split='train', 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            )
+            datasets_pretrain.append(incart_dataset)
+            
+        elif dataset == 'code15':
+            code15 = code.ECGCODE15Dataset(
+                config, 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(code15))
+            train_code15, val_code15 = Subset(code15, range(0, train_size)), Subset(code15, range(train_size, len(code15)))
+            datasets_pretrain.append(train_code15)
+            val_datasets.append(val_code15)
+        elif dataset == 'code':
+            code = code.ECGCODEDataset(
+                config, 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(code))
+            train_code, val_code = Subset(code, range(0, train_size)), Subset(code15, range(train_size, len(code15)))
+            datasets_pretrain.append(train_code)
+            val_datasets.append(val_code)
+        elif dataset == 'ptbxl':
+            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
+                config, 
+                split='train', 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+            val_datasets.append(ptb_xl.ECGPTBXLDataset(
+                config, 
+                split='val', 
+                global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
+                local_augmentations=get_transforms(config, split='train', type='local')
+            ))
+        elif dataset == 'chapman':
+            chapman_dataset = chapman.ECGChapmanDataset(
+                config, 
+                global_augmentations=get_transforms(config, split='train', type='global'),
+                local_augmentations=get_transforms(config, split='train', type='local')
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(chapman_dataset))
+            train_chapman, val_chapman = Subset(chapman_dataset, range(0, train_size)), Subset(chapman_dataset, range(train_size, len(chapman_dataset)))
+            datasets_pretrain.append(train_chapman)
+            val_datasets.append(val_chapman)
+
+        else:
+            raise ValueError(f"Dataset {dataset} not found")
+
+    val_dataset = ConcatDataset(val_datasets)
+    train_dataset = ConcatDataset(datasets_pretrain)
+
+    return train_dataset, val_dataset
 
 
 def get_transforms(config, split='train', type=None):
