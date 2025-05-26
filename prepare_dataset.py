@@ -66,7 +66,7 @@ if __name__ == '__main__':
         exams['file_name'] = all_files
     elif args.dataset == 'code':
         with open(os.path.join(args.data_folder, 'RECORDS.txt'), 'r') as f:
-            paths = f.readlines()
+            paths = [line.strip() for line in f.readlines()]
         
         exams = pd.DataFrame()
         exams['file_name'] = paths
@@ -89,6 +89,10 @@ if __name__ == '__main__':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['filename_hr']))), axis=1)
     elif args.dataset in ['chapman', 'cpsc2018', 'code']:
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
+
+    to_remove = exams[exams['valid'] == False]
+    print('to remove: ', len(to_remove))
+    print(to_remove.head())
 
     exams = exams[exams['valid']]
     exams.drop(columns=['valid'], inplace=True)
