@@ -146,6 +146,10 @@ class RandomCrop(nn.Module):
     def forward(self, signal):
         # Get the size of the signal
         signal_length = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
+        if signal_length == 0:
+            print("Warning: Signal length is 0, returning original signal.")
+            return signal
+        
         # Calculate the target length
         target_length = int(torch.floor(signal_length * self.crop_size).numpy())
         # Randomly sample the starting point for the cropping (cut-off)
