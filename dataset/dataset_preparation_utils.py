@@ -6,7 +6,6 @@ import shutil
 import h5py
 import json
 import simple_icd_10
-
 import dataset.mit_bih as mit_bih
 import dataset.code as code
 import dataset.mimic_iv as mimic
@@ -15,6 +14,7 @@ import dataset.chapman as chapman
 import dataset.incart as incart
 from torch.utils.data import Subset, ConcatDataset
 from dataset.generic_utils import get_transforms
+import torch
 
 def load_datasets(config):
 
@@ -306,6 +306,7 @@ def check_sample(record_path):
         return False
     
     # check if the signal is empty
+    signa = torch.tensor(signal, dtype=torch.float32)
     sig_len = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
     if sig_len == 0:
         print(f"Record {record_path} is empty - skipping")
