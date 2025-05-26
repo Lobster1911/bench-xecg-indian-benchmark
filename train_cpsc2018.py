@@ -38,9 +38,9 @@ def train(config, run=None, wandb=False):
 
     if config.use_class_weights:
         if config.num_classes == 9:
-            print('Using class weights for 5 classes')
-            weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-            # weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
+            # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
+            weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
+            print(f'Class weights: {weights}')
         else:
             weights = None # TODO
     else:
@@ -65,12 +65,12 @@ def train(config, run=None, wandb=False):
 
     model = TrainingCPSC_2018(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
+        checkpoint_callback = ModelCheckpoint(monitor='val_auroc', mode='max')
         prj = f'train-cpsc2018'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')

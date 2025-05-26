@@ -9,23 +9,26 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
+from utils.train_utils import focal_loss
+
 
 class TrainingCPSC_2018(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
 
-        self.train_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.MultilabelAccuracy(num_labels=self.num_classes, average='micro', ignore_index=-1)
+        top_k = 1 if self.task == 'multiclass' else None
 
-        self.train_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
-        self.valid_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
-        self.test_f1 = torchmetrics.classification.MultilabelF1Score(num_labels=self.num_classes, average='macro', ignore_index=-1)
+        self.train_acc = torchmetrics.Accuracy(num_labels=self.num_classes, num_classes=self.num_classes, average='micro', ignore_index=-1, task=self.task, top_k=top_k)
+        self.valid_acc = torchmetrics.Accuracy(num_labels=self.num_classes, num_classes=self.num_classes, average='micro', ignore_index=-1, task=self.task, top_k=top_k)
+        self.test_acc = torchmetrics.Accuracy(num_labels=self.num_classes, num_classes=self.num_classes,average='micro', ignore_index=-1, task=self.task, top_k=top_k)
 
-        self.train_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step='macro', ignore_index=-1)  
-        self.valid_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step='macro', ignore_index=-1)
-        self.test_auroc = torchmetrics.classification.MultilabelAUROC(num_labels=self.num_classes, compute_on_step='macro', ignore_index=-1)
+        self.train_f1 = torchmetrics.F1Score(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task, top_k=top_k)
+        self.valid_f1 = torchmetrics.F1Score(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task, top_k=top_k)
+        self.test_f1 = torchmetrics.F1Score(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task, top_k=top_k)
 
+        self.train_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
+        self.valid_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
+        self.test_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
 
     def training_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)
@@ -99,14 +102,23 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
             self.model.set_eval_linear_probing()
 
         logits = self.model(x)
-        preds = (torch.sigmoid(logits) > 0.5).float()
 
-        loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights)
+        if self.task == 'multiclass':
+            targets = torch.argmax(targets, dim=1)
+            if self.use_focal_loss:
+                loss = nn.functional.cross_entropy(logits, targets, weight=self.weights, reduction='none')
+                loss = focal_loss(loss)
+            else:
+                loss = nn.functional.cross_entropy(logits, targets)
+            preds = torch.argmax(logits, dim=1)
 
-        if self.use_focal_loss:
-            pt = torch.exp(-loss_cls)
-            alpha = 2.
-            gamma = .25
-            loss_cls = (alpha * (1-pt)**gamma * loss_cls)
+        elif self.task == 'multilabel':
+            if self.use_focal_loss:
+                loss = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights, reduction='none')
+                loss = focal_loss(loss)
+            else:
+                loss = nn.functional.binary_cross_entropy_with_logits(logits, targets, weight=self.weights)
+
+            preds = (torch.sigmoid(logits) > 0.5).float()
         
-        return loss_cls, logits, preds, targets
+        return loss, logits, preds, targets

@@ -17,6 +17,7 @@ pandarallel.initialize(progress_bar=True)
 
 # CODE:  python prepare_dataset.py --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
 # PTB-XL: python prepare_dataset.py --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
+# CPSC: python prepare_dataset.py --dataset cpsc2018 --data_folder /media/Volume/data/CPSC2018/
 
 # MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic
 # CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
@@ -103,6 +104,6 @@ if __name__ == '__main__':
         exams['diagnosis_code'] = exams.parallel_apply(lambda row: extract_diagnosis_code(os.path.join(args.data_folder,row['file_name'])), axis=1)
 
 
-    print(exams.head())
+    # print(exams.head())
     print('final count rows: ', len(exams))
     exams.to_csv(os.path.join(args.data_folder, 'exams_filtered.csv'))

@@ -305,6 +305,12 @@ def check_sample(record_path):
         print(f"Record {record_path} has too low variance - skipping")
         return False
     
+    # check if the signal is empty
+    sig_len = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
+    if sig_len == 0:
+        print(f"Record {record_path} is empty - skipping")
+        return False
+    
     return True
 
 def resample_and_save_record_wfdb(record_path, desired_fs, output_file_path, nk_clean=False):

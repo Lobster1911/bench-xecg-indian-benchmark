@@ -39,7 +39,6 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # self.config = config
         self.len_train_dataset = len_train_dataset
         self.num_epochs_warmup = config.num_epochs_warmup
-        self.num_epochs_warm_restart = config.num_epochs_warm_restart
         self.sched_decay_factor = config.sched_decay_factor
         self.grad_loss_lambda = config.grad_loss_lambda
         self.min_max_loss_lambda = config.min_max_loss_lambda

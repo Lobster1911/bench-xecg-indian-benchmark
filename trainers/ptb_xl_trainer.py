@@ -31,9 +31,9 @@ class TrainingPTB_XL(CommonTrainerDownstream):
         self.test_f1 = torchmetrics.F1Score(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
         self.test_f1_macro = torchmetrics.F1Score(num_classes=self.num_classes, num_labels=self.num_classes, average='macro', ignore_index=-1,task=config.task, top_k=top_k)
         
-        self.train_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1,task=config.task)
-        self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes,  ignore_index=-1,task=config.task)
-        self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1,task=config.task)
+        self.train_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes, average='macro', ignore_index=-1, task=config.task)
+        self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes, average='macro', ignore_index=-1, task=config.task)
+        self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, num_labels=self.num_classes, average='macro', ignore_index=-1, task=config.task)
 
         # auprc
         self.train_auprc = torchmetrics.AveragePrecision(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1, task=config.task)

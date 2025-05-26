@@ -6,6 +6,7 @@ import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
 from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
+from tqdm import tqdm
 
 
 class ECGCPSC2018Dataset(PretrainDataset):
@@ -20,7 +21,7 @@ class ECGCPSC2018Dataset(PretrainDataset):
 
         self.tab_data = pd.read_csv(self.labels_file)
         self.load_records()
-        self.load_labels()  
+        self.load_labels(config.task)  
 
     def load_records(self):
         self.records = self.tab_data['file_name'].tolist()
@@ -31,10 +32,8 @@ class ECGCPSC2018Dataset(PretrainDataset):
         elif self.split == 'test':
             self.records = [record for record in self.records if 'g7' in record]
 
-        print(f'sample path CODE15: {self.records[0]}')
-        print(f'loaded {len(self.records)} records')
 
-    def load_labels(self):
+    def load_labels(self, task='multilabel'):
         labels = self.tab_data['diagnosis_code'].unique()
         splitted_labels = []
         for label in labels:
@@ -42,8 +41,21 @@ class ECGCPSC2018Dataset(PretrainDataset):
 
         self.labels = list(set(splitted_labels))
 
-        print(f'loaded {len(self.labels)} labels: {self.labels}')
+        new_records = []
 
+        if task == 'multiclass':
+            print(f'loaded {len(self.records)} records before removing multi label labels')
+
+            for record in tqdm(self.records, desc='Removing multi label labels'):
+                info = wfdb.rdheader(os.path.join(self.data_folder, record))
+                label_str = extract_diagnosis_code(info).split(',')
+                num_labels = sum([1 if label in label_str else 0 for label in self.labels])
+                if num_labels == 1:
+                    new_records.append(record)
+
+            self.records = new_records
+
+        print(f'loaded {len(self.records)} records')
     
     def __getitem__(self, idx):
         signal = super().__getitem__(idx)
