@@ -6,7 +6,6 @@ import ast
 from dataset.pretraining_dataset import PretrainDataset
 from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
 from pandarallel import pandarallel
-from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
 class ECGPTBXLDataset(PretrainDataset):

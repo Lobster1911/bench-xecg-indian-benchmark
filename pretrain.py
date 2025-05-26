@@ -9,7 +9,7 @@ import utils.utils as utils
 import torch
 import dataset.ptb_xl as ptb_xl
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from dataset.generic_utils import load_datasets
+from dataset.dataset_preparation_utils import load_datasets
 from trainers.common import DelayedCheckpoint
 # from utils.utils import get_least_used_gpu
 
