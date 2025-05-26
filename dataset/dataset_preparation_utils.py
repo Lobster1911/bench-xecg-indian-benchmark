@@ -306,7 +306,7 @@ def check_sample(record_path):
         return False
     
     # check if the signal is empty
-    signa = torch.tensor(signal, dtype=torch.float32)
+    signal = torch.tensor(signal, dtype=torch.float32)
     sig_len = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
     if sig_len == 0:
         print(f"Record {record_path} is empty - skipping")
