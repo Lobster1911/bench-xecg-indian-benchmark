@@ -64,7 +64,7 @@ def load_datasets(config):
             )
             # split the dataset into train and val
             train_size = int(0.9 * len(_code))
-            train_code, val_code = Subset(_code, range(0, train_size)), Subset(_code, range(train_size, len(code15)))
+            train_code, val_code = Subset(_code, range(0, train_size)), Subset(_code, range(train_size, len(_code)))
             datasets_pretrain.append(train_code)
             val_datasets.append(val_code)
         elif dataset == 'ptbxl':
