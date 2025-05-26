@@ -312,6 +312,8 @@ def check_sample(record_path):
         print(f"Record {record_path} is empty - skipping")
         return False
     
+    del signal
+    
     return True
 
 def resample_and_save_record_wfdb(record_path, desired_fs, output_file_path, nk_clean=False):
