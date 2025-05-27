@@ -4,7 +4,7 @@
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=64
-#SBATCH --mem-per-cpu=512G
+#SBATCH --mem-per-cpu=512M
 #SBATCH --time=1-00:00:00
 #SBATCH -o ./logs/slurm_output_%j_%x.out # STDOUT
 
