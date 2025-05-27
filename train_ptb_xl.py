@@ -56,6 +56,9 @@ def train(config, run=None, wandb=False):
 
     xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
+    log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
+    print(f"Logging every {log_every_n_steps} steps")
+
     if config.checkpoint is not None and config.checkpoint != '':   
         checkpoint = torch.load(config.checkpoint, weights_only=False)
         new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
@@ -75,9 +78,9 @@ def train(config, run=None, wandb=False):
         prj = f'train-ptbxl-{config.classification_taksk}-{config.task}'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=1)
+        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=log_every_n_steps)
     else:
-        trainer = L.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=1)
+        trainer = L.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=log_every_n_steps)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)

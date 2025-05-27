@@ -103,6 +103,9 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
 
         logits = self.model(x)
 
+        if logits.dim() == 1:
+            logits = logits.unsqueeze(0)
+
         if self.task == 'multiclass':
             targets = torch.argmax(targets, dim=1)
             if self.use_focal_loss:

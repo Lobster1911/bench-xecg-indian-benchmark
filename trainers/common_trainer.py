@@ -57,7 +57,7 @@ class CommonTrainerDownstream(L.LightningModule):
                 params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
 
             if self.model.cls_type == 'token':
-                params.append({'params': self.model.cls_token.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+                params.append({'params': self.model.cls_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
             elif self.model.cls_type == 'attn_pool':
                 params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
 

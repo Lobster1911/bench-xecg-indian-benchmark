@@ -39,22 +39,31 @@ class ECGCPSC2018Dataset(PretrainDataset):
         for label in labels:
             splitted_labels.extend(label.split(','))
 
-        self.labels = list(set(splitted_labels))
+        self.labels_unique = list(set(splitted_labels))
+        labels = []
 
         new_records = []
 
         if task == 'multiclass':
             print(f'loaded {len(self.records)} records before removing multi label labels')
 
-            for record in tqdm(self.records, desc='Removing multi label labels'):
-                info = wfdb.rdheader(os.path.join(self.data_folder, record))
-                label_str = extract_diagnosis_code(info).split(',')
-                num_labels = sum([1 if label in label_str else 0 for label in self.labels])
-                if num_labels == 1:
-                    new_records.append(record)
+        for record in tqdm(self.records, desc='Processing labels'):
+            info = wfdb.rdheader(os.path.join(self.data_folder, record))
+            label_str = extract_diagnosis_code(info).split(',')
+            num_labels = sum([1 if label in label_str else 0 for label in self.labels_unique])
+            if task=='multiclass' and num_labels == 1:
+                new_records.append(record)
+                labels.append(label_str)
+            elif task == 'multilabel':
+                new_records.append(record)
+                labels.append(label_str)
 
-            self.records = new_records
+        # print number of sample for each label
+        for label in self.labels_unique:
+            count = sum([1 for label_str in labels if label in label_str])
+            print(f'Label {label} has {count} samples')
 
+        self.records = new_records
         print(f'loaded {len(self.records)} records')
     
     def __getitem__(self, idx):
@@ -62,10 +71,14 @@ class ECGCPSC2018Dataset(PretrainDataset):
         info = wfdb.rdheader(os.path.join(self.data_folder, self.records[idx]))
 
         label_str = extract_diagnosis_code(info).split(',')
-        labels = [1 if label in label_str else 0 for label in self.labels]
-        
+        labels = [1 if label in label_str else 0 for label in self.labels_unique]
+
+        signal = signal['global_signals'][0]  # Assuming global_signals is a list of signals
+        # if signal.shape[0] > self.sampling_freq * 10:
+        #   signal = signal[:self.sampling_freq * 10]
+
         return {
-            'signal': signal['global_signals'][0],
+            'signal': signal,
             'labels': torch.tensor(labels, dtype=torch.float32)
         }
 

@@ -29,7 +29,6 @@ class ECGPTBXLDataset(PretrainDataset):
             # get all the tab data index where the fold is 19
             self.tab_data = self.tab_data[self.tab_data['strat_fold'] == 10]
 
-
         if task == 'multiclass':
             self.tab_data['num_labels'] = self.tab_data.T.parallel_apply(lambda row: sum([1 if label in row['diagnostic_superclass'] else 0 for label in self.classes]))
             # keep only the records with sum == 1
@@ -37,6 +36,12 @@ class ECGPTBXLDataset(PretrainDataset):
         
         self.records = self.tab_data['filename_hr'].values.tolist()
         self.records = [os.path.join(self.data_folder, record.split('/')[1], record.split('/')[2]) for record in self.records]
+
+        print("Tabular data fields for PTB-XL: ", self.tab_data.head())
+        # for each label count the number of occurrences
+        table_count = self.tab_data['diagnostic_superclass'].explode().value_counts()
+        print("Number of occurrences for each label in PTB-XL: ")
+        print(table_count)
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
@@ -68,7 +73,6 @@ class ECGPTBXLDataset(PretrainDataset):
         self.tab_data['age'] = self.tab_data['age'].fillna(0)
         self.tab_data['age'] = self.tab_data['age'].astype(int)
         # remove some unised columns
-        print("Tabular data fields for  PTB-XL: ", self.tab_data.head())
 
     def __len__(self):
         return len(self.records)
