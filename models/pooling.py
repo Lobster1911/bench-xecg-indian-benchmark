@@ -48,3 +48,21 @@ class AttentionPooling(nn.Module):
         x = x + self.mlp(self.layernorm(x))
 
         return x
+    
+
+class LinearAttentionPooling(nn.Module):
+    def __init__(self, embed_dim: int):
+        super().__init__()
+
+        self.embed_dim = embed_dim
+        self.attention_layer = nn.Sequential(
+            nn.Linear(self.embed_dim, self.embed_dim // 2),
+            nn.ReLU(),
+            nn.Linear(self.embed_dim // 2, 1),
+        )
+        nn.Linear(self.embed_dim, 1)
+        self.softmax = nn.Softmax(dim=1)
+
+    def forward(self, x: torch.Tensor):
+        attention_weights = self.softmax(self.attention_layer(x))
+        return attention_weights.transpose(1, 2) @ x

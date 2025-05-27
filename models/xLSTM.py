@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import copy
 from models.normalizations import DINOCentering
 import torch.distributed as dist
-from models.pooling import AttentionPooling
+from models.pooling import AttentionPooling, LinearAttentionPooling
 
 class pretrainedxLSTM(nn.Module):
     def __init__(
@@ -48,6 +48,8 @@ class pretrainedxLSTM(nn.Module):
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
         elif self.cls_type == 'attn_pool':
             self.attn_pool = AttentionPooling(config.embedding_size, config.num_heads)
+        elif self.cls_type == 'lin_attn_pool':
+            self.attn_pool = LinearAttentionPooling(config.embedding_size)
             
         self.num_reg_tokens = config.num_reg_token
         if config.num_reg_token > 0:
@@ -103,7 +105,7 @@ class pretrainedxLSTM(nn.Module):
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]
-        elif self.cls_type == 'attn_pool':
+        elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
             cls = self.attn_pool(out).squeeze()      
         return cls, out
     

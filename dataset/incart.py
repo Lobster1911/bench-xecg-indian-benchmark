@@ -40,10 +40,8 @@ class ECGIncartDataset(PretrainDataset):
         sample_fs = info['fs']
         random_start = np.random.randint(0, len(signal) - self.win_len * sample_fs)
         random_end = random_start + self.win_len * sample_fs
-
-        print(random_start, random_end)
+        
         signal = signal[random_start:random_end]
-        print(signal.shape)
 
         self.map_leads_and_clean(signal, info)
         signal = self.resample_if_needed(signal, info)
