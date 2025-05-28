@@ -15,7 +15,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 
-from models.encoder.vit import TransformerBlock
+from st_mem.encoder.vit import TransformerBlock
 
 
 __all__ = ['ST_MEM_ViT', 'st_mem_vit_small', 'st_mem_vit_base']
@@ -91,12 +91,19 @@ class ST_MEM_ViT(nn.Module):
         self.head = nn.Identity() if num_classes is None else nn.Linear(self.width, num_classes)
 
     def forward_encoding(self, series):
+        series = series.transpose(1, 2)
         num_leads = series.shape[1]
         if num_leads > len(self.lead_embeddings):
             raise ValueError(f'Number of leads ({num_leads}) exceeds the number of lead embeddings')
 
         x = self.to_patch_embedding(series)
         b, _, n, _ = x.shape
+        
+        # cut the signal if needed
+        if n >= self.pos_embedding.shape[1]:
+            x = x[:, :, :self.pos_embedding.shape[1] -1, :]
+
+        n = x.shape[2]
         x = x + self.pos_embedding[:, 1:n + 1, :].unsqueeze(1)
 
         # lead indicating modules
@@ -130,6 +137,14 @@ class ST_MEM_ViT(nn.Module):
             print_str += f'    {k}={v},\n'
         print_str += ')'
         return print_str
+    
+
+    def training_params(self):
+        return self.head.parameters()
+    
+    def set_eval_linear_probing(self):
+        self.eval()
+        self.head.train()
 
 
 def st_mem_vit_small(num_leads, num_classes=None, seq_len=2250, patch_size=75, **kwargs):

@@ -97,7 +97,7 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
     
-    def pooling(self, out, padding_mask=None):
+    def pooling(self, out):
         if self.cls_type == 'max':
             cls = out.max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
@@ -109,7 +109,7 @@ class pretrainedxLSTM(nn.Module):
             cls = self.attn_pool(out).squeeze()      
         return cls, out
     
-    def forward_xlstm(self, x, padding_mask=None):
+    def forward_xlstm(self, x):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
             x = self.add_cls_token(x)

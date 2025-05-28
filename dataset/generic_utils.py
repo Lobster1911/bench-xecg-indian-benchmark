@@ -13,6 +13,15 @@ def get_transforms(config, split='train', type=None):
     t = transforms.Compose([])
     if config.normalize:
         t.transforms.append(Normalize())
+
+    if config.standardize:
+        t.transforms.append(Standardize())
+
+    if config.low_pass_filter:
+        t.transforms.append(LowpassFilter(config.sampling_freq, config.low_pass_filter))
+    
+    if config.high_pass_filter:
+        t.transforms.append(HighpassFilter(config.sampling_freq, config.high_pass_filter))
     
     if split != 'train': return t
 

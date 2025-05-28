@@ -33,6 +33,7 @@ class CommonTrainerDownstream(L.LightningModule):
         self.patch_size = config.patch_size
         self.layerwise_lr_decay = config.layerwise_lr_decay
         self.task = config.task
+        self.use_st_mem = config.use_st_mem
         
 
     def get_params(self):

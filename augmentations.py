@@ -11,7 +11,50 @@ from sklearn.utils import check_random_state
 
 from typing import Any
 import torch.nn as nn
-from scipy.signal import resample
+from scipy.signal import butter, resample, sosfiltfilt, square
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+
+class Standardize:
+    """Standardize the input sequence.
+    """
+    def __init__(self, axis: Union[int, Tuple[int, ...], List[int]] = (-1, -2)) -> None:
+        if isinstance(axis, list):
+            axis = tuple(axis)
+        self.axis = axis
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        loc = torch.mean(x, axis=self.axis, keepdims=True)
+        scale = torch.std(x, axis=self.axis, keepdims=True)
+        # Set rst = 0 if std = 0
+        return torch.tensor(np.divide(x - loc, scale, out=np.zeros_like(x), where=scale != 0), dtype=x.dtype)
+    
+class SOSFilter:
+    """Apply SOS filter to the input sequence.
+    """
+    def __init__(self,
+                 fs: int,
+                 cutoff: float,
+                 order: int = 5,
+                 btype: str = 'highpass') -> None:
+        self.sos = butter(order, cutoff, btype=btype, fs=fs, output='sos')
+
+    def __call__(self, x):
+        return torch.tensor(sosfiltfilt(self.sos, x.T).copy(), dtype=x.dtype).T
+
+class HighpassFilter(SOSFilter):
+    """Apply highpass filter to the input sequence.
+    """
+    def __init__(self, fs: int, cutoff: float, order: int = 5) -> None:
+        super(HighpassFilter, self).__init__(fs, cutoff, order, btype='highpass')
+
+class LowpassFilter(SOSFilter):
+    """Apply lowpass filter to the input sequence.
+    """
+    def __init__(self, fs: int, cutoff: float, order: int = 5) -> None:
+        super(LowpassFilter, self).__init__(fs, cutoff, order, btype='lowpass')
+
+
 
 def get_padding_mask(signal):
     """
