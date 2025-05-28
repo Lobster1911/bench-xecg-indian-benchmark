@@ -1,10 +1,10 @@
 #!/bin/bash -l
-#SBATCH --job-name=pretrain_xlstm
-#SBATCH --partition=h100
+#SBATCH --job-name=ptb_xl
+#SBATCH --partition=l40s
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=128
-#SBATCH --mem-per-cpu=1G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem-per-cpu=512M
 #SBATCH --time=7-00:00:00
 #SBATCH -o ./logs/slurm_output_%j_%x.out # STDOUT
 

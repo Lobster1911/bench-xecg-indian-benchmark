@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=pretrain_xlstm
+#SBATCH --job-name=cpsc2018
 #SBATCH --partition=l40s
 #SBATCH --gpus=1
 #SBATCH --ntasks=1

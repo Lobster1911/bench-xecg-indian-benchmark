@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=ptb_xl
+#SBATCH --job-name=pretrain
 #SBATCH --partition=h100
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
