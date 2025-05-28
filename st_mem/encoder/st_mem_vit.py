@@ -35,7 +35,8 @@ class ST_MEM_ViT(nn.Module):
                  qkv_bias: bool = True,
                  drop_out_rate: float = 0.,
                  attn_drop_out_rate: float = 0.,
-                 drop_path_rate: float = 0.):
+                 drop_path_rate: float = 0.,
+                 linear_probing: bool = False):
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
         self._repr_dict = {'seq_len': seq_len,
@@ -50,9 +51,11 @@ class ST_MEM_ViT(nn.Module):
                            'qkv_bias': qkv_bias,
                            'drop_out_rate': drop_out_rate,
                            'attn_drop_out_rate': attn_drop_out_rate,
-                           'drop_path_rate': drop_path_rate}
+                           'drop_path_rate': drop_path_rate,
+                           'linear_probing': linear_probing}
         self.width = width
         self.depth = depth
+        self.linear_probing = linear_probing
 
         # embedding layers
         num_patches = seq_len // patch_size
@@ -128,7 +131,11 @@ class ST_MEM_ViT(nn.Module):
         return self.norm(x)
 
     def forward(self, series):
-        x = self.forward_encoding(series)
+        if self.linear_probing:
+            with torch.no_grad():
+                x = self.forward_encoding(series)
+        else:
+            x = self.forward_encoding(series)
         return self.head(x)
 
     def __repr__(self):
