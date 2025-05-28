@@ -97,19 +97,19 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
     
-    def pooling(self, out):
+    def pooling(self, out, padding_mask=None):
         if self.cls_type == 'max':
-            cls = out.max(dim=1)[0]
+            cls = out.masked_fill(padding_mask, -np.inf).max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            cls = out.mean(dim=1)
+            cls = out.masked_fill(padding_mask, 0).mean(dim=1)
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]
         elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
-            cls = self.attn_pool(out).squeeze()      
+            cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()      
         return cls, out
     
-    def forward_xlstm(self, x):
+    def forward_xlstm(self, x, padding_mask=None):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
             x = self.add_cls_token(x)
@@ -123,10 +123,12 @@ class pretrainedxLSTM(nn.Module):
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
 
-        cls, out = self.pooling(out)
+        cls, out = self.pooling(out, padding_mask)
         return cls, out
     
     def forward(self, x, masking=True, reconstruct=True):
+        padding_mask = self.get_padding_mask(x)
+
         if masking:   # masking
             mask = self.get_random_mask(x) # 1 is masked and 0 is non masked
             x = x.masked_fill(mask, 0) # apply the mask
@@ -183,7 +185,7 @@ class pretrainedxLSTM(nn.Module):
     def get_padding_mask(self, x):
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
         num_patches = x.shape[1] // self.patch_size
-        padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)
+        padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)[:, :, 0]
         return padding_mask_patched
 
     def get_random_mask(self, x):

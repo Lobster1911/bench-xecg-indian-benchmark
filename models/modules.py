@@ -123,7 +123,6 @@ class vanillaxLSTMWrapper(nn.Module):
         self.drop_path = DropPath()
         self.dropout_rates = [x.item() for x in torch.linspace(0, drop_path, len(self.model.blocks))]
 
-
     def step(self, x, state=None):
         return self.model.step(x, state=state)
 
@@ -154,7 +153,7 @@ class vanillaxLSTMWrapper(nn.Module):
             x = torch.diagonal(x, dim1=1, dim2=2).transpose(1,2)
             # print('x shape after diagonal', x.shape)
 
-        # x = self.model.post_blocks_norm(x)
+        x = self.model.post_blocks_norm(x)
         return x
      
 class DropPath(nn.Module):
@@ -192,7 +191,6 @@ class mLSTMWrapper(nn.Module):
         self.bidirectional = bidirectional
         self.drop_path = DropPath(drop_path, is_large_mlstm=True)
         self.dropout_rates = [x.item() for x in torch.linspace(0, drop_path, len(self.model.blocks))]
-
 
     def forward(self, x, need_expansion=True):
         len_seq = x.shape[1]
