@@ -61,7 +61,7 @@ class ECGCODEDataset(PretrainDataset):
         # remove trace_file, patient_id and nn_predicted_age
         print("tabular data fields for CODE: ", self.tab_data.head())
 
-        self.tab_data['patient_id'] = self.tab_data.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
+        self.tab_data['patient_id'] = self.tab_data.T.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
         self.unique_patients = self.tab_data['patient_id'].unique()
         
     
