@@ -19,13 +19,15 @@ class xLSTMClassification(pretrainedxLSTM):
 
 
     def forward(self, x):
+        padding_mask = self.get_padding_mask(x)
+
         if self.linear_probing:
             with torch.no_grad():
                 x = self.patch_embedding(x)
-                cls, _ = self.forward_xlstm(x)
+                cls, _ = self.forward_xlstm(x, padding_mask)
         else:  
             x = self.patch_embedding(x)
-            cls, _ = self.forward_xlstm(x)
+            cls, _ = self.forward_xlstm(x, padding_mask)
 
         res = self.fc(cls)
         return res

@@ -99,7 +99,7 @@ class pretrainedxLSTM(nn.Module):
     
     def pooling(self, out, padding_mask=None):
         if self.cls_type == 'max':
-            cls = out.masked_fill(padding_mask, -np.inf).max(dim=1)[0]
+            cls = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
             cls = out.masked_fill(padding_mask, 0).mean(dim=1)
         elif self.cls_type == 'token':
@@ -143,7 +143,7 @@ class pretrainedxLSTM(nn.Module):
             x_emb[patched_mask] = self.mask_token
 
         
-        cls, out = self.forward_xlstm(x_emb)
+        cls, out = self.forward_xlstm(x_emb, padding_mask=padding_mask)
 
         # reconstruct signal
         if reconstruct:
@@ -185,7 +185,7 @@ class pretrainedxLSTM(nn.Module):
     def get_padding_mask(self, x):
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
         num_patches = x.shape[1] // self.patch_size
-        padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)[:, :, 0]
+        padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)[:, :, 0].unsqueeze(-1).expand(-1, -1, self.embedding_size)
         return padding_mask_patched
 
     def get_random_mask(self, x):
