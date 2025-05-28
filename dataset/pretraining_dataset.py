@@ -4,6 +4,9 @@ import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
+from pandarallel import pandarallel
+from dataset.generic_utils import get_max_n_jobs
+pandarallel.initialize(progress_bar=True)
 
 leads = ['i', 'ii', 'iii', 'avr', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
 
@@ -29,10 +32,6 @@ class PretrainDataset(torch.utils.data.Dataset):
 
         s, info = wfdb.rdsamp(os.path.join(self.data_folder, record))
 
-        # if nan fill
-        if np.isnan(s).any():
-            print("WARNING: Nan detected")
-       
         # mapping leads in the correct position
         s = self.map_leads_and_clean(s, info)
         s = self.resample_if_needed(s, info)

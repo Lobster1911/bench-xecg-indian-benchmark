@@ -97,7 +97,7 @@ class pretrainedxLSTM(nn.Module):
         param.requires_grad = False
         return param
     
-    def pooling(self, out):
+    def pooling(self, out, padding_mask=None):
         if self.cls_type == 'max':
             cls = out.max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
@@ -109,7 +109,7 @@ class pretrainedxLSTM(nn.Module):
             cls = self.attn_pool(out).squeeze()      
         return cls, out
     
-    def forward_xlstm(self, x):
+    def forward_xlstm(self, x, padding_mask=None):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
             x = self.add_cls_token(x)
@@ -180,6 +180,11 @@ class pretrainedxLSTM(nn.Module):
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
         return torch.cat([cls_token, x], dim=1)
     
+    def get_padding_mask(self, x):
+        padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
+        num_patches = x.shape[1] // self.patch_size
+        padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)
+        return padding_mask_patched
 
     def get_random_mask(self, x):
         """

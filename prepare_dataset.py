@@ -12,7 +12,6 @@ from joblib import Parallel, delayed
 import json
 import wfdb.processing as wp
 from pandarallel import pandarallel
-from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
 
 # CODE:  python prepare_dataset.py --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
@@ -73,8 +72,6 @@ if __name__ == '__main__':
         exams['file_name'] = paths
     else:
         exams = pd.read_csv(args.label_file)
-
-
 
 
     print(exams.head)
