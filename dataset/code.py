@@ -57,13 +57,11 @@ class ECGCODEDataset(PretrainDataset):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)
         # set exam_id as index
-        self.tab_data.set_index('file_name', inplace=True)
         # remove trace_file, patient_id and nn_predicted_age
         print("tabular data fields for CODE: ", self.tab_data.head())
 
-        self.tab_data['patient_id'] = self.tab_data.T.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
+        self.tab_data['patient_id'] = self.tab_data.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
         self.unique_patients = self.tab_data['patient_id'].unique()
-        
     
     def __getitem__(self, idx):
         patient = str(self.unique_patients[idx])
