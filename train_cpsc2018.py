@@ -20,6 +20,8 @@ from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from torchvision import transforms
 from dataset.generic_utils import get_transforms
+import st_mem.encoder as encoder
+
 
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
@@ -51,19 +53,29 @@ def train(config, run=None, wandb=False):
 
     test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
-
-    xlstm = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
-
-
-    if config.checkpoint is not None and config.checkpoint != '':   
-        checkpoint = torch.load(config.checkpoint, weights_only=False)
-        new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
-        # remove the fc layer
-        new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
-        message = xlstm.load_state_dict(new_state_dict, strict=False) 
-        print(message) 
-
-    model = TrainingCPSC_2018(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    
+    if config.use_st_mem:
+        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes)
+        checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
+        checkpoint_model = checkpoint['model']
+        state_dict = base_model.state_dict()
+        for k in ['head.weight', 'head.bias']:
+            if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
+                print(f"Remove key {k} from pre-trained checkpoint")
+                del checkpoint_model[k]
+        msg = base_model.load_state_dict(checkpoint_model, strict=False)
+        print(msg)
+    else:
+        base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        if config.checkpoint is not None and config.checkpoint != '':   
+            checkpoint = torch.load(config.checkpoint, weights_only=False)
+            new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
+            # remove the fc layer
+            new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
+            message = base_model.load_state_dict(new_state_dict, strict=False) 
+            print(message) 
+            
+    model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
