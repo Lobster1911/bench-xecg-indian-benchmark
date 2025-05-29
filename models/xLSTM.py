@@ -102,7 +102,8 @@ class pretrainedxLSTM(nn.Module):
             cls = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
             sum_feat = out.masked_fill(padding_mask, 0).sum(dim=1)
-            valid_counts = padding_mask.sum(dim=1).clamp(min=1)  # (bs, 1)
+            seq_len = out.shape[1]
+            valid_counts = padding_mask.sum(dim=1).clamp(min=1) - seq_len  # (bs, 1)
             print(valid_counts)
             cls = sum_feat / valid_counts
         elif self.cls_type == 'token':
