@@ -44,6 +44,7 @@ def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean', cen
     if mask is not None:
         target = target[mask]
         input = input[mask]
+        
 
     if centering == 'sinkhorn_knopp':
         target = sinkhorn_knopp_teacher(target, teacher_temp)
@@ -51,6 +52,8 @@ def embedding_cross_entropy_loss(input, target, mask=None, reduction='mean', cen
         target = F.softmax(target, dim=-1)
     
     loss = torch.sum(target * F.log_softmax(input / stud_temp, dim=-1), dim=-1)
+    # set nan to 0 
+    loss[loss != loss] = 0
     
     if reduction == "mean":
         loss = -loss.mean()
