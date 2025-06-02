@@ -87,7 +87,10 @@ class ST_MEM_ViT(nn.Module):
         self.norm = nn.LayerNorm(width)
 
         # classifier head
-        self.head = nn.Identity() if num_classes is None else nn.Linear(width, num_classes)
+        self.head = nn.Identity() if num_classes is None else nn.Sequential(
+            nn.BatchNorm1d(width),
+            nn.Linear(width, num_classes)
+        )
 
     def reset_head(self, num_classes: Optional[int] = None):
         del self.head
