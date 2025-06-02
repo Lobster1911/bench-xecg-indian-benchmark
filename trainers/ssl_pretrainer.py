@@ -26,11 +26,13 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         ):
         super().__init__()
         self.lr = config.lr
+        self.layerwise_lr_decay = config.layerwise_lr_decay
         self.reconstruction_lr = config.reconstruction_lr
         self.model = model
         self.batch_size = config.batch_size
         self.optimizer = config.optimizer
         self.wd = config.wd
+        self.final_wd = config.final_wd
         self.use_scheduler = config.use_scheduler
         self.patch_size = config.patch_size
         self.epochs = config.epochs
@@ -90,9 +92,22 @@ class PretrainedxLSTMNetwork(L.LightningModule):
                 sched_head.step()
 
             self.update_teacher()
+            self.update_scheduled_weight_decay(opt_core)
             return
         else:
             return rec_loss
+        
+    def update_scheduled_weight_decay(self, opt_core):
+        # linear decay
+        steps_per_epoch = np.ceil(self.len_train_dataset / self.batch_size)
+        total_steps = steps_per_epoch * self.epochs
+        step = self.global_step 
+        if self.model.use_teacher_student:  step = step // 2 # this because i do two steps in the training loop
+        wd = self.wd + (self.final_wd - self.wd) * (step / total_steps)
+    
+        for param_group in opt_core.param_groups:
+            param_group['weight_decay'] = wd
+            
     
     @torch.no_grad()
     def update_teacher(self):
@@ -440,6 +455,40 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
     def get_params(self):
         return self.model.trainable_parameters()
+    
+    def get_params(self):
+        if self.layerwise_lr_decay > 0.:
+            params = [ ]
+            num_layers = len(self.model.xlstm.model.blocks) + 1
+
+            # Assign learning rates to each transformer layer
+            for i, layer in enumerate(self.model.xlstm.model.blocks):
+                layer_lr = self.lr * (self.layerwise_lr_decay ** (num_layers - i - 1))  # Earlier layers get smaller LR
+                layer_params = layer.parameters()
+                params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
+
+            layer_lr = self.lr * (self.layerwise_lr_decay ** num_layers)
+            params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
+
+            params.append({'params': self.model.mask_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'mask_token'})
+
+            if self.model.xlstm_type =='large':
+                params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
+            else:
+                params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
+
+            if self.model.cls_type == 'token':
+                params.append({'params': self.model.cls_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'cls'})
+            elif self.model.cls_type == 'attn_pool' or self.model.cls_type == 'lin_attn_pool':
+                params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'cls'})
+
+            if self.model.num_reg_tokens > 0:
+                params.append({'params': self.reg_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'reg_tokens'})
+        else:
+            params = [
+                {'params': self.model.trainable_parameters(), 'lr': self.lf, 'weight_decay': self.wd},
+            ]
+        return params
     
     def get_lr(self):
         return self.lr

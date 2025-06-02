@@ -86,6 +86,7 @@ def configure_optimizer_teacher_student(trainer):
         return [optimizer1, optimizer2], [scheduler1, scheduler2]
     else:
         return [optimizer1, optimizer2]
+
     
 
 class DelayedCheckpoint(ModelCheckpoint):
