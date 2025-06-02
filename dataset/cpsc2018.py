@@ -82,7 +82,6 @@ class ECGCPSC2018Dataset(PretrainDataset):
             'labels': torch.tensor(labels, dtype=torch.float32)
         }
 
-
 def extract_diagnosis_code(record):
     for comment in record.comments:
         if comment.startswith('Dx:'):

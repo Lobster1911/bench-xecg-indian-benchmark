@@ -14,7 +14,7 @@ class xLSTMClassification(pretrainedxLSTM):
 
         self.fc = nn.Sequential(            
             nn.Dropout(config.dropout),
-            # nn.BatchNorm1d(config.embedding_size, affine=False),
+            nn.LayerNorm(config.embedding_size),
             nn.Linear(config.embedding_size, num_classes)
         )
 
