@@ -48,11 +48,7 @@ max_length_signal: 12
 use_teacher_student: false
 ema_0: 0.996 
 ema_1: 1.
-n_prototypes: 65536
 start_train_head_at_epoch: 0
-use_koleo_regularization: false
-centering: sinkhorn_knopp
-teacher_temp: 0.07
 
 # data and augmentations hyperparameters
 normalize: true
@@ -89,5 +85,4 @@ n_global_view: 2
 
 sampling_freq: 100
 nk_clean: true
-use_sim_dino: true
 lambda_code_rate: 0.1

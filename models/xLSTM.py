@@ -28,7 +28,6 @@ class pretrainedxLSTM(nn.Module):
         self.use_teacher_student = config.use_teacher_student
         self.mask_ratio = config.mask_ratio
         self.embedding_size = config.embedding_size
-        self.use_sim_dino = config.use_sim_dino
         self.cls_type = config.cls_type
         self.masking_type = config.masking_type
         self.xlstm_type = config.xlstm_type
@@ -55,22 +54,6 @@ class pretrainedxLSTM(nn.Module):
         if config.num_reg_token > 0:
             self.reg_token = nn.Parameter(torch.zeros(1, config.num_reg_token, config.embedding_size))
             nn.init.xavier_uniform_(self.reg_token, gain=1.0)
-            
-        if self.use_teacher_student:   
-            if not self.use_sim_dino:
-                self.dino_head = HeadModule(
-                    inp_size=config.embedding_size,
-                    hidden_size=config.embedding_size // 2,
-                    out_size=config.n_prototypes,
-                    dropout=config.dropout
-                )
-
-                self.ibot_head = HeadModule(
-                    inp_size=config.embedding_size,
-                    hidden_size=config.embedding_size // 2,
-                    out_size=config.n_prototypes,
-                    dropout=config.dropout
-                )
           
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
@@ -103,7 +86,7 @@ class pretrainedxLSTM(nn.Module):
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
             sum_feat = out.masked_fill(padding_mask, 0).sum(dim=1)
             seq_len = out.shape[1]
-            valid_counts = seq_len - padding_mask.sum(dim=1).clamp(min=1)  # (bs, 1)
+            valid_counts = (seq_len - padding_mask.sum(dim=1)).clamp(min=1)  # (bs, 1)
             cls = sum_feat / valid_counts
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
@@ -159,12 +142,6 @@ class pretrainedxLSTM(nn.Module):
         
         if masking: tortn['mask'] = mask
         if reconstruct: tortn['reconstruction'] = rec
-        
-        if not self.use_sim_dino:
-            cls_after_head = self.dino_head(cls)
-            patches_after_head = self.ibot_head(out)
-            tortn['cls_after_head'] = cls_after_head
-            tortn['patches_after_head'] = patches_after_head
         
         return tortn
 

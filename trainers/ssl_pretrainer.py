@@ -51,15 +51,12 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
 
-        self.use_sim_dino = config.use_sim_dino
-        self.use_koleo_regularization = config.use_koleo_regularization and not self.use_sim_dino
 
         self.centering = config.centering
         self.teacher_temp = config.teacher_temp
         self.stud_temp = config.stud_temp
 
-        if self.use_sim_dino: self.mcr_loss = MCRLoss(eps=0.05)
-        if self.use_koleo_regularization: self.koleo_reg = KoLeoLoss()
+        self.mcr_loss = MCRLoss(eps=0.05)
 
         if self.model.use_teacher_student:
             self.model.init_teacher()
@@ -230,47 +227,21 @@ class PretrainedxLSTMNetwork(L.LightningModule):
         # i do not want to predict where masking is applied to masked tokens
         combined_mask = combined_mask * ~combined_padding_mask
 
-        if self.use_sim_dino:
-            cls_tok_stud_g = torch.stack([g['cls'] for g in global_out] + [l['cls'] for l in local_out], dim=0)
-            cls_tok_teacher_g = torch.stack([g['cls'] for g in global_out_teacher], dim=0)
-        
-            compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
-            self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False)
-            self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False)
+        cls_tok_stud_g = torch.stack([g['cls'] for g in global_out] + [l['cls'] for l in local_out], dim=0)
+        cls_tok_teacher_g = torch.stack([g['cls'] for g in global_out_teacher], dim=0)
+    
+        compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
+        self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False)
+        self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False)
 
-            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
-            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
+        stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
+        teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
 
-            # simplified dino uses only the mse between the embeddigns
-            patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
-            self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True)
+        # simplified dino uses only the mse between the embeddigns
+        patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
+        self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True)
 
-            teacher_student_loss = compression_term + self.lambda_code_rate * expansion_term + patch_loss
-
-        else:
-            stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
-            teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
-            # i use first cls tokens of the second augmented signal to match the cls of the first augmented signal
-            patch_loss = embedding_cross_entropy_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp)
-
-            cross_cls_loss = []
-            for i, t_out in enumerate(global_out_teacher):
-                for j, s_g_out in enumerate(global_out):
-                    if i == j: continue
-                    cross_cls_loss.append(embedding_cross_entropy_loss(s_g_out['cls'], t_out['cls'], reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp))
-                for s_l_out in local_out:
-                    cross_cls_loss.append(embedding_cross_entropy_loss(s_l_out['cls'], t_out['cls'], reduction='mean', mask=combined_mask, centering=self.centering, stud_temp=self.stud_temp, teacher_temp=self.teacher_temp))
-
-            cross_cls_loss = torch.stack(cross_cls_loss, dim=0).mean()
-            # TODO add losses
-
-        
-        if self.use_koleo_regularization:
-            koleo_loss1 = self.koleo_reg(global_out[0]['cls']) # on cls tokens
-            koleo_loss2 = self.koleo_reg(global_out[1]['cls'])
-            koleo_loss = (koleo_loss1 + koleo_loss2) / 2
-            teacher_student_loss = teacher_student_loss + koleo_loss * 0.1
-            self.log(f"{step}_koleo_loss", koleo_loss.item(), prog_bar=True)
+        teacher_student_loss = compression_term + self.lambda_code_rate * expansion_term + patch_loss
 
         self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True)
 
@@ -281,10 +252,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
         # log norm of output
         with torch.no_grad():
-            if self.use_sim_dino:
-                norm = torch.norm(global_out[0]['patches'], dim=-1)
-            else: 
-                norm = torch.norm(global_out[0]['patches_after_head'], dim=-1)
+            norm = torch.norm(global_out[0]['patches'], dim=-1)
             norm = norm.mean()
             self.log(f"{step}_norm_emb", norm.item(), prog_bar=False)
 

@@ -202,6 +202,20 @@ class RandomCrop(nn.Module):
         start_idx = np.random.randint(low=0, high=signal_length - target_length)
         # Crop the signal
         return signal[start_idx:start_idx + target_length, ...]
+    
+class CropFixedLen(nn.Module):
+    """
+        Randomly crop the signal.
+    """
+    def __init__(self, length):
+        super(CropFixedLen, self).__init__()
+        self.length = length
+
+    def forward(self, signal):
+        # Get the size of the signal
+        if signal.shape[1] > self.length:
+            return signal[..., self.length:]
+        return signal
 
 
 class RandomDropLeads(nn.Module):

@@ -23,13 +23,17 @@ def get_transforms(config, split='train', type=None):
     if config.high_pass_filter:
         t.transforms.append(HighpassFilter(config.sampling_freq, config.high_pass_filter))
     
-    if split != 'train': return t
+    if split != 'train': 
+        t.transforms.append(CropFixedLen(config.max_length_signal))
+        return t
 
     if config.random_crop < 1. and config.random_crop > 0.:
         t.transforms.append(RandomCrop(
             config.global_random_crop if type == 'global' else  config.local_random_crop if type == 'local' else config.random_crop,
             max_length=config.sampling_freq * config.max_length_signal
         ))
+    else:
+        t.transforms.append(CropFixedLen(config.max_length_signal))
 
     if config.shift_baseline_wander_in_sample:
         t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
