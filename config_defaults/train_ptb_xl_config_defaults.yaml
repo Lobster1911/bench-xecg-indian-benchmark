@@ -36,7 +36,7 @@ patch_embedding: "linear"
 bidirectional: false
 use_cls_token: false
 use_focal_loss: false
-sampling_freq: 100
+sampling_freq: 250
 use_final_layer_norm: true
 
 normalize: true

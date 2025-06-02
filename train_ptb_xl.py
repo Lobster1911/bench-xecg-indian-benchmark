@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from torchvision import transforms
 from dataset.generic_utils import get_transforms
 import st_mem.encoder as encoder
+from ecg_jepa.models import load_encoder
 
 
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
@@ -67,6 +68,10 @@ def train(config, run=None, wandb=False):
                 del checkpoint_model[k]
         msg = base_model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
+    elif config.use_ecg_jepa:
+        ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
+        base_model = load_encoder(ckpt_dir=ckpt_dir) # dim is the dimension of the latent space
+
     else:
         base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         if config.checkpoint is not None and config.checkpoint != '':   

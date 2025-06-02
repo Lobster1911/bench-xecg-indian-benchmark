@@ -135,7 +135,6 @@ class TrainingPTB_XL(CommonTrainerDownstream):
         self.test_acc_no_avg = self.test_acc_no_avg.to(preds.device)
         self.test_acc_no_avg(preds, targets)
 
-
         self.test_f1 = self.test_f1.to(preds.device)
         self.test_f1(preds, targets)
         self.test_f1_macro = self.test_f1_macro.to(preds.device)
