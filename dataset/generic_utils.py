@@ -24,7 +24,7 @@ def get_transforms(config, split='train', type=None):
         t.transforms.append(HighpassFilter(config.sampling_freq, config.high_pass_filter))
     
     if split != 'train': 
-        t.transforms.append(CropFixedLen(config.max_length_signal))
+        t.transforms.append(CropFixedLen(config.sampling_freq * config.max_length_signal))
         return t
 
     if config.random_crop < 1. and config.random_crop > 0.:
