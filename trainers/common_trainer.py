@@ -70,8 +70,8 @@ class CommonTrainerDownstream(L.LightningModule):
             elif self.use_st_mem:
                 # embeddings, need the smallest layer_lr
                 params.append({'params': self.model.to_patch_embedding.parameters(), 'lr': layer_lr, 'name': 'to_patch_embedding'})
-                params.append({'params': self.model.pos_embedding.parameters(), 'lr': layer_lr, 'name': 'pos_embedding'})
-                params.append({'params': self.model.sep_embedding.parameters(), 'lr': layer_lr, 'name': 'sep_embedding'})
+                params.append({'params': self.model.pos_embedding, 'lr': layer_lr, 'name': 'pos_embedding'})
+                params.append({'params': self.model.sep_embedding, 'lr': layer_lr, 'name': 'sep_embedding'})
                 params.append({'params': self.model.lead_embeddings.parameters(), 'lr': layer_lr, 'name': 'lead_embeddings'})
                 params.append({'params': self.model.norm.parameters(), 'lr': self.lr_xlstm, 'name': 'ln'})
             else:
