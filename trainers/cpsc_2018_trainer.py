@@ -26,6 +26,10 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.valid_f1 = torchmetrics.F1Score(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task, top_k=top_k)
         self.test_f1 = torchmetrics.F1Score(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task, top_k=top_k)
 
+        self.train_auprc = torchmetrics.AveragePrecision(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1, task=config.task)
+        self.valid_auprc = torchmetrics.AveragePrecision(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1, task=config.task)
+        self.test_auprc = torchmetrics.AveragePrecision(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1, task=config.task)
+
         self.train_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
         self.valid_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
         self.test_auroc = torchmetrics.AUROC(num_labels=self.num_classes, num_classes=self.num_classes, average='macro', ignore_index=-1, task=self.task)
@@ -49,6 +53,11 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.train_auroc(logits, targets)
         self.log("train_auroc", self.train_auroc)
 
+        # auprc
+        self.train_auprc = self.train_auprc.to(logits.device)
+        self.train_auprc(logits, targets)
+        self.log("train_auprc", self.train_auprc, prog_bar=True)
+
         return loss
     
     def validation_step(self, batch, _):
@@ -68,6 +77,11 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.valid_auroc = self.valid_auroc.to(logits.device)
         self.valid_auroc(logits, targets)
         self.log('val_auroc', self.valid_auroc, prog_bar=True)
+
+        # auprc
+        self.valid_auprc = self.valid_auprc.to(logits.device)
+        self.valid_auprc(logits, targets)
+        self.log('val_auprc', self.valid_auprc, prog_bar=True)
 
         return loss
             
@@ -89,6 +103,12 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.test_auroc = self.test_auroc.to(logits.device)
         self.test_auroc(logits, targets)
         self.log("test_auroc", self.test_auroc)
+
+        # auprc
+        self.test_auprc = self.test_auprc.to(logits.device)
+        self.test_auprc(logits, targets)
+        self.log("test_auprc", self.test_auprc)
+
 
         return loss
             

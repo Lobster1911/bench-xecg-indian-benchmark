@@ -33,7 +33,7 @@ def get_transforms(config, split='train', type=None):
             max_length=config.sampling_freq * config.max_length_signal
         ))
     else:
-        t.transforms.append(CropFixedLen(config.max_length_signal))
+        t.transforms.append(CropFixedLen(config.sampling_freq * config.max_length_signal))
 
     if config.shift_baseline_wander_in_sample:
         t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
