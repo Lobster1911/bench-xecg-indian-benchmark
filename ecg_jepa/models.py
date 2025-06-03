@@ -1,7 +1,7 @@
 import torch
 from ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier
 
-def load_encoder(ckpt_dir, num_classes=5, leads=None):
+def load_encoder(ckpt_dir, num_classes=5, leads=None, drop_path_rate=0.0):
 
     if leads is None:
         leads = [0,1,2,3,4,5,6,7]
@@ -16,12 +16,12 @@ def load_encoder(ckpt_dir, num_classes=5, leads=None):
         'c': 8,
         'pos_type': 'sincos',
         'mask_scale': (0, 0),
-        'leads': leads
+        'leads': leads,
+        'drop_path_rate': drop_path_rate
     }
     encoder = ecg_jepa(**params).encoder
     ckpt = torch.load(ckpt_dir)
     encoder.load_state_dict(ckpt['encoder'])
-    embed_dim = 768
 
     model = ECGJepaClassifier(encoder, num_classes)
 

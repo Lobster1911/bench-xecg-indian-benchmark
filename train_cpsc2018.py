@@ -56,7 +56,7 @@ def train(config, run=None, wandb=False):
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
     
     if config.use_st_mem:
-        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing)
+        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
         checkpoint_model = checkpoint['model']
         state_dict = base_model.state_dict()
@@ -68,7 +68,7 @@ def train(config, run=None, wandb=False):
         print(msg)
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, num_classes=config.num_classes) # dim is the dimension of the latent space
+        base_model = load_encoder(ckpt_dir=ckpt_dir, num_classes=config.num_classes, drop_path_rate=config.drop_path_prob) # dim is the dimension of the latent space
 
     else:
         base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))

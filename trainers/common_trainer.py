@@ -34,14 +34,25 @@ class CommonTrainerDownstream(L.LightningModule):
         self.layerwise_lr_decay = config.layerwise_lr_decay
         self.task = config.task
         self.use_st_mem = config.use_st_mem
+        self.use_ecg_jepa = config.use_ecg_jepa
+
+    def get_layers(self):
+        if self.use_ecg_jepa:
+            # get all the params
+            return self.model.encoder.encoder_blocks.blocks
+        elif self.use_st_mem:
+            return [self.model.__getattr__(f'block{i}') for i in range(self.model.depth)]
+        else:
+            return self.model.xlstm.model.blocks
         
 
     def get_params(self):
         if self.linear_probing:
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]
         elif self.layerwise_lr_decay > 0.:
-            params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]    
-            num_layers = len(self.model.xlstm.model.blocks) + 1
+            params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]   
+            layers = self.get_layers()
+            num_layers = len(layers) + 1 
 
             # Assign learning rates to each transformer layer
             for i, layer in enumerate(self.model.xlstm.model.blocks):
@@ -50,20 +61,34 @@ class CommonTrainerDownstream(L.LightningModule):
                 params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
 
             layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** num_layers)
-            params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
 
-            if self.model.xlstm_type =='large':
-                params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+            if self.use_ecg_jepa:
+                # linear projection, need the smallest layer_lr
+                params.append({"params": self.model.encoder.W_P.parameters(), "lr": layer_lr, "name": "W_P"})
+                # final layer norm, normal lr
+                params.append({"params": self.model.encoder.norm.parameters(), "lr": self.lr_xlstm, "name": "ln"})
+            elif self.use_st_mem:
+                # embeddings, need the smallest layer_lr
+                params.append({'params': self.model.to_patch_embedding.parameters(), 'lr': layer_lr, 'name': 'to_patch_embedding'})
+                params.append({'params': self.model.pos_embedding.parameters(), 'lr': layer_lr, 'name': 'pos_embedding'})
+                params.append({'params': self.model.sep_embedding.parameters(), 'lr': layer_lr, 'name': 'sep_embedding'})
+                params.append({'params': self.model.lead_embeddings.parameters(), 'lr': layer_lr, 'name': 'lead_embeddings'})
+                params.append({'params': self.model.norm.parameters(), 'lr': self.lr_xlstm, 'name': 'ln'})
             else:
-                params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+                params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
 
-            if self.model.cls_type == 'token':
-                params.append({'params': self.model.cls_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
-            elif self.model.cls_type == 'attn_pool' or self.model.cls_type == 'lin_attn_pool':
-                params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+                if self.model.xlstm_type =='large':
+                    params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+                else:
+                    params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
 
-            if self.model.num_reg_tokens > 0:
-                params.append({'params': self.reg_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'reg_tokens'})
+                if self.model.cls_type == 'token':
+                    params.append({'params': self.model.cls_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+                elif self.model.cls_type == 'attn_pool' or self.model.cls_type == 'lin_attn_pool':
+                    params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
+
+                if self.model.num_reg_tokens > 0:
+                    params.append({'params': self.reg_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'reg_tokens'})
 
         else:
             params = [
