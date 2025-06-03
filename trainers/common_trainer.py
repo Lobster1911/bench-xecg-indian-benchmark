@@ -55,7 +55,7 @@ class CommonTrainerDownstream(L.LightningModule):
             num_layers = len(layers) + 1 
 
             # Assign learning rates to each transformer layer
-            for i, layer in enumerate(self.model.xlstm.model.blocks):
+            for i, layer in enumerate(layers):
                 layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** (num_layers - i - 1))  # Earlier layers get smaller LR
                 layer_params = layer.parameters()
                 params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
