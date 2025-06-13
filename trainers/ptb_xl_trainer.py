@@ -41,12 +41,12 @@ class TrainingPTB_XL(CommonTrainerDownstream):
         self.test_auprc = torchmetrics.AveragePrecision(num_classes=self.num_classes, num_labels=self.num_classes, ignore_index=-1, task=config.task)
 
         # add sensitivity and specificity for the first class
-        self.val_spec = torchmetrics.Specificity(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
-        self.test_spec = torchmetrics.Specificity(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
-        self.val_recall = torchmetrics.Recall(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
-        self.test_recall = torchmetrics.Recall(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
-        self.val_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
-        self.test_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.val_spec = torchmetrics.Specificity(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.test_spec = torchmetrics.Specificity(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.val_recall = torchmetrics.Recall(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.test_recall = torchmetrics.Recall(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.val_precision = torchmetrics.Precision(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
+        self.test_precision = torchmetrics.Precision(num_classes=self.num_classes, num_labels=self.num_classes, average=None, ignore_index=-1,task=config.task, top_k=top_k)
 
     def training_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)

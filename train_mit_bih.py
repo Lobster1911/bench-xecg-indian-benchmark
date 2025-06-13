@@ -36,6 +36,8 @@ def train(config, run=None, wandb=False):
         train_len = int(dataset_len * 0.9)
         train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_len, dataset_len - train_len])
         print(f"Train dataset size: {len(train_dataset)}")
+        print(f"Val dataset size: {len(val_dataset)}")
+
 
     if config.use_class_weights:
         # weights = get_training_class_weights(train_dataset).to('cuda')
@@ -51,7 +53,8 @@ def train(config, run=None, wandb=False):
         weights = None
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
-    val_dataloader = DataLoader(val_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
+    val_batch_size = 1 if config.split_val_by_patient else config.batch_size
+    val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
 
     test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))

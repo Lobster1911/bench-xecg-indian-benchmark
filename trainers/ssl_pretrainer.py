@@ -272,7 +272,7 @@ class PretrainedxLSTMNetwork(L.LightningModule):
             nrmse, mse, mae, grad, min_max = (nrmse + nrmse2) / 2, (mse + mse2) / 2, (mae + mae2) / 2, (grad + grad2) / 2, (min_max + min_max2) / 2
         else:
             raise ValueError(f"Pretraining strategy {self.pretraining_strategy} still to be implemented completely")
-            nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(out['reconstruction'], x, out['mask'])
+            # nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(out['reconstruction'], x, out['mask'])
 
         loss = torch.tensor(0.0, device=self.device)
 

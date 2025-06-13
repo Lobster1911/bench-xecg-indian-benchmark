@@ -82,17 +82,23 @@ class pretrainedxLSTM(nn.Module):
     
     def pooling(self, out, padding_mask=None):
         if self.cls_type == 'max':
-            cls = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
+            if padding_mask is None:
+                cls = out.max(dim=1)[0]
+            else:
+                cls = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
         elif self.cls_type == 'mean' or self.cls_type == 'avg':
-            sum_feat = out.masked_fill(padding_mask, 0).sum(dim=1)
-            seq_len = out.shape[1]
-            valid_counts = (seq_len - padding_mask.sum(dim=1)).clamp(min=1)  # (bs, 1)
-            cls = sum_feat / valid_counts
+            if padding_mask is None:
+                cls = out.mean(dim=1)
+            else:
+                cls = out.masked_fill(padding_mask, 0).sum(dim=1) / (out.shape[1] - padding_mask.sum(dim=1)).clamp(min=1)
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]
         elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
-            cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()      
+            if padding_mask is None:
+                cls = self.attn_pool(out).squeeze()
+            else:
+                cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()      
         return cls, out
     
     def forward_xlstm(self, x, padding_mask=None):

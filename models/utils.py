@@ -69,7 +69,7 @@ def get_xlstm(config):
             ),
             feedforward=FeedForwardConfig(proj_factor=1.3, act_fn="gelu"),
         ),
-        context_length=7000,
+        context_length=8000,
         num_blocks=len(config.xlstm_config),
         embedding_dim=config.embedding_size,
         slstm_at=[idx if b == 's' else 0 for idx, b in enumerate(config.xlstm_config)],

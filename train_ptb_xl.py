@@ -87,7 +87,7 @@ def train(config, run=None, wandb=False):
 
     model = TrainingPTB_XL(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 

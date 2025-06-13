@@ -32,7 +32,6 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
 
-        out = self.layer_norm(out)
         return out  
     
 
