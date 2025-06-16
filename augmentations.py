@@ -191,8 +191,10 @@ class RandomCrop(nn.Module):
         # Get the size of the signal
         end = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
         # start of signal: there may be padding at the beginning of the signal
-        start = (signal != 0).cumsum(dim=0).min(dim=-1)[0].min(dim=-1)[0].numpy() - 1 
-        
+        start = (signal != 0).cumsum(dim=0).max(dim=-1)[0].max(dim=-1)[0].numpy() 
+        if not (signal[0] == 0).all():
+            start = 0 # if the signal do not starts with zeros, we can start from the beginning
+
         # Calculate the target length
         # consider a maximun length of the signal
         signal_length = min(end - start, self.max_length) # Ensure we don't exceed the actual length
@@ -410,7 +412,6 @@ def resample_signal(signal: torch.Tensor, current_freq: float = 500, target_freq
     """
     signal = signal.transpose(0, 1)
     num_channels, signal_length = signal.shape
-    print(f'Resampling signal from {current_freq}Hz to {target_freq}Hz, signal shape: {signal.shape}')
     target_length = int(signal_length * target_freq / current_freq)
     resampled = np.array([resample(channel, target_length) for channel in signal.numpy()])
     signal = torch.tensor(resampled, dtype=signal.dtype)

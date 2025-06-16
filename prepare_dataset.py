@@ -73,7 +73,6 @@ if __name__ == '__main__':
     else:
         exams = pd.read_csv(args.label_file)
 
-
     print(exams.head)
     print(exams.columns)
     print('initial count rows: ', len(exams))

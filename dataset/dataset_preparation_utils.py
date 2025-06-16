@@ -292,7 +292,7 @@ def check_sample(record_path):
     if np.isnan(signal).any():
         print(f"Record {record_path} has nan - skipping")
         return False
-
+    
     if len(signal) < 360:
         print(f"Record {record_path} has less than 360 samples - skipping")
         return False
