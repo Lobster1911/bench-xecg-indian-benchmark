@@ -199,7 +199,7 @@ class RandomCrop(nn.Module):
         
         target_length = int(np.floor(signal_length * self.crop_size))
         # Randomly sample the starting point for the cropping (cut-off)
-        
+
         start_idx = np.random.randint(low=start, high=signal_length - target_length + start)
         # Crop the signal
         return signal[start_idx:start_idx + target_length, ...]
@@ -410,6 +410,7 @@ def resample_signal(signal: torch.Tensor, current_freq: float = 500, target_freq
     """
     signal = signal.transpose(0, 1)
     num_channels, signal_length = signal.shape
+    print(f'Resampling signal from {current_freq}Hz to {target_freq}Hz, signal shape: {signal.shape}')
     target_length = int(signal_length * target_freq / current_freq)
     resampled = np.array([resample(channel, target_length) for channel in signal.numpy()])
     signal = torch.tensor(resampled, dtype=signal.dtype)
