@@ -191,7 +191,7 @@ class RandomCrop(nn.Module):
         # Get the size of the signal
         end = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
         # start of signal: there may be padding at the beginning of the signal
-        start = (signal == 0).cumsum(dim=0).max(dim=-1)[0].max(dim=-1)[0].numpy()
+        start = (signal != 0).cumsum(dim=0).min(dim=-1)[0].min(dim=-1)[0].numpy() - 1 
         
         # Calculate the target length
         # consider a maximun length of the signal
@@ -199,7 +199,7 @@ class RandomCrop(nn.Module):
         
         target_length = int(np.floor(signal_length * self.crop_size))
         # Randomly sample the starting point for the cropping (cut-off)
-        print(f"Signal length: {signal_length}, Target length: {target_length}, start: {start}, end: {end}")
+        
         start_idx = np.random.randint(low=start, high=signal_length - target_length + start)
         # Crop the signal
         return signal[start_idx:start_idx + target_length, ...]
