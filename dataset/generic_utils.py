@@ -39,7 +39,7 @@ def get_transforms(config, split='train', type=None):
         t.transforms.append(RandomShiftBaselineWander(config.sampling_freq, 0.5))
 
     if config.random_drop_leads > 0.:
-        t.transforms.append(RandomDropLeads(config.random_drop_leads))
+        t.transforms.append(RandomDropLeads(config.random_drop_leads, keep_lead_II = config.keep_lead_II))
 
     if config.random_surrogate_prob > 0.:
         t.transforms.append(FTSurrogate(0.05, prob=config.random_surrogate_prob))

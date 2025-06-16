@@ -189,17 +189,18 @@ class RandomCrop(nn.Module):
 
     def forward(self, signal):
         # Get the size of the signal
-        signal_length = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
-        if signal_length == 0:
-            print("Warning: Signal length is 0, returning original signal.")
-            return signal
+        end = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
+        # start of signal: there may be padding at the beginning of the signal
+        start = (signal == 0).cumsum(dim=0).max(dim=-1)[0].max(dim=-1)[0].numpy()
         
         # Calculate the target length
         # consider a maximun length of the signal
-        signal_length = min(signal_length, self.max_length) # Ensure we don't exceed the actual length
+        signal_length = min(end - start, self.max_length) # Ensure we don't exceed the actual length
+        
         target_length = int(np.floor(signal_length * self.crop_size))
         # Randomly sample the starting point for the cropping (cut-off)
-        start_idx = np.random.randint(low=0, high=signal_length - target_length)
+        print(f"Signal length: {signal_length}, Target length: {target_length}, start: {start}, end: {end}")
+        start_idx = np.random.randint(low=start, high=signal_length - target_length + start)
         # Crop the signal
         return signal[start_idx:start_idx + target_length, ...]
     
@@ -222,9 +223,10 @@ class RandomDropLeads(nn.Module):
     """
         Randomly drop leads from the signal.
     """
-    def __init__(self, probability=0.5):
+    def __init__(self, probability=0.5, keep_lead_II=True):
         super(RandomDropLeads, self).__init__()
         self.probability = probability
+        self.keep_lead_II = keep_lead_II  # Ensure lead II is never removed
 
     def forward(self, signal):
         if self.training and self.probability > 0: # Also check if probability is non-zero
@@ -236,8 +238,15 @@ class RandomDropLeads(nn.Module):
             leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
 
             # Ensure lead II (index 1 assuming standard 12-lead) is never removed
-            if signal.shape[-1] > 1: # Check if there's more than one lead
+            if self.keep_lead_II: # Check if there's more than one lead
                 leads_to_remove[1] = False
+            else:
+                # ensure at least one lead is kept
+                if leads_to_remove.sum() == signal.shape[-1]:
+                    # select one random lead to keep, this avoids removing all leads
+                    random_lead = np.random.randint(0, signal.shape[-1])
+                    leads_to_remove[random_lead] = False
+                
 
             # Apply modification to the copy
             signal_out[..., leads_to_remove] = 0

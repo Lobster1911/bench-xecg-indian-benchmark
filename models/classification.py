@@ -12,8 +12,8 @@ class xLSTMClassification(pretrainedxLSTM):
         self.linear_probing = config.linear_probing
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-
-        self.fc = nn.Sequential(            
+        self.fc = nn.Sequential(
+            nn.LayerNorm(config.embedding_size, elementwise_affine=False),        
             nn.Dropout(config.dropout),
             nn.Linear(config.embedding_size, num_classes)
         )

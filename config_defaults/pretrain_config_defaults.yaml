@@ -57,6 +57,7 @@ shift_baseline_wander_in_sample: false
 shuffle_baseline_wander_in_batch: true
 random_crop: 0.9
 random_drop_leads: 0
+keep_lead_II: true
 random_surrogate_prob: 0
 random_jitter_prob: 0
 random_change_amplitude: 0.
