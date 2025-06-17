@@ -39,6 +39,9 @@ def train(config, run=None, wandb=False):
     val_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
+    if config.training_pct < 1.0:
+        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
+
     if config.use_class_weights:
         if config.num_classes == 9:
             # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')

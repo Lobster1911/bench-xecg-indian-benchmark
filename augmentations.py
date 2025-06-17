@@ -75,7 +75,7 @@ class RandomChangeAmplitude(nn.Module):
     def forward(self, signal):
         if self.prob == 0.: return signal
         
-        scale = np.random.rand() * self.amplitude_range + 1
+        scale = (np.random.rand() - 0.5) * self.amplitude_range + 1
         return signal * scale
         
 

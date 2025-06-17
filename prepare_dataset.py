@@ -18,10 +18,6 @@ pandarallel.initialize(progress_bar=True)
 # PTB-XL: python prepare_dataset.py --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
 # CPSC: python prepare_dataset.py --dataset cpsc2018 --data_folder /media/Volume/data/CPSC2018/
 
-# MIMIC: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/MIMIC_IV/nkclean_360_12l/ --dataset mimic
-# CODE:  python prepare_dataset.py --nk_clean --data_folder /media/Volume/data/CODE15/raw --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
-# PTB-XL: python prepare_dataset.py --nk_clean --output_folder /media/Volume/data/PTB-XL/nkclean_360_12l/ --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl
-
 # CLUSTER:
 # PTB_XL: python prepare_dataset.py --data_folder /home/datasets/ptb-xl/raw/1.0.3/ --label_file /home/datasets/ptb-xl/raw/1.0.3/ptbxl_database.csv --dataset ptbxl --output_folder /home/datasets/ptb-xl/nkclean_360_12l/ --nk_clean
 # CODE15: python prepare_dataset.py --data_folder /home/datasets/CODE15/raw/ --label_file /home/datasets/CODE15/raw/exams.csv --dataset code15 --output_folder /home/datasets/CODE15/nkclean_360_12l/ --nk_clean
