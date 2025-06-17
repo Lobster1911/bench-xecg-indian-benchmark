@@ -20,19 +20,19 @@ class ECGMIMICDataset(PretrainDataset):
         # fold 19 is for testing, while fold 18 is for validation
         if split == 'train':
             # get all the tab data index where the fold is not 18 or 19
-            self.records = self.tab_data[self.tab_data['fold'] != 18][self.tab_data['fold'] != 19]['file_name'].tolist()
+            self.tab_data = self.tab_data[self.tab_data['fold'] != 18][self.tab_data['fold'] != 19]
         elif split == 'val':
             # get all the tab data index where the fold is 18
-            self.records = self.tab_data[self.tab_data['fold'] == 18]['file_name'].tolist()
+            self.tab_data = self.tab_data[self.tab_data['fold'] == 18]
         elif split == 'test':
             # get all the tab data index where the fold is 19
-            self.records = self.tab_data[self.tab_data['fold'] == 19]['file_name'].tolist()
+            self.tab_data = self.tab_data[self.tab_data['fold'] == 19]
 
         self.unique_patients = list(self.tab_data['subject_id'].unique())
         self.patient_to_records = self.tab_data.groupby("subject_id")["file_name"].apply(list).to_dict()
 
-        print(f'MIMIC-IV: sample path: {self.records[0]}')
-        print(f'MIMIC-IV: loaded {len(self.records)} records')
+        # print(f'MIMIC-IV: sample path: {self.records[0]}')
+        # print(f'MIMIC-IV: loaded {len(self.records)} records')
         print(f'MIMIC-IV: number of unique patients {len(self.unique_patients)}')
 
     def load_tabular_data(self):
