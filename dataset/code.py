@@ -46,8 +46,9 @@ class ECGCODEDataset(PretrainDataset):
 
     def load_records(self):
         self.records = self.tab_data.index.tolist()
-        print(f'sample path CODE: {self.records[0]}')
-        print(f'loaded {len(self.records)} records')
+        print(f'CODE: sample path: {self.records[0]}')
+        print(f'CODE: loaded {len(self.records)} records')
+        print(f'CODE: number of unique patients {len(self.unique_patients)}')
 
     def __len__(self):
         return len(self.unique_patients)
@@ -62,14 +63,16 @@ class ECGCODEDataset(PretrainDataset):
 
         self.tab_data['patient_id'] = self.tab_data.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
         self.unique_patients = self.tab_data['patient_id'].unique()
+        self.patient_to_records = self.tab_data.groupby("patient_id")["file_name"].apply(list).to_dict()
     
     def __getitem__(self, idx):
         patient = str(self.unique_patients[idx])
+        records = self.patient_to_records[int(patient)]
 
-        records = self.tab_data[self.tab_data['patient_id'] == patient]['file_name'].tolist()
+        # records = self.tab_data[self.tab_data['patient_id'] == int(patient)]['file_name'].tolist()
         num_views = self.n_global_view + self.n_local_view
         if len(records) > num_views:
-            records = np.random.choice(records, num_views, replace=False)
+            records = np.random.choice(records, num_views)
 
         signals = [ wfdb.rdsamp(os.path.join(self.data_folder, record)) for record in records]
 
@@ -82,7 +85,6 @@ class ECGCODEDataset(PretrainDataset):
             new_signals.append(s)
         signals = new_signals
     
-
         if self.global_augmentations is not None:
             global_signals = [ self.global_augmentations(signals[i % len(signals)]) for i in range(self.n_global_view)]
         else:
