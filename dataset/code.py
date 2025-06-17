@@ -67,7 +67,7 @@ class ECGCODEDataset(PretrainDataset):
     
     def __getitem__(self, idx):
         patient = str(self.unique_patients[idx])
-        records = self.patient_to_records[int(patient)]
+        records = self.patient_to_records[patient]
 
         # records = self.tab_data[self.tab_data['patient_id'] == int(patient)]['file_name'].tolist()
         num_views = self.n_global_view + self.n_local_view
