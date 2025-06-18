@@ -72,7 +72,7 @@ def train(config, run=None, wandb=False):
 
     model = TrainingMIT_BIH(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:

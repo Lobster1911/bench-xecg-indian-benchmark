@@ -211,11 +211,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) - 1
 
-        if self.bidirectional:
-            valid_labels = around_r_peaks
-        else:
-            valid_labels = [(around_r_peaks[i + 1][0] - self.patch_size, around_r_peaks[i][1]) for i in range(len(around_r_peaks) -1)]
-            valid_labels.append((len(window_signal) + window_start - 1, around_r_peaks[-1][1]))
+        valid_labels = around_r_peaks
 
         for r, l in valid_labels:
             # print(r, l)
