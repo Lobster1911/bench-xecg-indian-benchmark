@@ -73,8 +73,10 @@ class ECGCODEDataset(PretrainDataset):
         num_views = self.n_global_view + self.n_local_view
         if len(records) > num_views:
             records = np.random.choice(records, num_views)
-
-        signals = [ wfdb.rdsamp(os.path.join(self.data_folder, record)) for record in records]
+            
+        unique_records = set([record for record in records])
+        unique_signals = { record: wfdb.rdsamp(os.path.join(self.data_folder, record)) for record in unique_records }
+        signals = [ unique_signals[record] for record in records ]
 
         # mapping leads in the correct position
         new_signals = []

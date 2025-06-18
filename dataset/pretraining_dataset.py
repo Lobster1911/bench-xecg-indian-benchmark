@@ -7,6 +7,7 @@ import numpy as np
 from pandarallel import pandarallel
 from dataset.generic_utils import get_max_n_jobs
 pandarallel.initialize(progress_bar=True)
+from functools import lru_cache
 
 leads = ['i', 'ii', 'iii', 'avr', 'avl', 'avf', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
 jepa_leads =  ['i', 'ii', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']
