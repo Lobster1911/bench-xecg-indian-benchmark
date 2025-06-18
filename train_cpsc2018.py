@@ -40,7 +40,7 @@ def train(config, run=None, wandb=False):
     print(f"Val dataset size: {len(val_dataset)}")
 
     if config.training_pct < 1.0:
-        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
+        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct, key='labels')
 
     if config.use_class_weights:
         if config.num_classes == 9:

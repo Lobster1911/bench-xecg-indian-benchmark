@@ -189,17 +189,17 @@ class mLSTMWrapper(nn.Module):
         self.model = xlstm
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
-        self.drop_path = DropPath(drop_path, is_large_mlstm=True)
+        self.drop_path = DropPath(is_large_mlstm=True)
         self.dropout_rates = [x.item() for x in torch.linspace(0, drop_path, len(self.model.blocks))]
 
     def forward(self, x, need_expansion=True):
         len_seq = x.shape[1]
         # print('len_seq', len_seq)
-        pad_len = max(16 - len_seq, 2**int(np.ceil(np.log2(len_seq))) - len_seq)
+        pad_len = (64 - len_seq % 64) % 64
         x = torch.cat([x, torch.zeros(x.shape[0], pad_len, x.shape[2]).to(x.device)], dim=1)
         x, _ = self.model_forward_wrap(x, need_expansion=need_expansion)
         if pad_len > 0:
-            x = x[:, :-pad_len, :]
+           x = x[:, :-pad_len, :]
         
         return x
     
@@ -246,8 +246,10 @@ class mLSTMWrapper(nn.Module):
             block_state = state[i]
             x = self.dropout(x)
             
-            x, block_state_new = self.drop_path(x, block, block_state, self.dropout_rates[i])
-            # x, block_state_new = block(x, block_state)
+            # print(x.dtype, x.device, x.shape)
+            with torch.amp.autocast('cuda', enabled=False):
+               x, block_state_new = self.drop_path(x, block, self.dropout_rates[i], state=block_state)
+            #x, block_state_new = block(x, block_state)
 
             if block_state is None:
                 state[i] = block_state_new
