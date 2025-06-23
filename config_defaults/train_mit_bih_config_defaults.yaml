@@ -33,7 +33,7 @@ activation_fn: "relu"
 xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
 wandb_log: false
 num_heads: 4
-xlstm_type: "small"
+encoder_type: "small"
 patch_embedding: "linear"
 bidirectional: false
 skip_majority_class_samples: true

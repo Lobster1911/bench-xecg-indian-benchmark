@@ -31,10 +31,10 @@ class xLSTMClassification(pretrainedxLSTM):
         if self.linear_probing:
             with torch.no_grad():
                 x = self.patch_embedding(x)
-                cls, _ = self.forward_xlstm(x, padding_mask)
+                cls, _ = self.forward_core(x, padding_mask)
         else:  
             x = self.patch_embedding(x)
-            cls, _ = self.forward_xlstm(x, padding_mask)
+            cls, _ = self.forward_core(x, padding_mask)
 
         res = self.fc(cls)
         return res
@@ -72,10 +72,10 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
         if self.linear_probing:
             with torch.no_grad():
                 x = self.patch_embedding(x)
-                _, features = self.forward_xlstm(x)
+                _, features = self.forward_core(x)
         else:  
             x = self.patch_embedding(x)
-            _, features = self.forward_xlstm(x)
+            _, features = self.forward_core(x)
 
         res = self.fc(features)
         return res

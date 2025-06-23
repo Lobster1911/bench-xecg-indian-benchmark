@@ -15,7 +15,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multiclass import OneVsRestClassifier
 
 # define the LightningModule
-class PretrainedxLSTMNetwork(L.LightningModule):
+class PretrainedNetwork(L.LightningModule):
     def __init__(
             self, 
             model, 
@@ -427,10 +427,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
     def get_params(self):
         if self.layerwise_lr_decay > 0.:
             params = [ ]
-            num_layers = len(self.model.xlstm.model.blocks) + 1
+            num_layers = len(self.model.core.model.blocks) + 1
 
             # Assign learning rates to each transformer layer
-            for i, layer in enumerate(self.model.xlstm.model.blocks):
+            for i, layer in enumerate(self.model.core.model.blocks):
                 layer_lr = self.lr * (self.layerwise_lr_decay ** (num_layers - i - 1))  # Earlier layers get smaller LR
                 layer_params = layer.parameters()
                 params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
@@ -440,10 +440,10 @@ class PretrainedxLSTMNetwork(L.LightningModule):
 
             params.append({'params': self.model.mask_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'mask_token'})
 
-            if self.model.xlstm_type =='large':
-                params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
+            if self.model.encoder_type =='large':
+                params.append({'params': self.model.core.model.out_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
             else:
-                params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
+                params.append({'params': self.model.core.model.post_blocks_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
 
             if self.model.cls_type == 'token':
                 params.append({'params': self.model.cls_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'cls'})

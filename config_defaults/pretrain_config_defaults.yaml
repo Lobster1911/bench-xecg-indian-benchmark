@@ -32,7 +32,7 @@ activation_fn: relu
 xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
 wandb_log: false
 num_heads: 4
-xlstm_type: original
+encoder_type: original
 weight_tying: false
 patch_embedding: linear
 bidirectional: false
@@ -43,6 +43,8 @@ monitor_delay_epochs: 2
 use_final_layer_norm: true
 use_cls_normalization: true
 max_length_signal: 12
+
+use_transformer: false
 
 
 # jepa like args

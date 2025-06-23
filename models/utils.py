@@ -7,6 +7,7 @@ from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
 from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
 import os
+from transformer import encoder
 
 def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':
@@ -21,6 +22,8 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 
+def get_transformer(config):
+    return encoder.__dict__['Transformer'](seq_len=1200, patch_size=config.patch_size, num_leads=12, drop_path_rate=config.drop_path_prob)
 
 def get_reconstruction_head(patch_size, embedding_size, num_channels):
     return EmbedPatching(

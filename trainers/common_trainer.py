@@ -43,7 +43,7 @@ class CommonTrainerDownstream(L.LightningModule):
         elif self.use_st_mem:
             return [self.model.__getattr__(f'block{i}') for i in range(self.model.depth)]
         else:
-            return self.model.xlstm.model.blocks
+            return self.model.core.model.blocks
         
 
     def get_params(self):
@@ -77,10 +77,10 @@ class CommonTrainerDownstream(L.LightningModule):
             else:
                 params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
 
-                if self.model.xlstm_type =='large':
-                    params.append({'params': self.model.xlstm.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+                if self.model.encoder_type =='large':
+                    params.append({'params': self.model.core.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
                 else:
-                    params.append({'params': self.model.xlstm.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
+                    params.append({'params': self.model.core.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
 
                 if self.model.cls_type == 'token':
                     params.append({'params': self.model.cls_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})

@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from models.utils import get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head
+from models.utils import get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head,  get_transformer
 from models.modules import HeadModule
 from models.SeriesDecomposition import SeriesDecomposition 
 from augmentations import RandomDropLeads, FTSurrogate, Jitter, RandomResample
@@ -30,14 +30,17 @@ class pretrainedxLSTM(nn.Module):
         self.embedding_size = config.embedding_size
         self.cls_type = config.cls_type
         self.masking_type = config.masking_type
-        self.xlstm_type = config.xlstm_type
+        self.encoder_type = config.encoder_type
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 
-        if config.xlstm_type == 'large':
-            self.xlstm = get_large_xlstm(config)
+        if config.encoder_type == 'large':
+            self.core = get_large_xlstm(config)
+        elif config.encoder_type == 'transformer':
+            self.core = get_transformer(config)
         else:
-            self.xlstm = get_xlstm(config)
+            self.core = get_xlstm(config)
+        
 
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
@@ -101,7 +104,7 @@ class pretrainedxLSTM(nn.Module):
                 cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()      
         return cls, out
     
-    def forward_xlstm(self, x, padding_mask=None):
+    def forward_core(self, x, padding_mask=None):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
             x = self.add_cls_token(x)
@@ -110,7 +113,7 @@ class pretrainedxLSTM(nn.Module):
 
         # pass to xlstm
         need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
-        out = self.xlstm(x, need_expansion = need_expansion) # [batch_size, embedding_dim]
+        out = self.core(x, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
@@ -135,7 +138,7 @@ class pretrainedxLSTM(nn.Module):
             x_emb[patched_mask] = self.mask_token
 
         
-        cls, out = self.forward_xlstm(x_emb, padding_mask=padding_mask)
+        cls, out = self.forward_core(x_emb, padding_mask=padding_mask)
 
         # reconstruct signal
         if reconstruct:
@@ -209,7 +212,7 @@ class pretrainedxLSTM(nn.Module):
         if self.bidirectional:
             reconstructed = []
             for i in range(length - 1):
-                out = self.xlstm(x, need_expansion=False)
+                out = self.core(x, need_expansion=False)
                 new_patch = out[:, -1, :].unsqueeze(1)
                 r, _ = self.reconstruction(new_patch)
                 reconstructed.append(r)
@@ -220,14 +223,14 @@ class pretrainedxLSTM(nn.Module):
         else:
             state = None
             for i in range(x.shape[1]):
-                new_x, state = self.xlstm.step(x[:, i].unsqueeze(1), state=state)
+                new_x, state = self.core.step(x[:, i].unsqueeze(1), state=state)
 
             r, _ = self.reconstruction(new_x)
 
             reconstructed = [r]
 
             for i in range(length - 1):
-                new_x, state = self.xlstm.step(new_x, state=state)
+                new_x, state = self.core.step(new_x, state=state)
                 r, _ = self.reconstruction(new_x)
                 reconstructed.append(r)
             

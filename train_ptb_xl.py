@@ -71,7 +71,6 @@ def train(config, run=None, wandb=False):
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
         base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes) # dim is the dimension of the latent space
-
     else:
         base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         if config.checkpoint is not None and config.checkpoint != '':   

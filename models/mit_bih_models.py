@@ -27,7 +27,7 @@ class xLSTMClassificationMIT_BIH(pretrainedxLSTM):
         if self.num_reg_tokens > 0:
             x = self.add_reg_tokens(x)
 
-        out = self.xlstm(x, need_expansion=False) # [batch_size, embedding_dim]
+        out = self.core(x, need_expansion=False) # [batch_size, embedding_dim]
 
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)

@@ -59,7 +59,7 @@ def train(config, run=None, wandb=False):
     test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
 
-    xlstm = xLSTMClassificationMIT_BIH(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+    base_model = xLSTMClassificationMIT_BIH(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
 
 
     if config.checkpoint is not None and config.checkpoint != '':   
@@ -67,10 +67,10 @@ def train(config, run=None, wandb=False):
         new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
         # remove the fc layer
         new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
-        message = xlstm.load_state_dict(new_state_dict, strict=False) 
+        message = base_model.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingMIT_BIH(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
     lr_monitor = LearningRateMonitor(logging_interval='step')

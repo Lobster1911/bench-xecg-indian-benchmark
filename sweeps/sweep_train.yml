@@ -78,7 +78,7 @@ parameters:
     value: 'pretrained_models/medium_512/checkpoints/epoch=38-step=174330.ckpt'
   oversample:
     value: False
-  xlstm_type:
+  encoder_type:
     value: 'small'
   patch_embedding:
     value: 'enriched'
