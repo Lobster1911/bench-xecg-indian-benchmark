@@ -76,7 +76,7 @@ def train(config, run=None, wandb=False):
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor='val_f1', mode='max')
+        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
         wand_logger = WandbLogger(project=f"train-mitbih-{config.num_classes}", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback], gradient_clip_val=config.grad_clip)
