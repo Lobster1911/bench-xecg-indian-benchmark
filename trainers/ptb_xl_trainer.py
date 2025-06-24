@@ -216,7 +216,7 @@ class TrainingPTB_XL(CommonTrainerDownstream):
                 loss = nn.functional.cross_entropy(logits, targets, weight=self.weights, reduction='none')
                 loss = focal_loss(loss)
             else:
-                loss = nn.functional.cross_entropy(logits, targets)
+                loss = nn.functional.cross_entropy(logits, targets, weight=self.weights)
             preds = torch.argmax(logits, dim=1)
 
         elif self.task == 'multilabel':
