@@ -141,7 +141,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         logits = self.model(x).squeeze()
         preds = (torch.sigmoid(logits) > 0.5).float().squeeze()
 
-        mask = (targets != -1)
+        mask = (targets != -1).squeeze()
         loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
 
         return loss_cls, logits, preds, targets.long()

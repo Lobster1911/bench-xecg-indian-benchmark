@@ -112,7 +112,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 # print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}')
             elif len(ann) < len(self.samples[i]) // self.patch_size:
                 self.samples[i] = self.samples[i][:len(ann) * self.patch_size]
-                # print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}')
+                print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}, should never see this')
                 
             annotations_tmp.append(ann)
 
