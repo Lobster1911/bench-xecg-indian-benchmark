@@ -26,6 +26,8 @@ def split_dataset_preserve_labels(dataset, split_ratio=0.1, key='class_label'):
 def format_keys(key):
     if key.startswith('model.'):
         key = key[6:]
+
+    key.replace('xlstm.model', 'core.model')  # Remove 'module.' prefix if present
         
     return key
 
@@ -93,16 +95,19 @@ def get_training_class_weights(train_dataset, do_not_consider_classes = [], labe
   """
   labels = [sample[label_key] for sample in train_dataset]
 
-  # remove classes that should not be considered
-  labels = [label for label in labels if label not in do_not_consider_classes]
+  if len(labels[0]) > 1:
+    # If labels are multilabel, flatten them
+    labels = [label for sublist in labels for label in sublist]
+
+  labels = [label.item() for label in labels if label not in do_not_consider_classes]
   
   # labels = train_dataset.get_labels()
   class_counts = Counter(labels)
-  print(f"Class Counts: {class_counts}")
   total_samples = len(labels)
   num_classes = len(class_counts)
 
   class_weights = {cls: total_samples / (num_classes * count) for cls, count in class_counts.items()}
+  
   weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
   print(f"Class Weights: {weights}")
   return weights
