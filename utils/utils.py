@@ -27,7 +27,7 @@ def format_keys(key):
     if key.startswith('model.'):
         key = key[6:]
 
-    key.replace('xlstm.model', 'core.model')  # Remove 'module.' prefix if present
+    key = key.replace('xlstm.model', 'core.model')  # Remove 'module.' prefix if present
         
     return key
 
