@@ -15,7 +15,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
+from utils.utils import get_training_class_weights
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from torchvision import transforms
 from dataset.generic_utils import get_transforms
@@ -32,6 +32,12 @@ def train(config, run=None, wandb=False):
     print(f"Train dataset size: {len(train_dataset)}")
     val_dataset = sleep_apnea.ECGSleepApneaDataset(config, split='val', augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
+
+    if config.use_class_weights:
+        weights = get_training_class_weights(train_dataset, label_key='annotation').to('cuda')
+        print(f"Using class weights: {weights}")
+    else:
+        weights = None
 
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=sleep_apnea.make_collate_fn(config, split='train'))
@@ -50,7 +56,7 @@ def train(config, run=None, wandb=False):
         message = xlstm.load_state_dict(new_state_dict, strict=False) 
         print(message) 
 
-    model = TrainingSleepApnea(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=None)
+    model = TrainingSleepApnea(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
