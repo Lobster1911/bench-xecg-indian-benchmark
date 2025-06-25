@@ -45,11 +45,11 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         if self.split == 'train':
             records = [record for i, record in enumerate(records) if i not in test_idxs]
             # keep the 90% of the records
-            records = records[:int(len(records) * 0.9)]
+            records = records[:int(len(records) * 0.8)]
         elif self.split == 'val':
             records = [record for i, record in enumerate(records) if i in test_idxs]
             # keep the 10% of the records
-            records = records[int(len(records) * 0.9):]
+            records = records[int(len(records) * 0.8):]
         elif self.split == 'test':
             records = [record for i, record in enumerate(records) if i in test_idxs]
 

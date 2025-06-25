@@ -189,7 +189,7 @@ class RandomCrop(nn.Module):
 
     def forward(self, signal):
         # Get the size of the signal
-        end = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
+        end = (signal != 0).flip(0).cumsum(0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
         # start of signal: there may be padding at the beginning of the signal
         start = (signal != 0).cumsum(dim=0).max(dim=-1)[0].max(dim=-1)[0].numpy() 
         if not (signal[0] == 0).all():
