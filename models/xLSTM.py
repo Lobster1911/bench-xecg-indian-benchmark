@@ -97,6 +97,11 @@ class pretrainedxLSTM(nn.Module):
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]
+        elif self.cls_type == 'token_2':
+            cls_1 = out[:, 0, :]
+            cls_2 = out[:, -1, :]
+            out = out[:, 1:-1, :]
+            cls = cls_1 + cls_2
         elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
             if padding_mask is None:
                 cls = self.attn_pool(out).squeeze()
@@ -108,6 +113,9 @@ class pretrainedxLSTM(nn.Module):
         # add the [cls] and [reg] tokens
         if self.cls_type == 'token':
             x = self.add_cls_token(x)
+        elif self.cls_type == 'token_2':
+            x = self.add_cls_token_2(x)
+            
         if self.num_reg_tokens > 0:
             x = self.add_reg_tokens(x)
 
@@ -170,6 +178,11 @@ class pretrainedxLSTM(nn.Module):
     def add_cls_token(self, x):
         cls_token = self.cls_token.expand(x.shape[0], -1, -1)
         return torch.cat([cls_token, x], dim=1)
+    
+    def add_cls_token_2(self, x):
+        cls_token_1 = self.cls_token.expand(x.shape[0], -1, -1)
+        cls_token_2 = self.cls_token.expand(x.shape[0], -1, -1)
+        return torch.cat([cls_token_1, x, cls_token_2], dim=1)
     
     def get_padding_mask(self, x):
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
