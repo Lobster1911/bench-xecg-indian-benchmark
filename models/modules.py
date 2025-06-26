@@ -14,6 +14,23 @@ class LinearPatchEmbedding(nn.Module):
         x = self.conv(x).flatten(2).transpose(1, 2)
         return x
     
+
+class NonLinearPatchEmbedding(nn.Module):
+    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
+        super().__init__()
+        self.conv1 = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size)
+        self.conv2 = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size)
+        self.linear = nn.Linear(num_hiddens, num_hiddens)
+        self.act = nn.ReLU()
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1) # put the channels in the middle
+        x1 = self.act(self.conv1(x))
+        x2 = self.conv2(x)
+        x = (x1 + x2).flatten(2).transpose(1, 2)
+        return x
+    
+    
 class EnrichedLinearPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, enrich_dim=64, kernel_size=16):
         super().__init__()

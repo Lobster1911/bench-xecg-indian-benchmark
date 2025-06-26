@@ -5,7 +5,7 @@ from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import mLSTMWrapper, LinearPatchEmbedding, ConvPatchEmbedding, EmbedPatching, EnrichedLinearPatchEmbedding, vanillaxLSTMWrapper
+from models.modules import *
 import os
 from transformer import encoder
 
@@ -13,6 +13,9 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':
         print('using linear patch embedding')
         return LinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
+    if type == 'non_linear':
+        print('using non-linear patch embedding')
+        return NonLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     if type == 'conv':
         print('using conv patch embedding')
         return ConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
