@@ -445,7 +445,7 @@ class PretrainedNetwork(L.LightningModule):
             else:
                 params.append({'params': self.model.core.model.post_blocks_norm.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'ln2'})
 
-            if self.model.cls_type == 'token':
+            if self.model.cls_type == 'token' or self.model.cls_type == 'token_2':
                 params.append({'params': self.model.cls_token, 'lr': self.lr, 'weight_decay': self.wd, 'name': 'cls'})
             elif self.model.cls_type == 'attn_pool' or self.model.cls_type == 'lin_attn_pool':
                 params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr, 'weight_decay': self.wd, 'name': 'cls'})
