@@ -61,7 +61,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.split_val_by_patient = config.split_val_by_patient
         self.augmentations = augmentations
         self.sampling_freq = config.sampling_freq
-        self.leads_to_use = leads
+        self.leads_to_use = config.leads
+        self.use_ecg_jepa = config.use_ecg_jepa
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -122,7 +123,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
-            if subset == 'train':
+            if subset == 'train' or self.use_ecg_jepa:
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
                     if (sample_class != last_class or skipped > 10 or sample_class != 'N') or not self.skip_majority_class_samples:
@@ -186,11 +187,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         around_r_peaks = sample['around_r_peaks']
         len_signal = signal.shape[0]
 
-        if self.random_shift and self.split == 'train':
+        if self.random_shift and (self.split == 'train' or self.use_ecg_jepa):
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start = max(0, r_peak - self.win_len + shift)
             window_end = min(r_peak + self.win_len + shift, len_signal)
-        elif self.split == 'train':
+        elif self.split == 'train' or self.use_ecg_jepa:
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
         else:

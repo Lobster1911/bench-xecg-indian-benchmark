@@ -37,7 +37,6 @@ num_heads: 4
 encoder_type: "small"
 patch_embedding: "linear"
 bidirectional: false
-skip_majority_class_samples: true
 num_reg_token: 0
 use_final_layer_norm: true
 

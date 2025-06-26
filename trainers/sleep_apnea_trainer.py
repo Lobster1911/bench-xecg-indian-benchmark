@@ -133,6 +133,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     def predict_batch(self, batch):
         x = batch["signals"]
         targets = batch['labels']
+        patient_ids = batch['patient_ids']
         # get one hot encoding
 
         if self.linear_probing: 
@@ -145,7 +146,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         targets = targets.squeeze()
         loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
 
-        return loss_cls, logits, preds, targets.long()
+        return loss_cls, logits, preds, targets.long(), patient_ids
 
 
 def format_to_segment(preds, target, patch_size, segment_size=6000):

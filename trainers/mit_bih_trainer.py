@@ -238,12 +238,20 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         cls, r_peak_pos = self.model(x)
         r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
 
+        if cls.shape[1] > targets.shape[1]:
+            cls = cls[:, :targets.shape[1], :]
+
+        if r_peak_pos.shape[1] > r_peaks.shape[1]:
+            r_peak_pos = r_peak_pos[:, :r_peaks.shape[1]]
+            
         # cls is an array with [batch_size, num_patches, num_classes]
         # target is an array with [batch_size, seq_len]
 
         # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
         preds = torch.argmax(cls, dim=-1)
         
+
+
         loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, label_smoothing=self.label_smoothing, ignore_index=-1)
         
         if self.use_focal_loss:

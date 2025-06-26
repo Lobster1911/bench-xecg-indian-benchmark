@@ -331,10 +331,18 @@ class MaskTransformer(nn.Module):
 
         return vec
     
-    def representation(self, x):
+    def representation(self, x, return_features=False):
         assert x.dim() == 3, f'Input should be of dimension 3, x.dim()={x.dim()}'
         assert x.shape[1] == len(self.leads), f'lead error with {x.shape}'
-        assert x.shape[2] == 2500, f'Input should be of shape (bs, c, 2500), x.shape[2]={x.shape[2]}'
+        if x.shape[2] < 2500:
+            # add padding
+            padding = 2500 - x.shape[2]
+            x = torch.nn.functional.pad(x, (0, padding), mode='constant', value=0)
+        elif x.shape[2] > 2500:
+            # cut the signal
+            x = x[:,:,:2500]
+
+        # assert x.shape[2] == 2500, f'Input should be of shape (bs, c, 2500), x.shape[2]={x.shape[2]}'
 
         pos_embed = self.pos_embed
         attention_mask = self._cross_attention_mask().to(x.device) # (c*p, c*p)
@@ -353,8 +361,10 @@ class MaskTransformer(nn.Module):
         if self.norm is not None:
             x = self.norm(x)
 
-        x = torch.mean(x, dim=1) # (bs,l*50,embed_dim) -> (bs,embed_dim)
-        return x
+        if return_features: 
+            return x
+        else: 
+            return torch.mean(x, dim=1) # (bs,l*50,embed_dim) -> (bs,embed_dim)
 
 class MaskTransformerPredictor(nn.Module):
     def __init__(
@@ -546,11 +556,13 @@ class ecg_jepa(nn.Module):
     
 
 class ECGJepaClassifier(nn.Module):
-    def __init__(self, encoder, num_classes, linear_probing=True):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
         super().__init__()
         self.encoder = encoder
         self.num_classes = num_classes
         self.linear_probing = linear_probing
+        self.patch_size = patch_size
+
         self.head = nn.Sequential(
             nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
             nn.Linear(self.encoder.embed_dim, num_classes)
@@ -572,4 +584,55 @@ class ECGJepaClassifier(nn.Module):
     def set_eval_linear_probing(self):
         self.encoder.eval()
         self.head.train()
+
+    def finetuning_params(self):
+        params = [param for name, param in self.named_parameters() if 'head' not in name]
+        return params
+    
+
+
+class ECGJepaFeatureClassifierMIT_BIH(nn.Module):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
+        super().__init__()
+        self.encoder = encoder
+        self.num_classes = num_classes
+        self.linear_probing = linear_probing
+        self.patch_size = patch_size
+
+        self.fc = nn.Sequential(
+            # nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
+            nn.Linear(self.encoder.embed_dim, num_classes)
+        )
+
+        self.r_peak_pos_fc = nn.Sequential(
+            # nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
+            nn.Linear(self.encoder.embed_dim, self.encoder.p)
+        )
+
+    def forward(self, x):
+        x = x.transpose(1, 2)
+        if self.linear_probing:
+            with torch.no_grad():
+                out = self.encoder.representation(x, return_features=True)
+        else:
+            out = self.encoder.representation(x, return_features=True)
+
+        # i need to group by 8 because i have one patch for each lead
+        bs, patches, emb = out.shape
+        out = out.reshape(bs, patches // 8, 8, emb).mean(dim=2)  # (bs, patches // 8, emb)
+
+        cls = self.fc(out)
+        r_peak_pos = self.r_peak_pos_fc(out)
+        return cls, r_peak_pos
+
+    def training_params(self):
+        return self.fc.parameters()
+    
+    def set_eval_linear_probing(self):
+        self.encoder.eval()
+        self.fc.train()
+    
+    def finetuning_params(self):
+        params = [param for name, param in self.named_parameters() if 'fc' not in name]
+        return params
     

@@ -60,6 +60,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         # and save the segments in a list
         self.samples = []
         self.annotations = []
+        self.patient_ids = []
 
         for record in tqdm(self.records, desc='Loading samples'):
             
@@ -76,6 +77,8 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                     self.samples.append(signal[i:i + self.window_size])
                 else:
                     self.samples.append(signal[i:length])
+
+                self.patient_ids.append(record)
 
                 annotations = []
                 # get the annotations for the segment
@@ -137,6 +140,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         return {
             'signal': tensor,
             'annotation': ann,
+            'patient_id': self.patient_ids[idx],
         }
     
 
@@ -148,6 +152,7 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         labels = [item['annotation'] for item in batch]
+        patient_ids = [item['patient_id'] for item in batch]
 
         # pad to same length and pad to match the patch size module
         if config.shuffle_baseline_wander_in_batch and split == 'train':
@@ -160,6 +165,7 @@ def make_collate_fn(config, split='train'):
         return {
             'signals': signals,
             'labels': labels,
+            'patient_ids': patient_ids,
         }
 
     return collate_fn
