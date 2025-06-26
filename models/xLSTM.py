@@ -45,7 +45,7 @@ class pretrainedxLSTM(nn.Module):
         if self.training_strategy == 'masked_token_prediction':
             self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
         
-        if self.cls_type == 'token':
+        if self.cls_type == 'token' or self.cls_type == 'token_2':
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
             nn.init.xavier_uniform_(self.cls_token, gain=1.0)
         elif self.cls_type == 'attn_pool':
@@ -115,7 +115,7 @@ class pretrainedxLSTM(nn.Module):
             x = self.add_cls_token(x)
         elif self.cls_type == 'token_2':
             x = self.add_cls_token_2(x)
-            
+
         if self.num_reg_tokens > 0:
             x = self.add_reg_tokens(x)
 
