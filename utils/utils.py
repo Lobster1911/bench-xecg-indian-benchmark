@@ -71,7 +71,7 @@ def parse_config(config_file, default_config_file):
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
         # merged_config.max_length_signal = 10
-        merged_config.win_len = 1250
+        merged_config.win_len = 1125
         merged_config.low_pass_filter = 40
         merged_config.high_pass_filter = 0.67
         merged_config.standardize = True

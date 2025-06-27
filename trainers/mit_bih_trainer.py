@@ -249,8 +249,6 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
         # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
         preds = torch.argmax(cls, dim=-1)
-        
-
 
         loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, label_smoothing=self.label_smoothing, ignore_index=-1)
         
