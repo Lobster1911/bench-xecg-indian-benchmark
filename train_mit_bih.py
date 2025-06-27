@@ -56,10 +56,11 @@ def train(config, run=None, wandb=False):
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
     val_batch_size = 1 if config.split_val_by_patient and not (config.use_st_mem or config.use_ecg_jepa) else config.batch_size
-    val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
+    val_num_workers = 0 if config.split_val_by_patient and not (config.use_st_mem or config.use_ecg_jepa) else config.num_workers
+    val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
 
     test_dataset = mit_bih.ECGMITBIHDataset(config, split='test', augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
+    test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
 
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob, is_mit_bih=True)
