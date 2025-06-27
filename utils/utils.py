@@ -63,10 +63,15 @@ def parse_config(config_file, default_config_file):
     # perform some checks
     if merged_config.use_ecg_jepa:
         merged_config.sampling_freq = 250
-        merged_config.patch_size = 75
+        merged_config.patch_size = 50
         # merged_config.max_length_signal = 10
         merged_config.win_len = 1250
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+    elif merged_config.use_st_mem:
+        merged_config.sampling_freq = 250
+        merged_config.patch_size = 75
+        # merged_config.max_length_signal = 10
+        merged_config.win_len = 1250
     return merged_config
 
 def parse_sweep_config(config, default_config_file):
