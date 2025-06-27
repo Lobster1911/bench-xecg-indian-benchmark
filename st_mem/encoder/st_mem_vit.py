@@ -40,20 +40,23 @@ class ST_MEM_ViT(nn.Module):
                  is_mit_bih: bool = False):
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
-        self._repr_dict = {'seq_len': seq_len,
-                           'patch_size': patch_size,
-                           'num_leads': num_leads,
-                           'num_classes': num_classes if num_classes is not None else 'None',
-                           'width': width,
-                           'depth': depth,
-                           'mlp_dim': mlp_dim,
-                           'heads': heads,
-                           'dim_head': dim_head,
-                           'qkv_bias': qkv_bias,
-                           'drop_out_rate': drop_out_rate,
-                           'attn_drop_out_rate': attn_drop_out_rate,
-                           'drop_path_rate': drop_path_rate,
-                           'linear_probing': linear_probing}
+        self._repr_dict = {
+            'seq_len': seq_len,
+            'patch_size': patch_size,
+            'num_leads': num_leads,
+            'num_classes': num_classes if num_classes is not None else 'None',
+            'width': width,
+            'depth': depth,
+            'mlp_dim': mlp_dim,
+            'heads': heads,
+            'dim_head': dim_head,
+            'qkv_bias': qkv_bias,
+            'drop_out_rate': drop_out_rate,
+            'attn_drop_out_rate': attn_drop_out_rate,
+            'drop_path_rate': drop_path_rate,
+            'linear_probing': linear_probing,
+            'is_mit_bih': is_mit_bih
+        }
         self.width = width
         self.depth = depth
         self.linear_probing = linear_probing
@@ -138,6 +141,9 @@ class ST_MEM_ViT(nn.Module):
         x = rearrange(x, 'b (c n) p -> b c n p', c=num_leads)
         x = x[:, :, 1:-1, :]
 
+        if self.is_mit_bih:
+            return x
+        
         x = torch.mean(x, dim=(1, 2))
         return self.norm(x)
 
