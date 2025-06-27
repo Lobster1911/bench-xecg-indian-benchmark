@@ -60,6 +60,7 @@ class ST_MEM_ViT(nn.Module):
         self.width = width
         self.depth = depth
         self.linear_probing = linear_probing
+        self.patch_size = patch_size
 
         # embedding layers
         num_patches = seq_len // patch_size
@@ -93,13 +94,13 @@ class ST_MEM_ViT(nn.Module):
         self.is_mit_bih = is_mit_bih
         if is_mit_bih:
             self.r_peak_pos_head = nn.Sequential(
-                nn.BatchNorm1d(width),
-                nn.Linear(width, 1)
+                # nn.BatchNorm1d(width),
+                nn.Linear(width, patch_size)
             )
 
         # classifier head
         self.head = nn.Identity() if num_classes is None else nn.Sequential(
-            nn.BatchNorm1d(width),
+            # nn.BatchNorm1d(width),
             nn.Linear(width, num_classes)
         )
 
@@ -112,6 +113,9 @@ class ST_MEM_ViT(nn.Module):
         num_leads = series.shape[1]
         if num_leads > len(self.lead_embeddings):
             raise ValueError(f'Number of leads ({num_leads}) exceeds the number of lead embeddings')
+        
+        if series.shape[2] % self.patch_size != 0:
+            series = torch.nn.functional.pad(series, (0, self.patch_size - (series.shape[2] % self.patch_size)))
 
         x = self.to_patch_embedding(series)
         b, _, n, _ = x.shape
@@ -153,6 +157,14 @@ class ST_MEM_ViT(nn.Module):
                 x = self.forward_encoding(series)
         else:
             x = self.forward_encoding(series)
+
+        if self.is_mit_bih:
+            x = x.mean(dim=1)  # (bs, patches // 8, emb)
+
+            r_peak_pos = self.r_peak_pos_head(x)
+            out = self.head(x)
+
+            return out, r_peak_pos
         return self.head(x)
 
     def __repr__(self):
