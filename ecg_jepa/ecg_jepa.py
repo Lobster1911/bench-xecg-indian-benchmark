@@ -619,7 +619,7 @@ class ECGJepaFeatureClassifierMIT_BIH(nn.Module):
 
         # i need to group by 8 because i have one patch for each lead
         bs, patches, emb = out.shape
-        out = out.reshape(bs, patches // 8, 8, emb).mean(dim=2)  # (bs, patches // 8, emb)
+        out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
 
         cls = self.fc(out)
         r_peak_pos = self.r_peak_pos_fc(out)
