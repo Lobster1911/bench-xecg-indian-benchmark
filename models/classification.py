@@ -1,6 +1,7 @@
 from models.xLSTM import pretrainedxLSTM
 import torch
 import torch.nn as nn
+from models.utils import get_normalization_layer
 
 class xLSTMClassification(pretrainedxLSTM):
     def __init__(
@@ -12,18 +13,11 @@ class xLSTMClassification(pretrainedxLSTM):
         self.linear_probing = config.linear_probing
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        if config.use_cls_normalization:
-            self.fc = nn.Sequential(
-                nn.LayerNorm(config.embedding_size, elementwise_affine=False),        
-                nn.Dropout(config.dropout),
-                nn.Linear(config.embedding_size, num_classes)
-            )
-        else:
-            self.fc = nn.Sequential(
-                nn.Dropout(config.dropout),
-                nn.Linear(config.embedding_size, num_classes)
-            )   
-
+        self.fc = nn.Sequential(
+            get_normalization_layer(config),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.embedding_size, num_classes)
+        )
 
     def forward(self, x):
         padding_mask = self.get_padding_mask(x)
@@ -64,6 +58,7 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
         super(xLSTMFeatureClassification, self).__init__(num_channels, config, reconstruction=False)
 
         self.fc = nn.Sequential(
+            get_normalization_layer(config),
             nn.Dropout(config.dropout),
             nn.Linear(config.embedding_size, num_classes)
         )

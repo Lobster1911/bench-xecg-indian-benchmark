@@ -36,7 +36,8 @@ class ST_MEM_ViT(nn.Module):
                  drop_out_rate: float = 0.,
                  attn_drop_out_rate: float = 0.,
                  drop_path_rate: float = 0.,
-                 linear_probing: bool = False):
+                 linear_probing: bool = False,
+                 is_mit_bih: bool = False):
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
         self._repr_dict = {'seq_len': seq_len,
@@ -85,6 +86,13 @@ class ST_MEM_ViT(nn.Module):
             self.add_module(f'block{i}', block)
         self.dropout = nn.Dropout(drop_out_rate)
         self.norm = nn.LayerNorm(width)
+
+        self.is_mit_bih = is_mit_bih
+        if is_mit_bih:
+            self.r_peak_pos_head = nn.Sequential(
+                nn.BatchNorm1d(width),
+                nn.Linear(width, 1)
+            )
 
         # classifier head
         self.head = nn.Identity() if num_classes is None else nn.Sequential(

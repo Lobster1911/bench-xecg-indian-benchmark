@@ -39,6 +39,7 @@ patch_embedding: "linear"
 bidirectional: false
 num_reg_token: 0
 use_final_layer_norm: true
+cls_normalization: null
 
 normalize: false
 oversample: false

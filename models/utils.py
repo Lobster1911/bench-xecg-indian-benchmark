@@ -9,6 +9,18 @@ from models.modules import *
 import os
 from transformer import encoder
 
+
+def get_normalization_layer(config):
+    if config.cls_normalization == 'layer':
+        return nn.LayerNorm(config.embedding_size, elementwise_affine=False)
+    elif config.cls_normalization == 'batch':
+        return nn.BatchNorm1d(config.embedding_size, affine=False)
+    elif config.cls_normalization == 'instance':
+        return nn.InstanceNorm1d(config.embedding_size, affine=False)
+    else:
+        return nn.Identity()
+    
+
 def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':
         print('using linear patch embedding')

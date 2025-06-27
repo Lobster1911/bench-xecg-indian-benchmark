@@ -34,10 +34,10 @@ num_heads: 4
 encoder_type: "small"
 patch_embedding: "linear"
 bidirectional: false
-use_cls_token: false
 use_focal_loss: false
 sampling_freq: 250
 use_final_layer_norm: true
+cls_normalization: null
 
 normalize: true
 random_crop: 0.9
