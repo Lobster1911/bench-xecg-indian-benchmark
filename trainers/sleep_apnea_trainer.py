@@ -203,9 +203,9 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
-        logits = self.model(x).squeeze()
-        preds = (torch.sigmoid(logits) > 0.5).float().squeeze()
-        targets = targets.squeeze()
+        logits = self.model(x).squeeze(-1)
+        preds = (torch.sigmoid(logits) > 0.5).float()
+
 
         if self.use_transformers:
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
@@ -213,11 +213,11 @@ class TrainingSleepApnea(CommonTrainerDownstream):
             targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
 
             min_length = min(logits.shape[-1], targets.shape[-1])
-            logits = logits[:, :min_length] if logits.dim() > 1 else logits[:min_length]
-            targets = targets[:, :min_length] if targets.dim() > 1 else targets[:min_length]  
-            preds = preds[:, :min_length] if preds.dim() > 1 else preds[:min_length]
+            logits = logits[:, :min_length] 
+            targets = targets[:, :min_length] 
+            preds = preds[:, :min_length] 
 
-            mask = (targets != -1).squeeze()
+            mask = (targets != -1)
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
 
         return loss_cls, logits, preds, targets.long(), segment_ids
@@ -235,8 +235,8 @@ def format_to_segment(preds, target, patch_size, segment_size=6000):
 
     if num_patches % patches_in_segment != 0:
         # we can skip the very last part
-        preds = preds[:-(num_patches % patches_in_segment)] if preds.ndim == 1 else preds[:, :-num_patches % patches_in_segment]
-        target = target[:-(num_patches % patches_in_segment)] if target.ndim == 1 else target[:, :-num_patches % patches_in_segment]
+        preds = preds[:, :-num_patches % patches_in_segment]
+        target = target[:, :-num_patches % patches_in_segment]
 
     # take the prediction and group for patches_in_segment
     preds = preds.view(-1, num_segments, patches_in_segment)
@@ -276,7 +276,7 @@ class PerPatientMetric(Metric):
             target: Ground truth labels - shape: (batch_size,)
             segment_ids: Segment IDs for each 10s sample - can be list of strings, torch.Tensor, or numpy array
         """
-        preds = torch.sigmoid(preds.squeeze())
+        preds = torch.sigmoid(preds)
         segment_ids = [ patient for patient, _ in segment_ids ] 
         
         # Store predictions, targets, and segment IDs
