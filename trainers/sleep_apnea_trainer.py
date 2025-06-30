@@ -236,7 +236,7 @@ def format_to_segment(preds, target, patch_size, segment_size=6000):
     if num_patches % patches_in_segment != 0:
         # we can skip the very last part
         preds = preds[:-(num_patches % patches_in_segment)] if preds.ndim == 1 else preds[:, :-num_patches % patches_in_segment]
-        target = target[:, :-(num_patches % patches_in_segment)] if target.ndim == 1 else target[:, :-num_patches % patches_in_segment]
+        target = target[:-(num_patches % patches_in_segment)] if target.ndim == 1 else target[:, :-num_patches % patches_in_segment]
 
     # take the prediction and group for patches_in_segment
     preds = preds.view(-1, num_segments, patches_in_segment)
