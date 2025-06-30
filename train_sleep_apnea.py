@@ -19,6 +19,9 @@ from utils.utils import get_training_class_weights
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from torchvision import transforms
 from dataset.generic_utils import get_transforms
+from ecg_jepa.models import load_encoder
+import st_mem.encoder as encoder
+
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -40,23 +43,37 @@ def train(config, run=None, wandb=False):
         weights = None
 
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=sleep_apnea.make_collate_fn(config, split='train'))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=sleep_apnea.make_collate_fn(config, split='train'), drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='val'))
 
     test_dataset = sleep_apnea.ECGSleepApneaDataset(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='test'))
 
-    xlstm = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
-
-    if config.checkpoint is not None and config.checkpoint != '':   
-        checkpoint = torch.load(config.checkpoint, weights_only=False)
-        new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
-        # remove the fc layer
-        new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
-        message = xlstm.load_state_dict(new_state_dict, strict=False) 
-        print(message) 
-
-    model = TrainingSleepApnea(model=xlstm, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    if config.use_st_mem:
+        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
+        checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
+        checkpoint_model = checkpoint['model']
+        state_dict = base_model.state_dict()
+        for k in ['head.weight', 'head.bias']:
+            if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
+                print(f"Remove key {k} from pre-trained checkpoint")
+                del checkpoint_model[k]
+        msg = base_model.load_state_dict(checkpoint_model, strict=False)
+        print(msg)
+    elif config.use_ecg_jepa:
+        ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
+        base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes) # dim is the dimension of the latent space
+    else:
+        base_model = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        if config.checkpoint is not None and config.checkpoint != '':   
+            checkpoint = torch.load(config.checkpoint, weights_only=False)
+            new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
+            # remove the fc layer
+            new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
+            message = base_model.load_state_dict(new_state_dict, strict=False) 
+            print(message) 
+            
+    model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     early_stopping = EarlyStopping(monitor='val_f1', patience=config.patience, mode='max')
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')

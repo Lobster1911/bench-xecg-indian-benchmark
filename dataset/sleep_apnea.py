@@ -15,18 +15,19 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         self.sampling_freq = config.sampling_freq
         self.data_folder = config.data_folder_sleep_apnea
         self.split = split
+        self.leads = config.leads
         self.patch_size = config.patch_size
         if self.split == 'train':
             self.window_size = config.window_size_train
         else:
             self.window_size = config.window_size_val
         self.augmentations = augmentations
-        self.segment_size = 6000
+        self.segment_size = 60000  # 60 seconds in samples
 
         if self.sampling_freq % self.patch_size != 0:
-            raise ValueError(f"Patch size {self.patch_size} must be divisible by sampling frequency {self.sampling_freq}")
-        if self.window_size % self.segment_size != 0:
-            raise ValueError(f"Window size {self.window_size} must be divisible by sampling frequency {self.sampling_freq}")
+            raise ValueError(f"Patch size {self.patch_size} must be divisible by patch zsize {self.patch_size}")
+        if self.window_size % self.segment_size != 0 and not config.use_transformers:
+            raise ValueError(f"Window size {self.window_size} must be divisible by segment_size {self.segment_size}")
 
         self.load_records()
         self.load_samples()
@@ -60,42 +61,51 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         # and save the segments in a list
         self.samples = []
         self.annotations = []
-        self.patient_ids = []
+        self.segment_id = []
 
+        # for each ecg record, read the signal and annotations
         for record in tqdm(self.records, desc='Loading samples'):
-            
             # read the record
             signal, info = wfdb.rdsamp(record)
             ann = wfdb.rdann(record, 'apn')
 
             # get the length of the signal
             length = len(signal)
-            # divide the signal into 5 min segments
-            count = 0
-            for i in range(0, length, self.window_size):
-                if i + self.window_size < length:
-                    self.samples.append(signal[i:i + self.window_size])
-                else:
-                    self.samples.append(signal[i:length])
 
-                self.patient_ids.append(record)
+            # divide the signal into window_size segments
+            count = 0
+            if self.window_size < self.segment_size: count_2 = 0
+
+            for i in range(0, length, self.window_size):
+                # append the segment to the samples list
+                self.samples.append(signal[i:min(length, i + self.window_size)])
 
                 annotations = []
                 # get the annotations for the segment
+
+                # case of transformer where segment size is smaller than window size (10 seconds)
+                if self.window_size < self.segment_size and (count_2 + 1) % (self.segment_size // self.window_size) == 0:
+                    count += 1
+
                 while count < len(ann.sample) and ann.sample[count] < i + self.window_size:
                     annotations.append((ann.sample[count] - i, ann.symbol[count]))
-                    count += 1
+                    self.segment_id.append((record, count))
+                    if self.window_size < self.segment_size: 
+                        count_2 += 1
+                        break
+                    else:
+                        count += 1
 
                 if len(annotations) == 0:
                     # do not add the segment
                     self.samples.pop()
                     continue
 
+                # appending list of annotation for the segment
                 self.annotations.append(annotations)
-                # print(f"segment {i} - {i + self.window_size} with {len(annotations)} annotations")
         
 
-        patches_in_segment = self.segment_size // self.patch_size
+        patches_in_segment = min(self.segment_size, self.window_size) // self.patch_size
 
         annotations_tmp = []
         # covnert the annotations to torch tensors
@@ -103,17 +113,17 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             ann = []
             for pos, label in ann_list:
                 if label == 'A':
-                    ann.append(torch.ones(patches_in_segment, dtype=torch.float32))
+                    ann.append(torch.ones(1, dtype=torch.float32))
                 elif label == 'N':
-                    ann.append(torch.zeros(patches_in_segment, dtype=torch.float32))
+                    ann.append(torch.zeros(1, dtype=torch.float32))
                 else:   
                     raise ValueError(f"Unknown label {label}")
             ann = torch.cat(ann, dim=0)
 
-            if len(ann) > len(self.samples[i]) // self.patch_size:
+            if len(ann) * patches_in_segment > len(self.samples[i]) // self.patch_size:
                 ann = ann[:len(self.samples[i]) // self.patch_size]
                 # print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}')
-            elif len(ann) < len(self.samples[i]) // self.patch_size:
+            elif len(ann) * patches_in_segment < len(self.samples[i]) // self.patch_size:
                 self.samples[i] = self.samples[i][:len(ann) * self.patch_size]
                 print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}, should never see this')
                 
@@ -130,7 +140,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         ann = self.annotations[idx]
 
         # map to the correct lead
-        tensor = torch.zeros(sample.shape[0], 12)
+        tensor = torch.zeros(sample.shape[0], len(self.leads), dtype=torch.float32)
         tensor[:, 1] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
 
 
@@ -140,7 +150,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         return {
             'signal': tensor,
             'annotation': ann,
-            'patient_id': self.patient_ids[idx],
+            'segment_id': self.segment_id[idx],
         }
     
 
@@ -152,7 +162,7 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         labels = [item['annotation'] for item in batch]
-        patient_ids = [item['patient_id'] for item in batch]
+        segment_ids = [item['segment_id'] for item in batch]
 
         # pad to same length and pad to match the patch size module
         if config.shuffle_baseline_wander_in_batch and split == 'train':
@@ -165,7 +175,7 @@ def make_collate_fn(config, split='train'):
         return {
             'signals': signals,
             'labels': labels,
-            'patient_ids': patient_ids,
+            'segment_ids': segment_ids,
         }
 
     return collate_fn

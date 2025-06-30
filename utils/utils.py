@@ -67,6 +67,8 @@ def parse_config(config_file, default_config_file):
         # merged_config.max_length_signal = 10
         merged_config.win_len = 1250
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
@@ -75,6 +77,10 @@ def parse_config(config_file, default_config_file):
         merged_config.low_pass_filter = 40
         merged_config.high_pass_filter = 0.67
         merged_config.standardize = True
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
+
+    merged_config.use_transformers = merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.encoder_type == 'transformer'
 
     return merged_config
 

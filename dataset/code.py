@@ -70,7 +70,7 @@ class ECGCODEDataset(PretrainDataset):
         records = self.patient_to_records[patient]
 
         # records = self.tab_data[self.tab_data['patient_id'] == int(patient)]['file_name'].tolist()
-        num_views = self.n_global_view + self.n_local_view
+        num_views = self.n_global_view # + self.n_local_view
         if len(records) > num_views:
             records = np.random.choice(records, num_views)
             

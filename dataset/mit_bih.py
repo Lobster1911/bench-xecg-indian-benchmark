@@ -62,7 +62,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.augmentations = augmentations
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
-        self.use_transformers = config.use_ecg_jepa or config.use_st_mem
+        self.use_transformers = config.use_transformers
 
         self.load_patient_data(split)
         self.load_samples(split)
