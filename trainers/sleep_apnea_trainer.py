@@ -214,7 +214,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
 
             min_length = min(logits.shape[-1], targets.shape[-1])
             logits = logits[:, :min_length] if logits.dim() > 1 else logits[:min_length]
-            targets = targets[:, :min_length] if targets.dim() > 1 else targets[:min_length]            if logits.shape[-1] > targets.shape[-1]:
+            targets = targets[:, :min_length] if targets.dim() > 1 else targets[:min_length]  
 
             mask = (targets != -1).squeeze()
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
