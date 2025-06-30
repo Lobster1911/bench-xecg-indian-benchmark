@@ -211,9 +211,10 @@ class TrainingSleepApnea(CommonTrainerDownstream):
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         else:
             targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
-            if targets.shape[-1] > logits.shape[-1]:
-                # if targets are longer than logits, we need to slice the targets
-                targets = targets[:, :logits.shape[-1]]
+
+            min_length = min(logits.shape[-1], targets.shape[-1])
+            logits = logits[:, :min_length] if logits.dim() > 1 else logits[:min_length]
+            targets = targets[:, :min_length] if targets.dim() > 1 else targets[:min_length]            if logits.shape[-1] > targets.shape[-1]:
 
             mask = (targets != -1).squeeze()
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
@@ -226,7 +227,9 @@ def format_to_segment(preds, target, patch_size, segment_size=6000):
     # target will be [bs, seq_len, num_classes]
 
     patches_in_segment = segment_size // patch_size
-    num_patches = preds.shape[1]
+
+    num_patches = preds.shape[0] if preds.ndim == 1 else preds.shape[1]
+
     num_segments = num_patches // patches_in_segment
 
     if num_patches % patches_in_segment != 0:
