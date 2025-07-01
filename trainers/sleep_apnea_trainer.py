@@ -208,6 +208,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
 
 
         if self.use_transformers:
+            targets = targets.squeeze(-1)
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         else:
             targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
@@ -385,11 +386,12 @@ class ECG10secSegmentMetric(Metric):
         """
         preds = torch.sigmoid(preds.squeeze())
         segment_ids = [ patient + '_' + str(seg_id) for patient, seg_id in segment_ids ] 
-        
+
         # Store predictions, targets, and segment IDs
-        self.predictions.append(preds.detach())
-        self.targets.append(target.detach())
-        self.segment_ids.extend(segment_ids)  # extend instead of append for list
+        self.predictions.append(preds.detach().cpu())
+        self.targets.append(target.detach().cpu())
+        self.segment_ids.append(segment_ids)
+
 
     def compute(self):
         """
@@ -398,24 +400,16 @@ class ECG10secSegmentMetric(Metric):
         Returns:
             dict: Dictionary containing 'auc_macro', 'f1_macro', 'accuracy_micro'
         """
-        # Concatenate all accumulated data
-        all_preds = torch.cat(self.predictions, dim=0)
-        all_targets = torch.cat(self.targets, dim=0)
-        all_segment_ids = self.segment_ids  # Already a flat list of strings
-        
-        # Convert to numpy for easier processing
-        preds_np = all_preds.cpu().numpy()
-        targets_np = all_targets.cpu().numpy()
-        
         # Group predictions by segment ID and average them
         segment_preds = defaultdict(list)
         segment_targets = {}
         
-        for i in range(len(preds_np)):
-            seg_id = all_segment_ids[i]
-            segment_preds[seg_id].append(preds_np[i])
-            segment_targets[seg_id] = targets_np[i]  # Should be same for all 10s parts of same segment
-        
+        for batch in range(len(self.predictions)):
+            for i in range(len(self.predictions[batch])):
+                seg_id = self.segment_ids[batch][i]
+                segment_preds[seg_id].append(self.predictions[batch][i].item())
+                segment_targets[seg_id] = self.targets[batch][i].item()  # Should be same for all 10s parts of same segment
+
         # Average predictions for each segment and collect final predictions/targets
         final_preds = []
         final_targets = []
@@ -425,6 +419,7 @@ class ECG10secSegmentMetric(Metric):
             final_preds.append(avg_pred)
             final_targets.append(segment_targets[seg_id])
         
+      
         final_preds = np.array(final_preds)
         final_targets = np.array(final_targets)
         
