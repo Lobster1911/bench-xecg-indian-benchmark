@@ -298,7 +298,7 @@ class PerPatientMetric(Metric):
         for batch in range(len(self.predictions)):
             for i in range(len(self.predictions[batch])):
                 seg_id = self.segment_ids[batch][i]
-                segment_preds[seg_id].append(self.predictions[batch][i])
+                segment_preds[seg_id].extend(self.predictions[batch][i])
                 segment_targets[seg_id] = self.targets[batch][i]  # Should be same for all 10s parts of same segment
 
         # Average predictions for each segment and collect final predictions/targets
