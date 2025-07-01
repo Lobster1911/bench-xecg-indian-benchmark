@@ -22,7 +22,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         else:
             self.window_size = config.window_size_val
         self.augmentations = augmentations
-        self.segment_size = 6000  # 60 seconds in samples
+        self.segment_size = 60000  # 60 seconds in samples
 
         if self.sampling_freq % self.patch_size != 0:
             raise ValueError(f"Patch size {self.patch_size} must be divisible by patch zsize {self.patch_size}")
