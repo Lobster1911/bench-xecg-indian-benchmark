@@ -308,7 +308,7 @@ class PerPatientMetric(Metric):
         for seg_id in segment_preds.keys():
             avg_pred = np.mean(segment_preds[seg_id])
             final_preds.append(avg_pred)
-            final_targets.append(segment_targets[seg_id])
+            final_targets.append(segment_targets[seg_id][0])
         
         final_preds = np.array(final_preds)
         final_targets = np.array(final_targets)
