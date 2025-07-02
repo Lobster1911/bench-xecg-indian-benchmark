@@ -233,6 +233,7 @@ def format_to_segment(preds, target, patch_size, segment_size=6000):
     num_patches = preds.shape[0] if preds.ndim == 1 else preds.shape[1]
 
     num_segments = num_patches // patches_in_segment
+    num_segments = max(num_segments, 1)
 
     if num_patches % patches_in_segment != 0:
         # we can skip the very last part

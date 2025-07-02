@@ -128,6 +128,15 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 
             annotations_tmp.append(ann)
         self.annotations = annotations_tmp
+
+        # count annotation distribution
+        annotation_count = {}
+        for ann_list in self.annotations:
+            for label in ann_list:
+                if label.item() not in annotation_count.keys():
+                    annotation_count[label.item()] = 0
+                annotation_count[label.item()] += 1
+        print(annotation_count)
             
 
     def __len__(self):
