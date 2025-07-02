@@ -25,7 +25,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         self.segment_size = 6000  # 60 seconds in samples
 
         if self.sampling_freq % self.patch_size != 0:
-            raise ValueError(f"Patch size {self.patch_size} must be divisible by patch zsize {self.patch_size}")
+            print(f"Warning: Sampling freq {self.sampling_freq} should be divisible by patch size {self.patch_size}")
         if self.window_size % self.segment_size != 0 and not config.use_transformers:
             raise ValueError(f"Window size {self.window_size} must be divisible by segment_size {self.segment_size}")
 
@@ -83,15 +83,14 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 annotations = []
                 # get the annotations for the segment
 
-                # case of transformer where segment size is smaller than window size (10 seconds)
-                if self.window_size < self.segment_size and (count_2 + 1) % (self.segment_size // self.window_size) == 0:
-                    count += 1
-
                 while count < len(ann.sample) and ann.sample[count] < i + self.window_size:
-                    annotations.append((ann.sample[count] - i, ann.symbol[count]))
+                    annotations.append((ann.sample[count] - i * count, ann.symbol[count]))
                     self.segment_id.append((record, count))
                     if self.window_size < self.segment_size: 
                         count_2 += 1
+                        # case of transformer where segment size is smaller than window size (10 seconds)
+                        if count_2  % (self.segment_size // self.window_size) == 0:
+                            count += 1
                         break
                     else:
                         count += 1
@@ -105,7 +104,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 self.annotations.append(annotations)
         
 
-        patches_in_segment = min(self.segment_size, self.window_size) // self.patch_size
+        patches_in_segment = min(self.segment_size, self.window_size) // ((100 / self.sampling_freq) * self.patch_size)
 
         annotations_tmp = []
         # covnert the annotations to torch tensors
@@ -128,7 +127,6 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}, should never see this')
                 
             annotations_tmp.append(ann)
-
         self.annotations = annotations_tmp
             
 
@@ -145,7 +143,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 
 
         if self.augmentations is not None:
-            sample = self.augmentations(sample)
+            tensor = self.augmentations(tensor)
 
         return {
             'signal': tensor,

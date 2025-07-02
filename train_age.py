@@ -4,11 +4,12 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from models.classification import xLSTMClassification
 
+import dataset.code as code
 import dataset.ptb_xl as ptbxl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
-from trainers.ptb_xl_trainer import TrainingPTB_XL
+from trainers.age_trainer import TrainingAge
 import torch
 import argparse
 import os
@@ -27,35 +28,24 @@ from ecg_jepa.models import load_encoder
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
-parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run_config.yaml', help='Path to the config file')
+parser.add_argument('--config_file', type=str, default='configs/train_age_run_config.yaml', help='Path to the config file')
 
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
     
-    train_dataset =  ptbxl.ECGPTBXLDataset(config, split='train', global_augmentations=get_transforms(config))
+    code_dataset = code.ECGCODE15AgeDataset(config, split='train', global_augmentations=get_transforms(config))
+    # split the dataset in val and train
+    train_dataset, val_dataset = torch.utils.data.random_split(code_dataset, [int(len(code_dataset) * 0.8), len(code_dataset) - int(len(code_dataset) * 0.8)])
+    #utils.split_dataset_preserve_labels(code_dataset, split_ratio=0.8, key='age')
     print(f"Train dataset size: {len(train_dataset)}")
-    val_dataset = ptbxl.ECGPTBXLDataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
-    if config.training_pct < 1.0:
-        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=code.make_collate_fn(config))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=code.make_collate_fn(config))
 
-    if config.use_class_weights:
-        if config.num_classes == 5:
-            print('Using class weights for 5 classes')
-            # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-            weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
-        else:
-            weights = None # TODO
-    else:
-        weights = None
-
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='train'), drop_last=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='val'))
-
-    test_dataset = ptbxl.ECGPTBXLDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='test'), num_workers=config.num_workers)
+    test_dataset = ptbxl.ECGPTBXLAgeDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config))
 
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
@@ -84,16 +74,15 @@ def train(config, run=None, wandb=False):
     log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
     print(f"Logging every {log_every_n_steps} steps")
 
-    model = TrainingPTB_XL(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    model = TrainingAge(model=base_model, config=config, len_train_dataset=len(train_dataset))
 
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode='max')
-        prj = f'train-ptbxl-{config.classification_taksk}-{config.task}'
-        wand_logger = WandbLogger(project=prj, experiment=run, config=config)
+        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
+        wand_logger = WandbLogger(project='train-age', experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=log_every_n_steps)
     else:
@@ -108,6 +97,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_ptb_xl_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'config_defaults/train_age_config_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

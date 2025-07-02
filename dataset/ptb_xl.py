@@ -94,6 +94,16 @@ class ECGPTBXLDataset(PretrainDataset):
         signal.update(class_info)
         return signal
 
+class ECGPTBXLAgeDataset(ECGPTBXLDataset):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        super().__init__(config, split, global_augmentations, local_augmentations)
+
+    def __getitem__(self, idx):
+        obj = super().__getitem__(idx)
+        obj['age'] = torch.tensor(self.tab_data.iloc[idx]['age'], dtype=torch.float32)
+        return obj
+
+
 def make_collate_fn(config, downstream=False, split='train'):
 
     if config.shuffle_baseline_wander_in_batch:
@@ -114,11 +124,16 @@ def make_collate_fn(config, downstream=False, split='train'):
         else:
             signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
             
-        return {
+        tortn = {
             'signals': signals,
             'class_labels': torch.stack(superclass_labels),
             'subclass_labels': torch.stack(subclass_labels),
         }
+        if batch[0].get('age') is not None:
+            tortn['age'] = torch.stack([item['age'] for item in batch])
+
+        return tortn
+
     return collate_fn
 
     

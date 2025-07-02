@@ -5,6 +5,8 @@ import wfdb
 import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
+from dataset.generic_utils import pad, pad_multi_view_batch
+
 
 class ECGCODE15Dataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
@@ -31,6 +33,18 @@ class ECGCODE15Dataset(PretrainDataset):
 
         print("tabular data fields for CODE 15: ", self.tab_data.head())
 
+class ECGCODE15AgeDataset(ECGCODE15Dataset):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        """
+        Args:
+            records (list): List of records of ECG traces
+        """
+        super().__init__(config, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
+
+    def __getitem__(self, idx):
+        obj = super().__getitem__(idx)
+        obj['age'] = torch.tensor(self.tab_data.loc[self.records[idx], 'age'], dtype=torch.float32)
+        return obj
 
 class ECGCODEDataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
@@ -101,3 +115,17 @@ class ECGCODEDataset(PretrainDataset):
             'global_signals': global_signals,
             'local_signals': local_signals,
         }
+    
+
+def make_collate_fn(config):
+    def collate_fn(batch):
+        signals = [item['global_signals'][0] for item in batch]
+        signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+            
+        tortn = {
+            'signals': signals,
+            'age': torch.stack([item['age'] for item in batch])
+        }
+        return tortn
+
+    return collate_fn
