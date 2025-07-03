@@ -298,7 +298,7 @@ class PerPatientMetric(Metric):
         segment_targets = {}
         
         for batch in range(len(self.predictions)):
-            if self.predictions[batch].ndim == 1:
+            if self.predictions[batch].ndim == 0:
                 continue
             for i in range(len(self.predictions[batch])):
                 seg_id = self.segment_ids[batch][i]
@@ -408,7 +408,7 @@ class ECG10secSegmentMetric(Metric):
         segment_targets = {}
         
         for batch in range(len(self.predictions)):
-            if self.predictions[batch].ndim == 1:
+            if self.predictions[batch].ndim == 0:
                 continue
             for i in range(len(self.predictions[batch])):
                 seg_id = self.segment_ids[batch][i]
