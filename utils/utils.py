@@ -82,6 +82,7 @@ def parse_config(config_file, default_config_file):
     elif merged_config.use_ecg_founder:
         merged_config.sampling_freq = 500
         merged_config.low_pass_filter = 30
+        merged_config.high_pass_filter = 0.5
 
     merged_config.use_transformers = merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.encoder_type == 'transformer'
 
