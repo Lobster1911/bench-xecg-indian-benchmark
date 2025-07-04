@@ -284,4 +284,6 @@ class pretrainedxLSTM(BaseModel):
 
         if hasattr(self.core, 'post_blocks_norm'):
             params.append({'params': self.core.post_blocks_norm, 'lr': lr, 'name': 'post_block_norm'})
+
+        return params
         
