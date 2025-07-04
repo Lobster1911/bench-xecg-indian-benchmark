@@ -30,7 +30,7 @@ split_val_by_patient: true
 use_focal_loss: false
 sampling_freq: 360
 
-activation_fn: "relu"
+activation_fn: "gelu"
 xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
 wandb_log: false
 num_heads: 4

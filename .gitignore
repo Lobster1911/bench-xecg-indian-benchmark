@@ -11,4 +11,5 @@ pretrained_models
 None
 logs
 checkpoints
+checkpoint
 configs/*

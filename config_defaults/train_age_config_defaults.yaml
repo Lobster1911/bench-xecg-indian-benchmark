@@ -27,7 +27,7 @@ max_length_signal: 12
 
 patience: 15
 
-activation_fn: "relu"
+activation_fn: "gelu"
 xlstm_config: ["m", "s", "m"]
 wandb_log: false
 num_heads: 4

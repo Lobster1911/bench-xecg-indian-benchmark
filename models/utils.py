@@ -85,7 +85,7 @@ def get_xlstm(config):
                 conv1d_kernel_size=4,
                 bias_init="powerlaw_blockdependent",
             ),
-            feedforward=FeedForwardConfig(proj_factor=1.3, act_fn="gelu"),
+            feedforward=FeedForwardConfig(proj_factor=1.3, act_fn=get_activation_fn(config.activation_fn)),
         ),
         context_length=8000,
         num_blocks=len(config.xlstm_config),
