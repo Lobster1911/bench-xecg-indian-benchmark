@@ -275,12 +275,12 @@ class pretrainedxLSTM(BaseModel):
             params.append({'params': self.core.model.post_blocks_norm.parameters(), 'lr': lr, 'weight_decay': wd, 'name': 'ln2'})
 
         if self.cls_type == 'token' or self.cls_type == 'token_2':
-            params.append({'params': self.cls_token, 'lr': lr, 'weight_decay': wd, 'name': 'cls'})
+            params.append({'params': self.cls_token, 'lr': last_layer_lr, 'weight_decay': wd, 'name': 'cls'})
         elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
-            params.append({'params': self.attn_pool.parameters(), 'lr': lr, 'weight_decay': wd, 'name': 'cls'})
+            params.append({'params': self.attn_pool.parameters(), 'lr': last_layer_lr, 'weight_decay': wd, 'name': 'cls'})
 
         if self.num_reg_tokens > 0:
-            params.append({'params': self.reg_token, 'lr': lr, 'weight_decay': wd, 'name': 'reg_tokens'})
+            params.append({'params': self.reg_token, 'lr': last_layer_lr, 'weight_decay': wd, 'name': 'reg_tokens'})
 
         params.append({'params': self.core.post_blocks_norm, 'lr': lr, 'name': 'post_block_norm'})
         
