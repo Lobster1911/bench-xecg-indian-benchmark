@@ -72,7 +72,10 @@ def train(config, run=None, wandb=False):
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
         base_model = load_encoder(ckpt_dir=ckpt_dir, num_classes=config.num_classes, drop_path_rate=config.drop_path_prob) # dim is the dimension of the latent space
-
+    elif config.use_ecg_founder:
+        from ecg_founder.finetune_model import ft_12lead_ECGFounder
+        path = './checkpoint/12_lead_ECGFounder.pth'
+        base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     else:
         base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         if config.checkpoint is not None and config.checkpoint != '':   
