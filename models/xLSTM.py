@@ -282,5 +282,6 @@ class pretrainedxLSTM(BaseModel):
         if self.num_reg_tokens > 0:
             params.append({'params': self.reg_token, 'lr': last_layer_lr, 'weight_decay': wd, 'name': 'reg_tokens'})
 
-        params.append({'params': self.core.post_blocks_norm, 'lr': lr, 'name': 'post_block_norm'})
+        if hasattr(self.core, 'post_blocks_norm'):
+            params.append({'params': self.core.post_blocks_norm, 'lr': lr, 'name': 'post_block_norm'})
         
