@@ -79,6 +79,9 @@ def parse_config(config_file, default_config_file):
         merged_config.standardize = True
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
+    elif merged_config.use_ecg_founder:
+        merged_config.sampling_freq = 500
+        merged_config.low_pass_filter = 30
 
     merged_config.use_transformers = merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.encoder_type == 'transformer'
 

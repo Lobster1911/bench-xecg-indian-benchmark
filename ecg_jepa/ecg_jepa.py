@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from timm.models.layers import DropPath, trunc_normal_
 from ecg_jepa.pos_encoding import get_2d_sincos_pos_embed
-
+from models.base_model import BaseModel
 def union_masks(masks_list):
     return torch.stack(masks_list).any(dim=0)
 
@@ -554,8 +554,9 @@ class ecg_jepa(nn.Module):
         loss = self.loss_func(z_pred, masked_h)
         return loss
     
+    
 
-class ECGJepaClassifier(nn.Module):
+class ECGJepaClassifier(BaseModel):
     def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
         super().__init__()
         self.encoder = encoder
@@ -577,21 +578,20 @@ class ECGJepaClassifier(nn.Module):
             repr = self.encoder.representation(x)
 
         return self.head(repr)
-
-    def training_params(self):
-        return self.head.parameters()
     
-    def set_eval_linear_probing(self):
-        self.encoder.eval()
-        self.head.train()
-
-    def finetuning_params(self):
-        params = [param for name, param in self.named_parameters() if 'head' not in name]
+    def get_layers(self):
+        return self.encoder.encoder_blocks.blocks
+    
+    def additional_params(self, lr, last_layer_lr, wd):
+        params = []
+        # linear projection, need the smallest layer_lr
+        params.append({"params": self.encoder.W_P.parameters(), "lr": last_layer_lr, "name": "W_P", "weight_decay": wd})
+        # final layer norm, normal lr
+        params.append({"params": self.encoder.norm.parameters(), "lr": lr, "name": "ln", "weight_decay": wd})
         return params
-    
 
 
-class ECGJepaFeatureClassifierMIT_BIH(nn.Module):
+class ECGJepaFeatureClassifierMIT_BIH(BaseModel):
     def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
         super().__init__()
         self.encoder = encoder
@@ -599,13 +599,11 @@ class ECGJepaFeatureClassifierMIT_BIH(nn.Module):
         self.linear_probing = linear_probing
         self.patch_size = patch_size
 
-        self.fc = nn.Sequential(
-            # nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
+        self.head = nn.Sequential(
             nn.Linear(self.encoder.embed_dim, num_classes)
         )
 
-        self.r_peak_pos_fc = nn.Sequential(
-            # nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
+        self.r_peak_pos_head = nn.Sequential(
             nn.Linear(self.encoder.embed_dim, self.encoder.p)
         )
 
@@ -621,18 +619,17 @@ class ECGJepaFeatureClassifierMIT_BIH(nn.Module):
         bs, patches, emb = out.shape
         out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
 
-        cls = self.fc(out)
-        r_peak_pos = self.r_peak_pos_fc(out)
+        cls = self.head(out)
+        r_peak_pos = self.r_peak_pos_head(out)
         return cls, r_peak_pos
-
-    def training_params(self):
-        return self.fc.parameters()
     
-    def set_eval_linear_probing(self):
-        self.encoder.eval()
-        self.fc.train()
+    def get_layers(self):
+        return self.encoder.encoder_blocks.blocks
     
-    def finetuning_params(self):
-        params = [param for name, param in self.named_parameters() if 'fc' not in name]
+    def additional_params(self, lr, last_layer_lr, wd):
+        params = []
+        # linear projection, need the smallest layer_lr
+        params.append({"params": self.encoder.W_P.parameters(), "lr": last_layer_lr, "name": "W_P", "weight_decay": wd})
+        # final layer norm, normal lr
+        params.append({"params": self.encoder.norm.parameters(), "lr": lr, "name": "ln", "weight_decay": wd})
         return params
-    

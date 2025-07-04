@@ -13,9 +13,8 @@ class xLSTMClassification(pretrainedxLSTM):
         self.linear_probing = config.linear_probing
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        self.fc = nn.Sequential(
+        self.head = nn.Sequential(
             get_normalization_layer(config),
-            nn.Dropout(config.dropout),
             nn.Linear(config.embedding_size, num_classes)
         )
 
@@ -30,21 +29,9 @@ class xLSTMClassification(pretrainedxLSTM):
             x = self.patch_embedding(x)
             cls, _ = self.forward_core(x, padding_mask)
 
-        res = self.fc(cls)
+        res = self.head(cls)
         return res
-    
-    def finetuning_params(self):
-        params = [param for name, param in self.named_parameters() if 'fc' not in name]
-        return params
-    
-    def set_eval_linear_probing(self):
-        self.eval()
-        self.fc.train()
 
-    def training_params(self):
-        params = []
-        params.extend(self.fc.parameters())
-        return params
     
 
 class xLSTMFeatureClassification(pretrainedxLSTM):
@@ -57,9 +44,8 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
         self.linear_probing = config.linear_probing
         super(xLSTMFeatureClassification, self).__init__(num_channels, config, reconstruction=False)
 
-        self.fc = nn.Sequential(
+        self.head = nn.Sequential(
             get_normalization_layer(config),
-            nn.Dropout(config.dropout),
             nn.Linear(config.embedding_size, num_classes)
         )
 
@@ -72,20 +58,6 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
             x = self.patch_embedding(x)
             _, features = self.forward_core(x)
 
-        res = self.fc(features)
+        res = self.head(features)
         return res
-    
-    def finetuning_params(self):
-        params = [param for name, param in self.named_parameters() if 'fc' not in name]
-        return params
-    
-    def set_eval_linear_probing(self):
-        self.eval()
-        self.fc.train()
-
-    def training_params(self):
-        params = []
-        params.extend(self.fc.parameters())
-        return params
-    
 

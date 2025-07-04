@@ -11,8 +11,9 @@ import copy
 from models.normalizations import DINOCentering
 import torch.distributed as dist
 from models.pooling import AttentionPooling, LinearAttentionPooling
+from models.base_model import BaseModel
 
-class pretrainedxLSTM(nn.Module):
+class pretrainedxLSTM(BaseModel):
     def __init__(
             self, 
             num_channels,
@@ -254,3 +255,32 @@ class pretrainedxLSTM(nn.Module):
             return [param for name, param in self.named_parameters() if "teacher" not in name and 'reconstruction' not in name]
         
         return self.parameters()
+    
+    def get_layers(self):
+        """
+        This function should return the layers of the model where to apply the layerwise decay
+        """
+        return self.core.model.blocks
+    
+    def additional_params(self, lr, last_layer_lr, wd):
+        """
+        This fucntion should return additional parameters used by a model (like classification token and so on...)
+        """
+        params = []
+        params.append({"params": self.patch_embedding.parameters(), "lr": last_layer_lr, "name": "patch_embedding"})
+
+        if self.encoder_type =='large':
+            params.append({'params': self.core.model.out_norm.parameters(), 'lr': lr, 'weight_decay': wd, 'name': 'ln2'})
+        else:
+            params.append({'params': self.core.model.post_blocks_norm.parameters(), 'lr': lr, 'weight_decay': wd, 'name': 'ln2'})
+
+        if self.cls_type == 'token' or self.cls_type == 'token_2':
+            params.append({'params': self.cls_token, 'lr': lr, 'weight_decay': wd, 'name': 'cls'})
+        elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
+            params.append({'params': self.attn_pool.parameters(), 'lr': lr, 'weight_decay': wd, 'name': 'cls'})
+
+        if self.num_reg_tokens > 0:
+            params.append({'params': self.reg_token, 'lr': lr, 'weight_decay': wd, 'name': 'reg_tokens'})
+
+        params.append({'params': self.core.post_blocks_norm, 'lr': lr, 'name': 'post_block_norm'})
+        

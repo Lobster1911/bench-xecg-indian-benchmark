@@ -16,12 +16,13 @@ from einops import rearrange
 from einops.layers.torch import Rearrange
 
 from st_mem.encoder.vit import TransformerBlock
+from models.base_model import BaseModel
 
 
 __all__ = ['ST_MEM_ViT', 'st_mem_vit_small', 'st_mem_vit_base']
 
 
-class ST_MEM_ViT(nn.Module):
+class ST_MEM_ViT(BaseModel):
     def __init__(self,
                  seq_len: int,
                  patch_size: int,
@@ -100,7 +101,6 @@ class ST_MEM_ViT(nn.Module):
 
         # classifier head
         self.head = nn.Identity() if num_classes is None else nn.Sequential(
-            # nn.BatchNorm1d(width),
             nn.Linear(width, num_classes)
         )
 
@@ -174,13 +174,18 @@ class ST_MEM_ViT(nn.Module):
         print_str += ')'
         return print_str
     
-
-    def training_params(self):
-        return self.head.parameters()
+    def get_layers(self):
+        return [self.__getattr__(f'block{i}') for i in range(self.model.depth)]
     
-    def set_eval_linear_probing(self):
-        self.eval()
-        self.head.train()
+    def additional_params(self, lr, last_layer_lr, wd):
+        params = []
+        params.append({'params': self.to_patch_embedding.parameters(), 'lr': last_layer_lr, 'name': 'to_patch_embedding', 'weight_decay': self.wd})
+        params.append({'params': self.pos_embedding, 'lr': last_layer_lr, 'name': 'pos_embedding', 'weight_decay': self.wd})
+        params.append({'params': self.sep_embedding, 'lr': last_layer_lr, 'name': 'sep_embedding', 'weight_decay': self.wd})
+        params.append({'params': self.lead_embeddings.parameters(), 'lr': last_layer_lr, 'name': 'lead_embeddings', 'weight_decay': self.wd})
+        params.append({'params': self.norm.parameters(), 'lr': lr, 'name': 'ln', 'weight_decay': self.wd})
+        return params
+
 
 
 def st_mem_vit_small(num_leads, num_classes=None, seq_len=2250, patch_size=75, **kwargs):

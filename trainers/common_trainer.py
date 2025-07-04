@@ -45,51 +45,12 @@ class CommonTrainerDownstream(L.LightningModule):
         else:
             return self.model.core.model.blocks
         
-
     def get_params(self):
         if self.linear_probing:
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]
-        elif self.layerwise_lr_decay > 0.:
+        elif self.layerwise_lr_decay > 0. and self.layerwise_lr_decay < 1.:
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]   
-            layers = self.get_layers()
-            num_layers = len(layers) + 1 
-
-            # Assign learning rates to each transformer layer
-            for i, layer in enumerate(layers):
-                layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** (num_layers - i - 1))  # Earlier layers get smaller LR
-                layer_params = layer.parameters()
-                params.append({"params": layer_params, "lr": layer_lr, "name": f"layer_{i}"})
-
-            layer_lr = self.lr_xlstm * (self.layerwise_lr_decay ** num_layers)
-
-            if self.use_ecg_jepa:
-                # linear projection, need the smallest layer_lr
-                params.append({"params": self.model.encoder.W_P.parameters(), "lr": layer_lr, "name": "W_P"})
-                # final layer norm, normal lr
-                params.append({"params": self.model.encoder.norm.parameters(), "lr": self.lr_xlstm, "name": "ln"})
-            elif self.use_st_mem:
-                # embeddings, need the smallest layer_lr
-                params.append({'params': self.model.to_patch_embedding.parameters(), 'lr': layer_lr, 'name': 'to_patch_embedding'})
-                params.append({'params': self.model.pos_embedding, 'lr': layer_lr, 'name': 'pos_embedding'})
-                params.append({'params': self.model.sep_embedding, 'lr': layer_lr, 'name': 'sep_embedding'})
-                params.append({'params': self.model.lead_embeddings.parameters(), 'lr': layer_lr, 'name': 'lead_embeddings'})
-                params.append({'params': self.model.norm.parameters(), 'lr': self.lr_xlstm, 'name': 'ln'})
-            else:
-                params.append({"params": self.model.patch_embedding.parameters(), "lr": layer_lr, "name": "patch_embedding"})
-
-                if self.model.encoder_type =='large':
-                    params.append({'params': self.model.core.model.out_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
-                else:
-                    params.append({'params': self.model.core.model.post_blocks_norm.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'ln2'})
-
-                if self.model.cls_type == 'token' or self.model.cls_type == 'token_2':
-                    params.append({'params': self.model.cls_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
-                elif self.model.cls_type == 'attn_pool' or self.model.cls_type == 'lin_attn_pool':
-                    params.append({'params': self.model.attn_pool.parameters(), 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'cls'})
-
-                if self.model.num_reg_tokens > 0:
-                    params.append({'params': self.reg_token, 'lr': self.lr_xlstm, 'weight_decay': self.wd, 'name': 'reg_tokens'})
-
+            params.extend(self.model.get_params_layerwise_decay(self.layerwise_lr_decay, self.lr_xlstm, self.wd))
         else:
             params = [
                 {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
