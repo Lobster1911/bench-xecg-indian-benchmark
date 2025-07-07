@@ -26,7 +26,9 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         self.valid_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
         self.test_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
 
-        if not config.use_transformers:
+        self.use_transformers = config.use_transformers or config.use_ecg_founder
+
+        if not self.use_transformers:
             self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
             self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
             self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
@@ -45,8 +47,6 @@ class TrainingSleepApnea(CommonTrainerDownstream):
             # Initialize metrics for validation and test
             self.val_metric = ECG10secSegmentMetric()
             self.test_metric = ECG10secSegmentMetric()
-
-        self.use_transformers = config.use_transformers
 
 
     def training_step(self, batch, _):

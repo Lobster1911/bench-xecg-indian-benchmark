@@ -26,7 +26,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 
         if self.sampling_freq % self.patch_size != 0:
             print(f"Warning: Sampling freq {self.sampling_freq} should be divisible by patch size {self.patch_size}")
-        if self.window_size % self.segment_size != 0 and not config.use_transformers:
+        if self.window_size % self.segment_size != 0 and not (config.use_transformers or config.use_ecg_founder):
             raise ValueError(f"Window size {self.window_size} must be divisible by segment_size {self.segment_size}")
 
         self.load_records()
@@ -148,7 +148,10 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 
         # map to the correct lead
         tensor = torch.zeros(sample.shape[0], len(self.leads), dtype=torch.float32)
-        tensor[:, 1] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
+        if len(self.leads) == 1:
+            tensor[:, 0] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
+        else:
+            tensor[:, 1] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
 
 
         if self.augmentations is not None:
