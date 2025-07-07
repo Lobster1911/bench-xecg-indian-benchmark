@@ -58,33 +58,7 @@ def train(config, run=None, wandb=False):
     test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
     
-    if config.use_st_mem:
-        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
-        checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
-        checkpoint_model = checkpoint['model']
-        state_dict = base_model.state_dict()
-        for k in ['head.weight', 'head.bias']:
-            if k in checkpoint_model and checkpoint_model[k].shape != state_dict[k].shape:
-                print(f"Remove key {k} from pre-trained checkpoint")
-                del checkpoint_model[k]
-        msg = base_model.load_state_dict(checkpoint_model, strict=False)
-        print(msg)
-    elif config.use_ecg_jepa:
-        ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, num_classes=config.num_classes, drop_path_rate=config.drop_path_prob) # dim is the dimension of the latent space
-    elif config.use_ecg_founder:
-        from ecg_founder.finetune_model import ft_12lead_ECGFounder
-        path = './checkpoint/12_lead_ECGFounder.pth'
-        base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
-    else:
-        base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
-        if config.checkpoint is not None and config.checkpoint != '':   
-            checkpoint = torch.load(config.checkpoint, weights_only=False)
-            new_state_dict = {utils.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
-            # remove the fc layer
-            new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
-            message = base_model.load_state_dict(new_state_dict, strict=False) 
-            print(message) 
+    base_model = utils.get_base_model(config)
             
     model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 

@@ -1,0 +1,62 @@
+lr_head: 0.01
+lr_xlstm: 0.00001
+wd: 0.01
+batch_size: 512
+num_workers: 32
+epochs: 30
+patch_size: 25
+dropout: 0.4
+embedding_size: 1024
+deterministic: true
+is_sweep: false
+grad_clip: 3
+num_classes: 1
+monitor_metric: valid_mse
+monitor_mode: min
+
+optimizer: "adamw"
+use_scheduler: true
+num_epochs_warmup: 1
+num_epochs_warm_restart: 15
+sched_decay_factor: 0.8
+random_surrogate_prob: 0.0
+random_jitter_prob: 0.0
+random_drop_leads: 0.0
+random_change_amplitude: 0.
+max_length_signal: 12
+
+patience: 15
+
+activation_fn: "gelu"
+xlstm_config: ["m", "s", "m"]
+wandb_log: false
+num_heads: 4
+encoder_type: vanilla
+patch_embedding: non_linear
+bidirectional: false
+use_focal_loss: false
+sampling_freq: 250
+use_final_layer_norm: true
+cls_normalization: null
+
+normalize: true
+random_crop: 0.9
+nk_clean: true
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+
+data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
+labels_file_ptbxl: /media/Volume/data/PTB-XL/ptbxl_database.csv
+data_folder_mimic: /media/Volume/data/MIMIC_IV/
+labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
+checkpoint: null
+
+classification_taksk: 'diagnosis_superclass'
+
+strategy: masked_token_prediction
+num_reg_token: 0
+
+n_global_view: 1
+n_local_view: 0
+
+data_folder_code15: /media/Volume/data/CODE15/processed/
+labels_file_code15: /media/Volume/data/CODE15/processed/exams_filtered.csv

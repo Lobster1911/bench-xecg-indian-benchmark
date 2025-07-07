@@ -12,9 +12,11 @@ from trainers.common_trainer import CommonTrainerDownstream
 from utils.train_utils import focal_loss
 
 
-class TrainingAge(CommonTrainerDownstream):
-    def __init__(self, model, config,  len_train_dataset, weights=None):
+class RegressionTrainer(CommonTrainerDownstream):
+    def __init__(self, model, config,  len_train_dataset, target_key='age', weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
+
+        self.target_key = target_key
 
         self.train_mae = torchmetrics.MeanAbsoluteError()
         self.valid_mae = torchmetrics.MeanAbsoluteError()
@@ -60,13 +62,13 @@ class TrainingAge(CommonTrainerDownstream):
     
     def predict_batch(self, batch):
         x = batch["signals"]
-        targets = batch['age']
+        targets = batch[self.target_key]
         # get one hot encoding
 
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
-        ages = self.model(x).squeeze()
-        loss = nn.functional.mse_loss(ages, targets)
+        results = self.model(x).squeeze()
+        loss = nn.functional.mse_loss(results, targets)
 
-        return loss, ages, targets
+        return loss, results, targets
