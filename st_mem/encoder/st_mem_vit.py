@@ -175,7 +175,7 @@ class ST_MEM_ViT(BaseModel):
         return print_str
     
     def get_layers(self):
-        return [self.__getattr__(f'block{i}') for i in range(self.model.depth)]
+        return [self.__getattr__(f'block{i}') for i in range(self.depth)]
     
     def additional_params(self, lr, last_layer_lr, wd):
         params = []
