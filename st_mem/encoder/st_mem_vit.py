@@ -179,11 +179,11 @@ class ST_MEM_ViT(BaseModel):
     
     def additional_params(self, lr, last_layer_lr, wd):
         params = []
-        params.append({'params': self.to_patch_embedding.parameters(), 'lr': last_layer_lr, 'name': 'to_patch_embedding', 'weight_decay': self.wd})
-        params.append({'params': self.pos_embedding, 'lr': last_layer_lr, 'name': 'pos_embedding', 'weight_decay': self.wd})
-        params.append({'params': self.sep_embedding, 'lr': last_layer_lr, 'name': 'sep_embedding', 'weight_decay': self.wd})
-        params.append({'params': self.lead_embeddings.parameters(), 'lr': last_layer_lr, 'name': 'lead_embeddings', 'weight_decay': self.wd})
-        params.append({'params': self.norm.parameters(), 'lr': lr, 'name': 'ln', 'weight_decay': self.wd})
+        params.append({'params': self.to_patch_embedding.parameters(), 'lr': last_layer_lr, 'name': 'to_patch_embedding'})
+        params.append({'params': self.pos_embedding, 'lr': last_layer_lr, 'name': 'pos_embedding'})
+        params.append({'params': self.sep_embedding, 'lr': last_layer_lr, 'name': 'sep_embedding'})
+        params.append({'params': self.lead_embeddings.parameters(), 'lr': last_layer_lr, 'name': 'lead_embeddings'})
+        params.append({'params': self.norm.parameters(), 'lr': lr, 'name': 'ln'})
         return params
 
 
