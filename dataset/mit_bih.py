@@ -119,7 +119,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             # map labels with r_peaks in a tuple
 
     def load_samples(self, subset):
-        def process_sample(patient, r_peaks, signal=None):
+        def process_sample(patient, r_peaks):
             samples = []
             last_class = None
             skipped = 0
@@ -150,7 +150,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         results = Parallel(n_jobs=-1)(
             delayed(process_sample)(
-                patient, self.r_peaks[patient], self.signals[patient] if subset != 'train' else None
+                patient, self.r_peaks[patient]
             ) for patient in tqdm(self.patients, desc="Processing patients")
         )
 
@@ -216,7 +216,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             'label': labels_mask,
         }
 
-    
     def filter_leads(self, signal, leads):
         # convert leads if needed 
         for i, lead in enumerate(leads):
@@ -246,27 +245,28 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
         super().__init__(config, split, augmentations)
 
     def load_samples(self, subset):
-         def process_sample(patient, r_peaks, signal=None):
-            samples = []
-            for i, r_peak in enumerate(r_peaks):
-                samples.append({
+        self.samples = []
+        for patient in tqdm(self.patients, desc="Processing patients"):
+            for i, r_peak in enumerate(self.r_peaks[patient]):
+                signal = self.signals[patient]
+                self.samples.append({
                     'patient': patient,
                     'r_peak': r_peak,
-                    'signal': 
+                    'signal': signal[max(0, r_peak[0] - 200): min(len(signal), r_peak[0] + self.win_len)],
                 })
 
-            return samples
+    def __getitem__(self, idx):
+        sample = self.samples[idx]
+        patient = sample['patient']
+        signal = torch.tensor(sample['signal'], dtype=torch.float32)
+        r_peak = sample['r_peak'][0]
 
-        results = Parallel(n_jobs=-1)(
-            delayed(process_sample)(
-                patient, self.r_peaks[patient], self.signals[patient] if subset != 'train' else None
-            ) for patient in tqdm(self.patients, desc="Processing patients")
-        )
-
-        # Flatten results and reindex with unique keys
-        self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
-
-        
+        return {
+            'signal': signal,
+            'patient_id': patient,
+            # 'r_peaks': torch.tensor([1.0] if r_peak >= 0 else [0.0], dtype=torch.float32),
+            'label': torch.tensor([self.get_label_int(sample['r_peak'][1])], dtype=torch.float32) if r_peak >= 0 else torch.tensor([-1.0], dtype=torch.float32),
+        }
 
 
 def make_collate_fn(config, split='train'):
@@ -277,7 +277,12 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         patients = [item['patient_id'] for item in batch]
-        r_peaks = [item['r_peaks'] for item in batch]
+        if batch[0]['r_peaks'] is None: 
+            r_peaks = None
+        else:
+            r_peaks = [item['r_pxeaks'] for item in batch]
+            r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
+
         labels = [item['label'] for item in batch]
 
         # pad to same length and pad to match the patch size module
@@ -286,7 +291,6 @@ def make_collate_fn(config, split='train'):
         else:
             signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
             
-        r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
         labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
         return {
