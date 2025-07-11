@@ -44,9 +44,10 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
         self.linear_probing = config.linear_probing
         super(xLSTMFeatureClassification, self).__init__(num_channels, config, reconstruction=False)
 
+        emb_size = config.embedding_size * 2 if config.cls_type == 'mix' else config.embedding_size
         self.head = nn.Sequential(
             get_normalization_layer(config),
-            nn.Linear(config.embedding_size, num_classes)
+            nn.Linear(emb_size, num_classes)
         )
 
     def forward(self, x):

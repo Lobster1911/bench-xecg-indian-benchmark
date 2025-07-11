@@ -95,6 +95,15 @@ class pretrainedxLSTM(BaseModel):
                 cls = out.mean(dim=1)
             else:
                 cls = out.masked_fill(padding_mask, 0).sum(dim=1) / (out.shape[1] - padding_mask.sum(dim=1)).clamp(min=1)
+
+        elif self.cls_type == 'mix':
+            if padding_mask is None:
+                max_p = out.max(dim=1)[0]
+                mean_p = out.mean(dim=1)
+            else:
+                max_p = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
+                mean_p = out.masked_fill(padding_mask, 0).sum(dim=1) / (out.shape[1] - padding_mask.sum(dim=1)).clamp(min=1)
+            cls = torch.cat([max_p, mean_p], dim=-1)
         elif self.cls_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]

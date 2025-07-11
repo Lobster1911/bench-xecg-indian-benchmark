@@ -519,12 +519,17 @@ class ecg_jepa(nn.Module):
                                        )
         
         self.target_encoder = copy.deepcopy(self.encoder)
+        self.set_target_encoder()
 
         self.predictor = MaskTransformerPredictor(embed_dim=encoder_embed_dim, predictor_embed_dim=predictor_embed_dim, depth=predictor_depth, num_heads=predictor_num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, qk_scale=qk_scale, drop_rate=drop_rate, attn_drop_rate=attn_drop_rate, drop_path_rate=drop_path_rate, norm_layer=norm_layer, init_std=init_std, c=self.c,p=self.p,t=self.t, pos_type=pos_type)
         self.loss_func = torch.nn.SmoothL1Loss()
 
+    def set_target_encoder(self):
+        for p in self.target_encoder.parameters():
+            p.requires_grad = False
      
     def forward(self, x):
+
         bs, c, T = x.shape 
         assert T == self.p * self.t, 'Input tensor has wrong shape'
         x = x.reshape(bs, c, self.p, self.t)
@@ -568,6 +573,7 @@ class ECGJepaClassifier(BaseModel):
         x = x.transpose(1, 2)
         if self.linear_probing:
             with torch.no_grad():
+                print("Using linear probing")
                 repr = self.encoder.representation(x)
         else:
             repr = self.encoder.representation(x)
