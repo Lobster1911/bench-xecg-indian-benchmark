@@ -1,9 +1,9 @@
 #!/bin/bash -l
 #SBATCH --job-name=lvef
-#SBATCH --partition=l40s
+#SBATCH --partition=h100
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=128
 #SBATCH --mem-per-cpu=512M
 #SBATCH --time=7-00:00:00
 #SBATCH -o ./logs/slurm_output_%j_%x.out # STDOUT
