@@ -38,7 +38,8 @@ class Transformer(nn.Module):
                  drop_path_rate: float = 0,
                  use_final_layer_norm: bool = True):
         super().__init__()
-        assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
+        assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size. But got ' \
+                                          f'seq_len={seq_len} and patch_size={patch_size}.'
         self._repr_dict = {'seq_len': seq_len,
                            'patch_size': patch_size,
                            'num_leads': num_leads,

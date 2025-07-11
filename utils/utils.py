@@ -14,12 +14,13 @@ from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from torch.utils.data import Subset
 import numpy as np
 from models.classification import xLSTMClassification
+from models.mit_bih_models import xLSTMClassificationMIT_BIH
 from ecg_jepa.models import load_encoder
 import st_mem.encoder as encoder
 from ecg_founder.finetune_model import ft_12lead_ECGFounder, ft_1lead_ECGFounder
 
 
-def get_base_model(config):
+def get_base_model(config, is_mit_bih=False):
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
@@ -42,7 +43,11 @@ def get_base_model(config):
             path = './checkpoint/12_lead_ECGFounder.pth'
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     else:
-        base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        if is_mit_bih:
+            base_model = xLSTMClassificationMIT_BIH(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        else:
+            base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        
         if config.checkpoint is not None and config.checkpoint != '':   
             checkpoint = torch.load(config.checkpoint, weights_only=False)
             new_state_dict = {format_keys(k): v for k, v in checkpoint['state_dict'].items()}
@@ -131,7 +136,7 @@ def parse_config(config_file, default_config_file):
         merged_config.drop_path_prob = False
 
     if merged_config.encoder_type == 'transformer':
-        merged_config.win_len = 1125
+        merged_config.win_len = 500
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
 

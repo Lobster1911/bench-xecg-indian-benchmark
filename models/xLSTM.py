@@ -85,6 +85,7 @@ class pretrainedxLSTM(BaseModel):
         return param
     
     def pooling(self, out, padding_mask=None):
+        cls= None
         if self.cls_type == 'max':
             if padding_mask is None:
                 cls = out.max(dim=1)[0]
