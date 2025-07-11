@@ -582,6 +582,9 @@ class ECGJepaClassifier(BaseModel):
     def get_layers(self):
         return self.encoder.encoder_blocks.blocks
     
+    def finetuning_params(self):
+        return self.encoder.parameters()
+    
     def additional_params(self, lr, last_layer_lr, wd):
         params = []
         # linear projection, need the smallest layer_lr
@@ -625,6 +628,9 @@ class ECGJepaFeatureClassifierMIT_BIH(BaseModel):
     
     def get_layers(self):
         return self.encoder.encoder_blocks.blocks
+    
+    def finetuning_params(self):
+        return self.encoder.parameters()
     
     def additional_params(self, lr, last_layer_lr, wd):
         params = []
