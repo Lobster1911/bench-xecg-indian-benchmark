@@ -10,13 +10,13 @@ import os
 from transformer import encoder
 
 
-def get_normalization_layer(config):
+def get_normalization_layer(config, embedding_size=None):
     if config.cls_normalization == 'layer':
-        return nn.LayerNorm(config.embedding_size)
+        return nn.LayerNorm(embedding_size)
     elif config.cls_normalization == 'batch':
-        return nn.BatchNorm1d(config.embedding_size)
+        return nn.BatchNorm1d(embedding_size)
     elif config.cls_normalization == 'instance':
-        return nn.InstanceNorm1d(config.embedding_size)
+        return nn.InstanceNorm1d(embedding_size)
     else:
         return nn.Identity()
     
