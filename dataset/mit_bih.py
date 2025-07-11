@@ -146,15 +146,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                     'around_r_peaks': r_peaks,
                 })
 
-               #  missing = len(signal) % (self.win_len * 2)
-                #if missing != 0:
-                #    around_r_peaks = [(r, l) for r, l in r_peaks if r > len(signal) - missing]
-                #    samples.append({
-                #        'patient': patient,
-                #        'r_peak': len(signal) - missing // 2,
-                #        'around_r_peaks': around_r_peaks,
-                #    })
-                # maybe some samples are issing at the end? 
             return samples
 
         results = Parallel(n_jobs=-1)(
@@ -166,7 +157,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # Flatten results and reindex with unique keys
         self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
         
-
     def __len__(self):
         return len(self.samples)
     
@@ -246,6 +236,37 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 signal_to_return[:, i] = signal[:, leads.index(lead)]
         return signal_to_return
 
+class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
+    def __init__(self, config, split='train', augmentations=None):
+        """
+        Args:
+            config: configuration object
+            split: 'train', 'val'or 'test'
+        """
+        super().__init__(config, split, augmentations)
+
+    def load_samples(self, subset):
+         def process_sample(patient, r_peaks, signal=None):
+            samples = []
+            for i, r_peak in enumerate(r_peaks):
+                samples.append({
+                    'patient': patient,
+                    'r_peak': r_peak,
+                    'signal': 
+                })
+
+            return samples
+
+        results = Parallel(n_jobs=-1)(
+            delayed(process_sample)(
+                patient, self.r_peaks[patient], self.signals[patient] if subset != 'train' else None
+            ) for patient in tqdm(self.patients, desc="Processing patients")
+        )
+
+        # Flatten results and reindex with unique keys
+        self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
+
+        
 
 
 def make_collate_fn(config, split='train'):

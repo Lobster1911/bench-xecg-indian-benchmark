@@ -62,12 +62,12 @@ def train(config, run=None, wandb=False):
             
     model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor='val_auroc', patience=config.patience, mode='max')
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, mode=config.monitor_mode, patience=config.patience)
     nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor='val_auroc', mode='max')
+        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
         prj = f'train-cpsc2018-{config.task}'
         wand_logger = WandbLogger(project=prj, experiment=run, config=config)
         wand_logger.watch(model, log='gradients')

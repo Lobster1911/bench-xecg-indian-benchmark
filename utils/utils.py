@@ -126,9 +126,9 @@ def parse_config(config_file, default_config_file):
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
 
-    if merged_config.linear_probing:
-        merged_config.layerwise_lr_decay = 0.
-        merged_config.drop_path_prob = False
+    # if merged_config.linear_probing:
+        # merged_config.layerwise_lr_decay = 0.
+        # merged_config.drop_path_prob = False
 
     merged_config.use_transformers = merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.encoder_type == 'transformer'
     return merged_config

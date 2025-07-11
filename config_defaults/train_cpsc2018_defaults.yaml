@@ -26,6 +26,8 @@ random_change_amplitude: 0.
 patience: 15
 num_reg_token: 0
 max_length_signal: 60
+monitor_metric: "val_auroc"
+monitor_mode: "max"
 
 activation_fn: "gelu"
 xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
