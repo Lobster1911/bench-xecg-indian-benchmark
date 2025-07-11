@@ -277,10 +277,10 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         patients = [item['patient_id'] for item in batch]
-        if batch[0]['r_peaks'] is None: 
+        if 'r_peaks' not in batch[0].keys(): 
             r_peaks = None
         else:
-            r_peaks = [item['r_pxeaks'] for item in batch]
+            r_peaks = [item['r_peaks'] for item in batch]
             r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
 
         labels = [item['label'] for item in batch]
