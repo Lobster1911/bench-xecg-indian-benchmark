@@ -26,7 +26,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 
         if self.sampling_freq % self.patch_size != 0:
             print(f"Warning: Sampling freq {self.sampling_freq} should be divisible by patch size {self.patch_size}")
-        if self.window_size % self.segment_size != 0 and not (config.use_transformers or config.use_ecg_founder):
+        if self.window_size % self.segment_size != 0 and config.is_recurrent:
             raise ValueError(f"Window size {self.window_size} must be divisible by segment_size {self.segment_size}")
 
         self.load_records()

@@ -26,9 +26,9 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         self.valid_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
         self.test_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
 
-        self.use_transformers = config.use_transformers or config.use_ecg_founder
+        self.is_recurrent = config.is_recurrent
 
-        if not self.use_transformers:
+        if self.is_recurrent:
             self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
             self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
             self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
@@ -61,7 +61,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         train_feature_f1(preds, targets)
         self.log('train_feature_f1', train_feature_f1, prog_bar=False)
 
-        if not self.use_transformers:
+        if self.is_recurrent:
             preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
             train_acc = self.train_acc.to(preds.device)
             train_acc(preds_segment, targets_segment)
@@ -93,7 +93,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         valid_feature_f1(preds, targets)
         self.log('val_feature_f1', valid_feature_f1, prog_bar=False)
 
-        if not self.use_transformers:
+        if self.is_recurrent:
             preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
             valid_acc = self.valid_acc.to(preds.device)
             valid_acc(preds_segment, targets_segment)
@@ -130,7 +130,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         test_feature_f1(preds, targets)
         self.log('test_feature_f1', test_feature_f1, prog_bar=False)
 
-        if not self.use_transformers:
+        if self.is_recurrent:
             preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
             test_acc = self.test_acc.to(preds.device)
             test_acc(preds_segment, targets_segment)   
@@ -157,7 +157,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     
     def on_validation_epoch_end(self):
         # Compute and log metrics
-        if self.use_transformers:
+        if not self.is_recurrent:
             metrics = self.val_metric.compute()
             self.log_dict({
                 'val_auc': metrics['auc_macro'],
@@ -176,7 +176,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         
     def on_test_epoch_end(self):
         # Compute and log final test metrics
-        if self.use_transformers:
+        if not self.is_recurrent:
             metrics = self.test_metric.compute()
             self.log_dict({
                 'test_auc': metrics['auc_macro'],
@@ -207,7 +207,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         preds = (torch.sigmoid(logits) > 0.5).float()
 
 
-        if self.use_transformers:
+        if not self.is_recurrent:
             targets = targets.squeeze(-1)
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         else:

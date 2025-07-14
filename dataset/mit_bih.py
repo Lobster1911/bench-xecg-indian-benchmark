@@ -8,6 +8,7 @@ from joblib import Parallel, delayed
 from tqdm import tqdm
 import neurokit2 as nk
 from dataset.generic_utils import RandomSwitchtBaselineWanderBatched
+from typing_extensions import override
 
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
@@ -62,7 +63,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.augmentations = augmentations
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
-        self.use_transformers = config.use_transformers
+        self.is_recurrent = config.is_recurrent 
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -103,7 +104,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
             return patient, signal, header, annotations, r_peaks, labels_orig, labels
 
-        results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
+        # results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
+        results = [process_patient(patient) for patient in self.patients]
 
         for patient, signal, header, annotations, r_peaks, labels_orig, labels in results:
             if self.sampling_freq != header.fs:
@@ -123,7 +125,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
-            if subset == 'train' or self.use_transformers:
+            if subset == 'train' or not self.is_recurrent:
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
                     if (sample_class != last_class or skipped > 10 or sample_class != 'N') or not self.skip_majority_class_samples:
@@ -177,11 +179,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         around_r_peaks = sample['around_r_peaks']
         len_signal = signal.shape[0]
 
-        if self.random_shift and (self.split == 'train' or self.use_transformers):
+        if self.random_shift and (self.split == 'train' or not self.is_recurrent):
             shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
             window_start = max(0, r_peak - self.win_len + shift)
             window_end = min(r_peak + self.win_len + shift, len_signal)
-        elif self.split == 'train' or self.use_transformers:
+        elif self.split == 'train' or not self.is_recurrent:
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
         else:
@@ -244,6 +246,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
         """
         super().__init__(config, split, augmentations)
 
+    @override
     def load_samples(self, subset):
         self.samples = []
         for patient in tqdm(self.patients, desc="Processing patients"):
@@ -260,6 +263,13 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
         patient = sample['patient']
         signal = torch.tensor(sample['signal'], dtype=torch.float32)
         r_peak = sample['r_peak'][0]
+        header = self.headers[patient]
+
+        signal = self.filter_leads(signal, header.__dict__['sig_name'])
+
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
+
 
         return {
             'signal': signal,
