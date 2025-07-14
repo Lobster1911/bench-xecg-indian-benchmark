@@ -28,7 +28,7 @@ class DeepBeatDataset(PretrainDataset):
         self.signals = data['signal']
         self.qa_label = data['qa_label']
         self.rhythm = data['rhythm']
-        self.rhythm_label = torch.from_numpy(data['rhythm_label']).float()
+        self.rhythm_label = torch.from_numpy(self.rhythm).float()
         self.parameters = data['parameters']
 
     def __len__(self):
