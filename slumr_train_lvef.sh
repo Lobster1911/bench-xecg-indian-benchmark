@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --job-name=lvef
-#SBATCH --partition=h100
+#SBATCH --partition=l40s
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
