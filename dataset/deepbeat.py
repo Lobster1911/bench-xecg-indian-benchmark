@@ -1,0 +1,50 @@
+
+from pathlib import Path
+
+import torch
+import yaml
+import pandas as pd
+import numpy as np
+
+from dataset.pretraining_dataset import PretrainDataset
+
+class DeepBeatDataset(PretrainDataset):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
+        self.data_folder = Path(config.data_folder_deepbeat)
+        self.signals = None
+        self.info_dict = {"fs": 32, "sig_name": ["II"]}
+
+        if split == 'train':
+            path = self.data_folder / 'train.npz'
+        elif split == 'val':
+            path = self.data_folder / 'validate.npz'
+        elif split == 'test':
+            path = self.data_folder / 'test.npz'
+        else:
+            raise ValueError(f'Unknown split {split}')
+
+        data = np.load(path, allow_pickle=True)
+        self.signals = data['signal']
+        self.qa_label = data['qa_label']
+        self.rhythm = data['rhythm']
+        self.rhythm_label = torch.from_numpy(self.rhythm).float()
+        self.parameters = data['parameters']
+
+    def __len__(self):
+        return len(self.signals)
+
+    def __getitem__(self, idx):
+        signal = self.signals[idx]
+        signal = self.resample_if_needed(signal, self.info_dict)
+        signal = self.map_leads_and_clean(signal, self.info_dict)
+
+        signal = torch.from_numpy(signal).float()
+
+        labels = self.rhythm_label[idx]
+
+        out = {
+            'signal': signal,
+            'label': labels,
+        }
+        return out
