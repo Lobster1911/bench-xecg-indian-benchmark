@@ -4,7 +4,7 @@ import lightning as L
 from lightning.pytorch.loggers import WandbLogger
 from models.classification import xLSTMClassification
 
-import dataset.code as code
+import dataset.code_dataset as code
 import dataset.ptb_xl as ptbxl
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor

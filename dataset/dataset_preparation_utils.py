@@ -7,7 +7,7 @@ import h5py
 import json
 import simple_icd_10
 import dataset.mit_bih as mit_bih
-import dataset.code as code
+import dataset.code_dataset as code
 import dataset.mimic_iv as mimic
 import dataset.ptb_xl as ptb_xl
 import dataset.chapman as chapman
