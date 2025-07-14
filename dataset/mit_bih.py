@@ -255,7 +255,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
                 self.samples.append({
                     'patient': patient,
                     'r_peak': r_peak,
-                    'signal': signal[max(0, r_peak[0] - 200): min(len(signal), r_peak[0] + self.win_len)],
+                    'signal': signal[max(0, r_peak[0] - 200): min(len(signal), r_peak[0] + 200)],
                 })
 
     def __getitem__(self, idx):
