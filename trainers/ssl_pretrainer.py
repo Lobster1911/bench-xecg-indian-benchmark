@@ -245,10 +245,8 @@ class PretrainedNetwork(L.LightningModule):
 
         self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True)
 
-
-        rank_me1 = self.rank_me(global_out[0]['cls'])
-        rank_me2 = self.rank_me(global_out[1]['cls'])
-        self.log(f"{step}_rank_me", ((rank_me1 + rank_me2) / 2).item(), prog_bar=True)
+        rank_me = [self.rank_me(out['cls']) for out in global_out]
+        self.log(f"{step}_rank_me", (sum(rank_me) / len(rank_me)).item(), prog_bar=True)
 
         # log norm of output
         with torch.no_grad():
