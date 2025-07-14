@@ -8,7 +8,7 @@ from dataset.deepbeat import DeepBeatDataset
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
-from trainers.ptb_xl_trainer import TrainingPTB_XL
+from trainers.deepbeat_trainer import TrainingDeepBeat
 import torch
 import argparse
 import os
