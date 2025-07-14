@@ -203,7 +203,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
-        logits = self.model(x).squeeze(-1)
+        logits = self.model(x).squeeze(-1) 
         preds = (torch.sigmoid(logits) > 0.5).float()
 
 
@@ -212,7 +212,6 @@ class TrainingSleepApnea(CommonTrainerDownstream):
             loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         else:
             targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
-
             min_length = min(logits.shape[-1], targets.shape[-1])
             logits = logits[:, :min_length] 
             targets = targets[:, :min_length] 

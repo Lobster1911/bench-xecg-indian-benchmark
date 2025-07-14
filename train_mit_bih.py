@@ -65,7 +65,7 @@ def train(config, run=None, wandb=False):
     test_dataset = dataset_class(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
 
-    base_model = utils.get_base_model(config, is_mit_bih=True)
+    base_model = utils.get_base_model(config, feature_classification=True)
 
     model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
