@@ -36,9 +36,6 @@ def train(config, run=None, wandb=False):
     val_dataset = DeepBeatDataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
-    if config.training_pct < 1.0:
-        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
-
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
