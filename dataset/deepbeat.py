@@ -13,7 +13,7 @@ class DeepBeatDataset(PretrainDataset):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = Path(config.data_folder_deepbeat)
         self.signals = None
-        self.info_dict = {"fs": 32}
+        self.info_dict = {"fs": 32, "sig_name": ["II"]}
 
         if split == 'train':
             path = self.data_folder / 'train.npz'
@@ -36,6 +36,7 @@ class DeepBeatDataset(PretrainDataset):
     def __getitem__(self, idx):
         signal = self.signals[idx]
         signal = self.resample_if_needed(signal, self.info_dict)
+        signal = self.map_leads_and_clean(signal, self.info_dict)
 
         labels = self.rhythm[idx]
 
