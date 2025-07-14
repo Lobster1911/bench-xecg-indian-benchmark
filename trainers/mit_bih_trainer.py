@@ -246,7 +246,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             # cls, r_peak_pos = self.model(x)
             cls, _ = self.model(x)
 
-            r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
+            # r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
 
             if cls.shape[1] > targets.shape[1]:
                 cls = cls[:, :targets.shape[1], :]
