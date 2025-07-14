@@ -11,7 +11,7 @@
 echo "Visible GPUs: "
 echo $CUDA_VISIBLE_DEVICES
 
-ulimit -n 4096
+ulimit -n 16384
 
 #source /home/$USER/.bashrc
 #conda init
