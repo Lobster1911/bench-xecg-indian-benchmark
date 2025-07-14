@@ -36,14 +36,14 @@ class DeepBeatDataset(PretrainDataset):
 
     def __getitem__(self, idx):
         signal = self.signals[idx]
-        signal = self.resample_if_needed(signal, self.info_dict).float()
+        signal = self.resample_if_needed(signal, self.info_dict)
         signal = self.map_leads_and_clean(signal, self.info_dict)
 
         labels = self.rhythm_label[idx]
 
         out = {
-            'signal': signal,
-            'label': labels,
+            'signal': signal.float(),
+            'label': labels.float(),
         }
         return out
 
