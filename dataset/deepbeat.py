@@ -6,7 +6,7 @@ import yaml
 import pandas as pd
 import numpy as np
 
-from pretraining_dataset import PretrainDataset
+from dataset.pretraining_dataset import PretrainDataset
 
 class DeepBeatDataset(PretrainDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
