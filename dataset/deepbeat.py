@@ -26,18 +26,39 @@ class DeepBeatDataset(PretrainDataset):
 
         data = np.load(path, allow_pickle=True)
         self.signals = data['signal']
+
+        print(f"Loaded {len(self.signals)} signals from {path} with shape {self.signals.shape}")
+
+
         self.qa_label = data['qa_label']
         self.rhythm = data['rhythm']
-        self.rhythm_label = torch.from_numpy(self.rhythm).float()
         self.parameters = data['parameters']
+
+        # get index of nan signals
+        nan_indices = np.where(np.isnan(self.signals).any(axis=1))[0]
+
+        if len(nan_indices) > 0:
+            print(f"Found {len(nan_indices)} signals with NaN values, removing them")
+            self.signals = np.delete(self.signals, nan_indices, axis=0)
+            self.rhythm = np.delete(self.rhythm, nan_indices, axis=0)
+            self.qa_label = np.delete(self.qa_label, nan_indices, axis=0)
+            self.parameters = np.delete(self.parameters, nan_indices, axis=0)
+
+        self.rhythm_label = torch.from_numpy(self.rhythm).float()
+
+
 
     def __len__(self):
         return len(self.signals)
 
     def __getitem__(self, idx):
         signal = self.signals[idx]
+
         signal = self.resample_if_needed(signal, self.info_dict)
         signal = self.map_leads_and_clean(signal, self.info_dict)
+
+        if self.global_augmentations is not None:
+            signal = self.global_augmentations(signal)
 
         signal = torch.from_numpy(signal).float()
 

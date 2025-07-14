@@ -113,6 +113,7 @@ class TrainingDeepBeat(CommonTrainerDownstream):
     
     def predict_batch(self, batch):
         x = batch["signal"]
+        
         targets = batch['label']
 
         if self.linear_probing: 
