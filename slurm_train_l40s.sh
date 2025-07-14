@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=$1
+#SBATCH --job-name=train_model
 #SBATCH --partition=l40s
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
