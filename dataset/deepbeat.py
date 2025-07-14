@@ -14,6 +14,7 @@ class DeepBeatDataset(PretrainDataset):
         self.data_folder = Path(config.data_folder_deepbeat)
         self.signals = None
         self.info_dict = {"fs": 32, "sig_name": ["II"]}
+        self.discard_bad_samples = config.discard_bad_samples
 
         if split == 'train':
             path = self.data_folder / 'train.npz'
@@ -26,9 +27,7 @@ class DeepBeatDataset(PretrainDataset):
 
         data = np.load(path, allow_pickle=True)
         self.signals = data['signal']
-
         print(f"Loaded {len(self.signals)} signals from {path} with shape {self.signals.shape}")
-
 
         self.qa_label = data['qa_label']
         self.rhythm = data['rhythm']
@@ -44,9 +43,19 @@ class DeepBeatDataset(PretrainDataset):
             self.qa_label = np.delete(self.qa_label, nan_indices, axis=0)
             self.parameters = np.delete(self.parameters, nan_indices, axis=0)
 
+        if self.discard_bad_samples:
+            # keep only records where qa_label is [1, 0, 0]
+            valid_indices = np.where((self.qa_label[:, 0] == 1) & (self.qa_label[:, 1] == 0) & (self.qa_label[:, 2] == 0))[0]
+            if len(valid_indices) > 0:
+                print(f"Found {len(valid_indices)} good quality signals, keeping them")
+                self.signals = self.signals[valid_indices]
+                self.qa_label = self.qa_label[valid_indices]
+                self.rhythm = self.rhythm[valid_indices]
+                self.parameters = self.parameters[valid_indices]
+            else:
+                print("No valid signals found, using all signals")
+
         self.rhythm_label = torch.from_numpy(self.rhythm).float()
-
-
 
     def __len__(self):
         return len(self.signals)

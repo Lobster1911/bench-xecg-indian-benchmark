@@ -12,15 +12,11 @@ from trainers.deepbeat_trainer import TrainingDeepBeat
 import torch
 import argparse
 import os
-import numpy as np
-from tqdm import tqdm
 import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from torchvision import transforms
 from dataset.generic_utils import get_transforms
-import st_mem.encoder as encoder
-from ecg_jepa.models import load_encoder
+from torch.utils.data import WeightedRandomSampler
+
 
 
 import argparse
@@ -36,7 +32,13 @@ def train(config, run=None, wandb=False):
     val_dataset = DeepBeatDataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
+    N = len(train_dataset)
+    num_samples = int(N * 0.1)  # 10% of the dataset
+    weights = torch.ones(N) / N  # Initialize weights to 1.0
+
+    sampler = WeightedRandomSampler(weights, num_samples, replacement=True)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, sampler=sampler)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     test_dataset = DeepBeatDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))

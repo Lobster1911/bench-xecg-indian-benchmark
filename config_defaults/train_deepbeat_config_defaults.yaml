@@ -26,6 +26,7 @@ random_drop_leads: 0.0
 random_change_amplitude: 0.
 max_length_signal: 25
 
+monitor_metric: val_f1
 patience: 15
 
 activation_fn: "gelu"
