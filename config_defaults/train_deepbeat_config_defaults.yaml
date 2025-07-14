@@ -1,0 +1,58 @@
+lr_head: 0.01
+lr_xlstm: 0.00001
+wd: 0.01
+batch_size: 64
+num_workers: 32
+epochs: 30
+patch_size: 128
+dropout: 0.4
+embedding_size: 512
+deterministic: true
+is_sweep: false
+grad_clip: 0.5
+weight_tying: false
+label_smoothing: 0.0
+training_pct: 1.
+
+optimizer: "adamw"
+use_scheduler: true
+num_epochs_warmup: 1
+num_epochs_warm_restart: 15
+sched_decay_factor: 0.8
+random_surrogate_prob: 0.0
+random_jitter_prob: 0.0
+random_drop_leads: 0.0
+random_change_amplitude: 0.
+max_length_signal: 12
+
+patience: 15
+
+activation_fn: "gelu"
+xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
+wandb_log: false
+num_heads: 4
+encoder_type: "small"
+patch_embedding: "linear"
+bidirectional: false
+use_focal_loss: false
+sampling_freq: 100
+use_final_layer_norm: true
+cls_normalization: null
+
+normalize: true
+random_crop: 0.9
+nk_clean: true
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+
+data_folder_deepbeat: ../../../data/DeepBeat_PPG/
+
+checkpoint: null
+
+task: 'multiclass'
+num_classes: 2
+
+strategy: masked_token_prediction
+num_reg_token: 0
+
+n_global_view: 1
+n_local_view: 0
