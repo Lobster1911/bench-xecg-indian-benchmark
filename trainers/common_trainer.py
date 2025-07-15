@@ -27,7 +27,6 @@ class CommonTrainerDownstream(pl.LightningModule):
         self.len_train_dataset = len_train_dataset
         self.num_epochs_warmup = config.num_epochs_warmup
         self.sched_decay_factor = config.sched_decay_factor
-        self.label_smoothing = config.label_smoothing
         self.epochs = config.epochs
         self.use_focal_loss = config.use_focal_loss
         self.linear_probing = config.linear_probing

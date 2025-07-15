@@ -1,11 +1,11 @@
 import os
 from torch import utils
-import lightning as L
+import lightning as pl
 from lightning.pytorch.loggers import WandbLogger
 from models.mit_bih_models import xLSTMClassificationMIT_BIH
 import dataset.mit_bih as mit_bih
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingMIT_BIH
+from trainers.mit_bih_trainer import TrainingMIT_BIH, TrainingMIT_BIH_R_Peak
 import torch
 import argparse
 import os
@@ -25,7 +25,7 @@ parser.add_argument('--config_file', type=str, default='configs/train_mit_bih_ru
 
 def train(config, run=None, wandb=False):
     # set deterministic training
-    if config.deterministic: L.seed_everything(42)
+    if config.deterministic: pl.seed_everything(42)
 
     dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.use_ecg_founder else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
@@ -45,6 +45,9 @@ def train(config, run=None, wandb=False):
 
 
     if config.use_class_weights:
+        if config.r_peaks_detection:
+            print('Using class weights for r-peaks detection')
+            weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
         # weights = get_training_class_weights(train_dataset).to('cuda')
         # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
         # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
@@ -67,18 +70,13 @@ def train(config, run=None, wandb=False):
 
     base_model = utils.get_base_model(config, feature_classification=True)
 
-    model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
-
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
-    lr_monitor = LearningRateMonitor(logging_interval='step')
-
-    if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
-        wand_logger = WandbLogger(project=f"train-mitbih-{config.num_classes}", experiment=run, config=config)
-        wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback], gradient_clip_val=config.grad_clip)
+    if config.r_peaks_detection:
+       model = TrainingMIT_BIH_R_Peak(model=base_model, config=config, len_train_dataset=len(train_dataset))
     else:
-        trainer = L.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping], gradient_clip_val=config.grad_clip)
+        model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
+
+    prj_string = f"train-mitbih-{config.num_classes}" if not config.r_peaks_detection else f"train-mitbih-r_peaks"
+    trainer = utils.get_trainer(config, model, prj_string, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)

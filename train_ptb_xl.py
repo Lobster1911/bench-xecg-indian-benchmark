@@ -64,18 +64,8 @@ def train(config, run=None, wandb=False):
 
     model = TrainingPTB_XL(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode='max')
-    nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
-    lr_monitor = LearningRateMonitor(logging_interval='step')
-
-    if wandb:
-        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode='max')
-        prj = f'train-ptbxl-{config.classification_taksk}-{config.task}'
-        wand_logger = WandbLogger(project=prj, experiment=run, config=config)
-        wand_logger.watch(model, log='gradients')
-        trainer = L.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=log_every_n_steps)
-    else:
-        trainer = L.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip, log_every_n_steps=log_every_n_steps)
+    prj_str = f'train-ptbxl-{config.classification_taksk}-{config.task}'
+    trainer = utils.get_trainer(config, model, prj_string=prj_str, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader)

@@ -10,8 +10,6 @@ embedding_size: 512
 deterministic: true
 is_sweep: false
 grad_clip: 0.5
-weight_tying: false
-label_smoothing: 0.0
 num_classes: 9
 
 optimizer: "adamw"

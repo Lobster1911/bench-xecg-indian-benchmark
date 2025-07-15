@@ -5,7 +5,6 @@ metric:
   goal: maximize
   name: test_f1/mean
 
-
 parameters:
   pretrain:
     value: False
@@ -44,8 +43,6 @@ parameters:
     value: False
   use_class_weights:
     values: [True, False]
-  label_smoothing:
-    value: 0.
 
   optimizer:
     value: 'adamw'
@@ -76,7 +73,6 @@ parameters:
     value: 4
   checkpoint:
     value: 'pretrained_models/medium_512/checkpoints/epoch=38-step=174330.ckpt'
-  oversample:
   encoder_type:
     value: 'small'
   patch_embedding:

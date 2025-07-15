@@ -18,6 +18,10 @@ from models.mit_bih_models import xLSTMClassificationMIT_BIH
 from ecg_jepa.models import load_encoder
 import st_mem.encoder as encoder
 from ecg_founder.finetune_model import ft_12lead_ECGFounder, ft_1lead_ECGFounder
+from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
+from lightning.pytorch.loggers import WandbLogger
+import lightning as pl
+
 
 
 def get_base_model(config, feature_classification=False):
@@ -124,6 +128,7 @@ def parse_config(config_file, default_config_file):
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
     elif merged_config.use_ecg_founder:
+        merged_config.win_len = 2500
         merged_config.sampling_freq = 500
         merged_config.low_pass_filter = 30
         merged_config.high_pass_filter = 0.5
@@ -141,7 +146,27 @@ def parse_config(config_file, default_config_file):
         merged_config.window_size_val = 1000
 
     merged_config.is_recurrent = not (merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.use_ecg_founder or merged_config.encoder_type == 'transformer')
+    
+    # ensure that for r_peaks detection, num_classes is equal to patch_size
+    if merged_config.r_peaks_detection:
+        merged_config.num_classes = merged_config.patch_size
+    
     return merged_config
+
+def get_trainer(config, model, prj_string, wandb=False, run=None):
+    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
+    nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+
+    if wandb:
+        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
+        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config)
+        wand_logger.watch(model, log='gradients')
+        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip)
+    else:
+        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip)
+
+    return trainer
 
 def parse_sweep_config(config, default_config_file):
     with open(default_config_file, 'r') as file:
