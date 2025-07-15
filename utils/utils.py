@@ -160,7 +160,7 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
 
     if wandb:
         checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
-        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config)
+        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         wand_logger.watch(model, log='gradients')
         trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip)
     else:

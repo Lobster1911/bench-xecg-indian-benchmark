@@ -23,6 +23,10 @@ random_surrogate_prob: 0.0
 random_jitter_prob: 0.0
 random_drop_leads: 0.0
 random_change_amplitude: 0.
+random_resample: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: false
+
 max_length_signal: 25
 data_pct: 1.0
 monitor_metric: val_auroc
@@ -41,7 +45,7 @@ use_final_layer_norm: true
 cls_normalization: null
 
 normalize: false
-random_crop: 0
+random_crop: 1.
 nk_clean: false
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
