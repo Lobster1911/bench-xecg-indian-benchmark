@@ -10,6 +10,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Learning
 
 from trainers.deepbeat_trainer import TrainingDeepBeat
 import torch
+import numpy as np
 import argparse
 import os
 import utils.utils as utils
@@ -32,14 +33,23 @@ def train(config, run=None, wandb=False):
     val_dataset = DeepBeatDataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
     print(f"Val dataset size: {len(val_dataset)}")
 
-    N = len(train_dataset)
-    num_samples = int(N * 0.1)  # 10% of the dataset
-    weights = torch.ones(N) / N  # Initialize weights to 1.0
+    if config.data_pct < 1.0:
+        N = len(train_dataset)
+        num_samples = int(N * config.data_pct)  # 10% of the dataset
+        weights = torch.ones(N) / N  # Initialize weights to 1.0
+        sampler = WeightedRandomSampler(weights, num_samples, replacement=True)
 
-    sampler = WeightedRandomSampler(weights, num_samples, replacement=True)
+        # take the 10% of the dataset for validation
+        rng = np.random.default_rng(42)
+        indices = rng.choice(len(val_dataset), size=int(len(val_dataset) * config.data_pct), replace=False)
+        val_subset = Subset(val_dataset, indices)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, sampler=sampler)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+        train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, sampler=sampler)
+        val_dataloader = DataLoader(val_subset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+
+    else:
+        train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
+        val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     test_dataset = DeepBeatDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)

@@ -25,7 +25,7 @@ random_jitter_prob: 0.0
 random_drop_leads: 0.0
 random_change_amplitude: 0.
 max_length_signal: 25
-
+data_pct: 1.0
 monitor_metric: val_f1
 patience: 15
 

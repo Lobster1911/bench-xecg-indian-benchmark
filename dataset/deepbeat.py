@@ -6,6 +6,8 @@ import yaml
 import pandas as pd
 import numpy as np
 
+from datetime import datetime, timedelta
+from tqdm import tqdm
 from dataset.pretraining_dataset import PretrainDataset
 
 class DeepBeatDataset(PretrainDataset):
@@ -15,6 +17,7 @@ class DeepBeatDataset(PretrainDataset):
         self.signals = None
         self.info_dict = {"fs": 32, "sig_name": ["II"]}
         self.discard_bad_samples = config.discard_bad_samples
+        self.discard_augmented_samples = config.discard_augmented_samples
 
         if split == 'train':
             path = self.data_folder / 'train.npz'
@@ -55,6 +58,36 @@ class DeepBeatDataset(PretrainDataset):
             else:
                 print("No valid signals found, using all signals")
 
+        if self.discard_augmented_samples:
+            last_datetime = None
+            last_patient = None
+            to_keep = []
+
+            print(f"Number of samples before filtering: {len(self.parameters)}")
+
+            for i, p in tqdm(enumerate(self.parameters)):
+                if last_datetime is None or last_patient is None:
+                    last_datetime = p[0]
+                    last_patient = p[2]
+                    to_keep.append(i)
+                else:
+                    # difference between timestamp is less than 25 seconds
+                    if isinstance(p[0], str):
+                        p[0] = datetime.strptime(p[0].strip(), '%d-%b-%Y %H:%M:%S')
+                    if p[2] == last_patient and (p[0] - last_datetime) <= timedelta(seconds=24):
+                        # keep the first one
+                        continue
+                    else:
+                        last_datetime = p[0]
+                        last_patient = p[2]
+                        to_keep.append(i)
+
+            print(f"Number of samples after filtering: {len(to_keep)}")
+            self.signals = self.signals[to_keep]
+            self.qa_label = self.qa_label[to_keep]
+            self.rhythm = self.rhythm[to_keep]
+            self.parameters = self.parameters[to_keep]
+            
         self.rhythm_label = torch.from_numpy(self.rhythm).float()
 
     def __len__(self):
