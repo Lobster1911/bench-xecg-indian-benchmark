@@ -34,7 +34,7 @@ def get_base_model(config, feature_classification=False):
         print(msg)
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes, linear_probing=config.linear_probing, feature_classification=is_mit_bih) # dim is the dimension of the latent space
+        base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes, linear_probing=config.linear_probing, feature_classification=feature_classification) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
             path = './checkpoint/1_lead_ECGFounder.pth'

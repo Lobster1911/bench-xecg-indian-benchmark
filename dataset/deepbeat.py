@@ -102,12 +102,13 @@ class DeepBeatDataset(PretrainDataset):
         if self.global_augmentations is not None:
             signal = self.global_augmentations(signal)
 
-        signal = torch.from_numpy(signal).float()
+        if isinstance(signal, np.ndarray):
+            signal = torch.from_numpy(signal).float()
 
         labels = self.rhythm_label[idx]
 
         out = {
-            'signal': signal,
+            'signal': signal.float(),
             'label': labels,
         }
         return out
