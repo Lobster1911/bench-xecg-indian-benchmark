@@ -159,11 +159,13 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     if wandb:
+        print(f"Using WandbLogger for project {prj_string} and run {run}")
         checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         wand_logger.watch(model, log='gradients')
         trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip)
     else:
+        print(f"Using default logger for project {prj_string} and run {run}")
         trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip)
 
     return trainer
