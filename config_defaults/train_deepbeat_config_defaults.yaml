@@ -12,6 +12,8 @@ deterministic: true
 is_sweep: false
 grad_clip: 0.5
 task: multiclass
+monitor_metric: val_auroc
+monitor_mode: max
 
 
 optimizer: "adamw"
