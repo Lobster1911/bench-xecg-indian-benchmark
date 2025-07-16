@@ -71,5 +71,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     config = utils.parse_config(args.config_file, 'config_defaults/train_deepbeat_config_defaults.yaml')
+    print(f"Using config: {args.config_file}")
 
     train(config, wandb=config.wandb_log)
