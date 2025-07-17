@@ -134,6 +134,22 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.log('val_f1_20', avg_distance_20['f1'], prog_bar=True)
         self.val_distance_20.reset()
 
+        # if self.plot_test_predictions:
+        #     try:
+        #         sample_1 = self.trainer.val_dataloaders.dataset[0]
+        #         sample_2 = self.trainer.val_dataloaders.dataset[1]
+        #         log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
+        #         img_1 = plot_r_peaks(sample_1, self.model, self.device, log_dir, self.current_epoch, 'r_peaks_1')
+        #         img_2 = plot_r_peaks(sample_2, self.model, self.device, log_dir, self.current_epoch, 'r_peaks_2')
+
+        #         if isinstance(self.logger, pl.loggers.WandbLogger):
+        #             self.logger.log_image(key="reconstructions_train", images=[img_1, img_2])
+        #     except Exception as e:
+        #         print(f"Error plotting R-peaks: {e}")
+        #         # print stack trace
+        #         import traceback
+        #         traceback.print_exc()
+
     def test_step(self, batch, _):
         loss_r_peak_pos, r_peak_pos, r_peaks, r_peaks_orig = self.predict_batch(batch)
 

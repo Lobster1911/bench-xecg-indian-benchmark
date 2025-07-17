@@ -142,7 +142,7 @@ def parse_config(config_file, default_config_file):
         merged_config.drop_path_prob = False
 
     if merged_config.encoder_type == 'transformer':
-        merged_config.win_len = 500
+        merged_config.win_len = 500 
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
         merged_config.max_length_signal = 1000

@@ -143,6 +143,7 @@ def plot_generation(sample, model, patch_size, device, logdir, epoch, name):
 def plot_r_peaks(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
         signal = sample['signal'].to(device).unsqueeze(0)
+        r_peaks = sample['r_peak'].to(device).unsqueeze(0)
         # print(f"Signal shape: {signal.shape}")
 
         # Get the original R-peaks
@@ -157,6 +158,7 @@ def plot_r_peaks(sample, model, device, logdir, epoch, name):
         if signal.shape[1] > 2000:
             signal = signal[:, :2000, :]
             r_peak_pos = r_peak_pos[:, :2000]
+            r_peaks = r_peaks[:, :2000]
 
         # print(f"Predicted R-peaks shape: {r_peak_pos.shape}")
 
@@ -168,7 +170,11 @@ def plot_r_peaks(sample, model, device, logdir, epoch, name):
         # Plot vertical lines for predicted R-peaks
         pred_peaks = np.where(r_peak_pos.cpu().squeeze().numpy())[0]
         for peak in pred_peaks:
-            ax.axvline(peak, color='orange', linestyle='--', label='Predicted R-peak' if peak == pred_peaks[0] else "", alpha=0.5)
+            ax.axvline(peak, color='orange', linestyle='--', label='Predicted R-peak' if peak == pred_peaks[0] else "", alpha=0.3)
+        
+        gts = np.where(r_peaks.cpu().squeeze().numpy())[0]
+        for gt in gts:
+            ax.axvline(gt, color='green', linestyle='--', label='Ground Truth R-peak' if gt == gts[0] else "", alpha=0.3)
 
         ax.set_title(f'R-peaks Prediction - {name}')
         ax.set_xlabel('Time (samples)')

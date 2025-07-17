@@ -28,7 +28,7 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
 
-    dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.use_ecg_founder else mit_bih.ECGMITBIHDataset
+    dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.use_ecg_founder and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
 
     if config.split_val_by_patient:
