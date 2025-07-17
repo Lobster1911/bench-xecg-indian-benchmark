@@ -298,7 +298,7 @@ def make_collate_fn(config, split='train'):
 
 
         r_peaks_orig = [item['r_peak_orig'] for item in batch]
-        r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=0)
+        r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=torch.nan)
 
         # pad to same length and pad to match the patch size module
         if config.shuffle_baseline_wander_in_batch and split == 'train':
