@@ -16,7 +16,8 @@ mappings = { 'di': 'i', 'dii': 'ii', 'diii': 'iii' }
 
 class PretrainDataset(torch.utils.data.Dataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
-        self.leads = leads if not config.use_ecg_jepa else jepa_leads
+        self.leads = config.leads if not config.use_ecg_jepa else jepa_leads
+        self.leads = [l.lower() for l in self.leads] # ensure leads are lowercase
         print('using leads :', self.leads)
         self.patch_size = config.patch_size
         self.split = split
@@ -56,6 +57,7 @@ class PretrainDataset(torch.utils.data.Dataset):
     
     def map_leads_and_clean(self, signal, info):
         s = np.zeros((len(signal), len(self.leads)))
+
         for lead in info['sig_name']:
             l = lead.lower()
             if l in mappings:
@@ -65,7 +67,8 @@ class PretrainDataset(torch.utils.data.Dataset):
                     s[:, self.leads.index(l)] = nk.ecg_clean(signal[:, info['sig_name'].index(lead)], sampling_rate=info['fs']).copy()
                 else:
                     s[:, self.leads.index(l)] = signal[:, info['sig_name'].index(lead)]
-        return s
+
+        return torch.tensor(s, dtype=torch.float32)
     
     def resample_if_needed(self, signal, info):
         if self.sampling_freq != info['fs']:

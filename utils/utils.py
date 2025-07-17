@@ -23,10 +23,9 @@ from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
 
 
-
 def get_base_model(config, feature_classification=False):
     if config.use_st_mem:
-        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob)
+        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob, feature_classification=feature_classification, r_peaks_detection=config.r_peaks_detection)
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
         checkpoint_model = checkpoint['model']
         state_dict = base_model.state_dict()
@@ -38,7 +37,7 @@ def get_base_model(config, feature_classification=False):
         print(msg)
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes, linear_probing=config.linear_probing, feature_classification=feature_classification) # dim is the dimension of the latent space
+        base_model = load_encoder(ckpt_dir=ckpt_dir, drop_path_rate=config.drop_path_prob, num_classes=config.num_classes, linear_probing=config.linear_probing, feature_classification=feature_classification, r_peaks_detection=config.r_peaks_detection) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
             path = './checkpoint/1_lead_ECGFounder.pth'
@@ -112,7 +111,7 @@ def parse_config(config_file, default_config_file):
     if merged_config.use_ecg_jepa:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 50
-        # merged_config.max_length_signal = 10
+        merged_config.max_length_signal = 2500
         merged_config.win_len = 1250
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
         merged_config.window_size_train = 1000
@@ -120,7 +119,7 @@ def parse_config(config_file, default_config_file):
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
-        # merged_config.max_length_signal = 10
+        merged_config.max_length_signal = 2325
         merged_config.win_len = 1125
         merged_config.low_pass_filter = 40
         merged_config.high_pass_filter = 0.67
@@ -132,9 +131,11 @@ def parse_config(config_file, default_config_file):
         merged_config.sampling_freq = 500
         merged_config.low_pass_filter = 30
         merged_config.high_pass_filter = 0.5
-        merged_config.max_length_signal = 10
+        merged_config.max_length_signal = 5000
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
+        merged_config.layerwise_lr_decay = 1.
+        merged_config.drop_path_prob = 0.
 
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.
@@ -144,13 +145,16 @@ def parse_config(config_file, default_config_file):
         merged_config.win_len = 500
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
-        merged_config.max_length_signal = 10
+        merged_config.max_length_signal = 1000
 
     merged_config.is_recurrent = not (merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.use_ecg_founder or merged_config.encoder_type == 'transformer')
     
     # ensure that for r_peaks detection, num_classes is equal to patch_size
     if merged_config.r_peaks_detection:
-        merged_config.num_classes = merged_config.patch_size
+        if merged_config.use_ecg_founder:
+            merged_config.num_classes = merged_config.max_length_signal
+        else:
+            merged_config.num_classes = merged_config.patch_size
     
     return merged_config
 

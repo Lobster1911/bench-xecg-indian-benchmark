@@ -23,7 +23,7 @@ random_surrogate_prob: 0.0
 random_jitter_prob: 0.0
 random_drop_leads: 0.0
 random_change_amplitude: 0.
-max_length_signal: 12
+max_length_signal: 1200
 
 patience: 15
 

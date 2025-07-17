@@ -12,7 +12,7 @@ deterministic: true
 is_sweep: false
 grad_clip: 0.5
 task: multiclass
-
+original_freq: 250
 
 optimizer: "adamw"
 use_scheduler: true
@@ -23,7 +23,7 @@ random_surrogate_prob: 0.0
 random_jitter_prob: 0.0
 random_drop_leads: 0.0
 random_change_amplitude: 0.
-max_length_signal: 25
+max_length_signal: 2500
 data_pct: 1.0
 monitor_metric: val_auroc
 patience: 5

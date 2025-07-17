@@ -1,5 +1,4 @@
 from torch import optim, nn
-import lightning as L
 import torchmetrics
 import torchmetrics.classification
 import torchmetrics.classification.accuracy
@@ -9,98 +8,6 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-
-class TrainingMIT_BIH_R_Peak(CommonTrainerDownstream):
-    def __init__(self, model, config,  len_train_dataset):
-        super().__init__(model, config,  len_train_dataset)
-        
-        self.train_rec = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.valid_rec = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.test_rec = torchmetrics.classification.precision_recall.BinaryRecall()
-        self.train_f1 = torchmetrics.classification.BinaryF1Score()
-        self.valid_f1 = torchmetrics.classification.BinaryF1Score()
-        self.test_f1 = torchmetrics.classification.BinaryF1Score()
-        self.train_acc = torchmetrics.classification.BinaryAccuracy()
-        self.valid_acc = torchmetrics.classification.BinaryAccuracy()
-        self.test_acc = torchmetrics.classification.BinaryAccuracy()
-
-    def training_step(self, batch, _):
-        loss_r_peak_pos, r_peak_pos, r_peaks = self.predict_batch(batch)
-
-        self.train_rec = self.train_rec.to(r_peak_pos.device)
-        self.train_rec(r_peak_pos, r_peaks)
-
-        self.train_f1 = self.train_f1.to(r_peak_pos.device)
-        self.train_f1(r_peak_pos, r_peaks)
-
-        self.train_acc = self.train_acc.to(r_peak_pos.device)
-        self.train_acc(r_peak_pos, r_peaks)
-
-        self.log('train_loss', loss_r_peak_pos.detach().item(), prog_bar=True)
-        self.log('train_rec', self.train_rec, prog_bar=True)
-        self.log('train_f1', self.train_f1, prog_bar=True)
-        self.log('train_acc', self.train_acc, prog_bar=True)
-
-        return loss_r_peak_pos
-
-    def validation_step(self, batch, _):
-        loss_r_peak_pos, r_peak_pos, r_peaks = self.predict_batch(batch)
-
-        self.valid_rec = self.valid_rec.to(r_peak_pos.device)
-        self.valid_rec(r_peak_pos, r_peaks)
-
-        self.valid_f1 = self.valid_f1.to(r_peak_pos.device)
-        self.valid_f1(r_peak_pos, r_peaks)
-
-        self.valid_acc = self.valid_acc.to(r_peak_pos.device)
-        self.valid_acc(r_peak_pos, r_peaks)
-
-        self.log('val_loss', loss_r_peak_pos.detach().item(), prog_bar=True)
-        self.log('val_rec', self.valid_rec, prog_bar=True)
-        self.log('val_f1', self.valid_f1, prog_bar=True)
-        self.log('val_acc', self.valid_acc, prog_bar=True)
-
-        return loss_r_peak_pos
-
-    def test_step(self, batch, _):
-        loss_r_peak_pos, r_peak_pos, r_peaks = self.predict_batch(batch)
-
-        self.test_rec = self.test_rec.to(r_peak_pos.device)
-        self.test_rec(r_peak_pos, r_peaks)
-
-        self.test_f1 = self.test_f1.to(r_peak_pos.device)
-        self.test_f1(r_peak_pos, r_peaks)
-
-        self.test_acc = self.test_acc.to(r_peak_pos.device)
-        self.test_acc(r_peak_pos, r_peaks)
-
-        self.log("test_loss", loss_r_peak_pos.detach().item())
-        self.log("test_rec", self.test_rec)
-        self.log("test_f1", self.test_f1)
-        self.log("test_acc", self.test_acc)
-
-        return loss_r_peak_pos 
-
-    def predict_batch(self, batch):
-        x = batch["signal"]
-        r_peaks = batch['r_peak'] # [bs, seq_len]
-
-        if self.linear_probing:
-            self.model.set_eval_linear_probing()
-
-        r_peak_pos = self.model(x)
-
-        r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
-
-        if r_peak_pos.shape[1] > r_peaks.shape[1]:
-            r_peak_pos = r_peak_pos[:, :r_peaks.shape[1]]
-
-
-        r_peaks = r_peaks[:, :r_peak_pos.shape[1]]
-        loss_r_peak_pos = nn.functional.binary_cross_entropy_with_logits(r_peak_pos, r_peaks)
-
-        return loss_r_peak_pos, r_peak_pos, r_peaks
-
 
 
 class TrainingMIT_BIH(CommonTrainerDownstream):

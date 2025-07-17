@@ -29,7 +29,7 @@ random_resample: false
 shift_baseline_wander_in_sample: false
 shuffle_baseline_wander_in_batch: false
 
-max_length_signal: 25
+max_length_signal: 2500
 data_pct: 1.0
 monitor_metric: val_auroc
 patience: 5

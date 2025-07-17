@@ -38,7 +38,9 @@ class ST_MEM_ViT(BaseModel):
                  attn_drop_out_rate: float = 0.,
                  drop_path_rate: float = 0.,
                  linear_probing: bool = False,
-                 is_mit_bih: bool = False):
+                 feature_classification: bool = False,
+                 r_peaks_detection: bool = False
+                 ):
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
         self._repr_dict = {
@@ -56,12 +58,15 @@ class ST_MEM_ViT(BaseModel):
             'attn_drop_out_rate': attn_drop_out_rate,
             'drop_path_rate': drop_path_rate,
             'linear_probing': linear_probing,
-            'is_mit_bih': is_mit_bih
+            'feature_classification': feature_classification,
+            'r_peaks_detection': r_peaks_detection
         }
         self.width = width
         self.depth = depth
         self.linear_probing = linear_probing
         self.patch_size = patch_size
+        self.feature_classification = feature_classification
+        self.r_peaks_detection = r_peaks_detection
 
         # embedding layers
         num_patches = seq_len // patch_size
@@ -91,13 +96,6 @@ class ST_MEM_ViT(BaseModel):
             self.add_module(f'block{i}', block)
         self.dropout = nn.Dropout(drop_out_rate)
         self.norm = nn.LayerNorm(width)
-
-        self.is_mit_bih = is_mit_bih
-        if is_mit_bih:
-            self.r_peak_pos_head = nn.Sequential(
-                # nn.BatchNorm1d(width),
-                nn.Linear(width, patch_size)
-            )
 
         # classifier head
         self.head = nn.Identity() if num_classes is None else nn.Sequential(
@@ -145,7 +143,7 @@ class ST_MEM_ViT(BaseModel):
         x = rearrange(x, 'b (c n) p -> b c n p', c=num_leads)
         x = x[:, :, 1:-1, :]
 
-        if self.is_mit_bih:
+        if self.feature_classification:
             return x
         
         x = torch.mean(x, dim=(1, 2))
@@ -158,13 +156,16 @@ class ST_MEM_ViT(BaseModel):
         else:
             x = self.forward_encoding(series)
 
-        if self.is_mit_bih:
-            x = x.mean(dim=1)  # (bs, patches // 8, emb)
+        if self.feature_classification:
+            if self.r_peaks_detection:
+                # get only the second lead for r-peaks detection
+                x = x[:, 1, :, :]
+            else:
+                x = x.mean(dim=1) 
 
-            r_peak_pos = self.r_peak_pos_head(x)
             out = self.head(x)
 
-            return out, r_peak_pos
+            return out
         return self.head(x)
 
     def __repr__(self):

@@ -19,6 +19,7 @@ class ECGHighIntensity(PretrainDataset):
 
         self.load_records(split)
         self.load_tabular_data()
+        self.reformat_data()
 
     def load_records(self, split):
         segments = self.data_folder / 'ecg_segments'
@@ -92,18 +93,38 @@ class ECGHighIntensity(PretrainDataset):
         self.samples = self.samples.to_numpy() # [patients, len]
         self.r_peaks = self.r_peaks.to_numpy() # [patients, len]
 
-        if self.max_length_signal < 20:
+        # resample all the signals to the model sampling frequency
+        if self.info_dict['fs'] != self.sampling_freq:
+            self.samples = np.array([self.resample_if_needed(signal, self.info_dict) for signal in self.samples])
+
+
+        if self.max_length_signal < self.samples.shape[1]:
             new_samples = []
             new_r_peaks = []
+
+            freq_factor = self.sampling_freq / self.info_dict['fs']
+            print(f"Resampling factor: {freq_factor}")
             for sample, r_peaks in zip(self.samples, self.r_peaks):
                 # add a new sample for every max_length_signal
-                for i in range(0, len(sample), self.max_length_signal * self.info_dict['fs']):
-                    new_samples.append(sample[i:i + self.max_length_signal * self.info_dict['fs']])
-                    new_r_peaks.append([r for r in r_peaks if i <= r < i + self.max_length_signal * self.info_dict['fs']])
+                for i in range(0, len(sample), self.max_length_signal):
+                    new_samples.append(sample[i:i + self.max_length_signal])
+                    i_orig = i / freq_factor
+                    new_r_peaks.append([r - i_orig for r in r_peaks if i_orig <= r <= (i_orig + self.max_length_signal / freq_factor)])
+                    # print the shapes of the new samples and r_peaks
+                    # print(new_samples[-1].shape, len(new_r_peaks[-1]))
 
-            self.samples = np.array(new_samples)
-            self.r_peaks = np.array(new_r_peaks)
-                    
+            # pad with zeros if the last sample is shorter than max_length_signal
+            self.samples = np.array([
+                np.pad(arr, (0, self.max_length_signal - len(arr)), constant_values=0)
+                for arr in new_samples
+            ])
+
+            max_len = max(len(arr) for arr in new_r_peaks)
+            self.r_peaks  = np.array([
+                np.pad(arr, (0, max_len - len(arr)), constant_values=np.nan)
+                for arr in new_r_peaks
+            ])
+
 
     def __len__(self):
         return len(self.samples)
@@ -111,33 +132,26 @@ class ECGHighIntensity(PretrainDataset):
     def __getitem__(self, idx):
         signal = self.samples[idx]
         r_peaks = self.r_peaks[idx]
+        r_peaks_orig_tensor = torch.tensor(r_peaks, dtype=torch.float32)
+        signal = torch.tensor(signal, dtype=torch.float32)
 
-        signal = self.resample_if_needed(signal, self.info_dict)
-        signal = self.map_leads_and_clean(signal, self.info_dict)
+        # signal = self.resample_if_needed(signal, self.info_dict)
+        signal = self.map_leads_and_clean(signal.unsqueeze(-1), self.info_dict)
 
-        if isinstance(signal, np.ndarray):
-            signal = torch.from_numpy(signal).float()
+        # get a tensor of the same shape of the signal where the r_peaks indexes are set to 1
+        r_peaks = r_peaks * self.sampling_freq / self.info_dict['fs']
+        r_peaks = [int(r) for r in r_peaks if not pd.isna(r)]
+        r_peaks_tensor = torch.zeros(len(signal), dtype=torch.float32)
+        r_peaks_tensor[r_peaks] = 1.0
 
         if self.global_augmentations is not None:
             signal = self.global_augmentations(signal)
 
+        # print(f"Signal shape: {signal.shape}, R-peaks shape: {r_peaks_tensor.shape}")
+
         obj = {
             'signal': signal,
-            'r_peaks': r_peaks,
+            'r_peak': r_peaks_tensor,
+            'r_peak_orig': r_peaks_orig_tensor,
         }
         return obj
-
-
-# if main
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser(description='Train a model')
-    parser.add_argument('--config_file', type=str, default='configs/train_high_intensity_run_config.yaml', help='Path to the config file')
-    args = parser.parse_args()
-
-    from utils import parse_config
-    config = parse_config(args.config_file, 'config_defaults/train_high_intensity_config_defaults.yaml')
-
-    dataset = ECGHighIntensity(config, split='train')
-    print(f"Dataset size: {len(dataset)}")
-    print(f"Sample: {dataset[0]}")

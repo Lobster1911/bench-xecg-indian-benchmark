@@ -5,7 +5,8 @@ from lightning.pytorch.loggers import WandbLogger
 from models.mit_bih_models import xLSTMClassificationMIT_BIH
 import dataset.mit_bih as mit_bih
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingMIT_BIH, TrainingMIT_BIH_R_Peak
+from trainers.mit_bih_trainer import TrainingMIT_BIH
+from trainers.r_peaks_trainer import TrainingRPeak
 import torch
 import argparse
 import os
@@ -43,7 +44,6 @@ def train(config, run=None, wandb=False):
         print(f"Train dataset size: {len(train_dataset)}")
         print(f"Val dataset size: {len(val_dataset)}")
 
-
     if config.use_class_weights:
         if config.r_peaks_detection:
             print('Using class weights for r-peaks detection')
@@ -71,7 +71,7 @@ def train(config, run=None, wandb=False):
     base_model = utils.get_base_model(config, feature_classification=True)
 
     if config.r_peaks_detection:
-       model = TrainingMIT_BIH_R_Peak(model=base_model, config=config, len_train_dataset=len(train_dataset))
+       model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
     else:
         model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 

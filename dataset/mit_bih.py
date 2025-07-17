@@ -51,7 +51,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_mit
         self.split = split
         self.samples = []
-        self.random_shift = config.random_shift and split == 'train'
         self.nkclean = config.nk_clean
         self.patch_size = config.patch_size
         self.normalize = config.normalize
@@ -111,7 +110,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             if self.sampling_freq != header.fs:
                 signal = nk.signal_resample(signal, sampling_rate=header.fs, desired_sampling_rate=self.sampling_freq, method='FFT')
                 # I should interpolate the r_peak annotations to the new sampling rate
-                r_peaks = [(int(r_peak * self.sampling_freq / header.fs), label) for r_peak, label in r_peaks]
+                r_peaks = [(r_peak, label) for r_peak, label in r_peaks]
 
             self.signals[patient] = signal
             self.headers[patient] = header
@@ -175,21 +174,21 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
-        r_peak = sample['r_peak']
-        around_r_peaks = sample['around_r_peaks']
+        r_peak = int(sample['r_peak'] * self.sampling_freq / header.fs)
+        # print("around_r_peaks", sample['around_r_peaks'])
+        around_r_peaks = [(int(r * self.sampling_freq / header.fs), l) for r, l in sample['around_r_peaks']]
+        # print("around_r_peaks after resampling", around_r_peaks)
         len_signal = signal.shape[0]
 
-        if self.random_shift and (self.split == 'train' or not self.is_recurrent):
-            shift = torch.randint(- self.patch_size // 3, self.patch_size // 3, (1,)).item() # shift between 0 and patch_size // 3
-            window_start = max(0, r_peak - self.win_len + shift)
-            window_end = min(r_peak + self.win_len + shift, len_signal)
-        elif self.split == 'train' or not self.is_recurrent:
+
+        if self.split == 'train' or not self.is_recurrent:
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
         else:
             window_start = 0
             window_end = len_signal
 
+        # print(f"Window start: {window_start}, Window end: {window_end}, Signal length: {len_signal}")
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
 
@@ -211,11 +210,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
 
+        original_r_peaks = torch.tensor([r for r, _ in sample['around_r_peaks']], dtype=torch.float32)
+
         return {
             'signal': window_signal,
             'patient_id': patient,
-            'r_peaks': r_peaks_mask,
+            'r_peak': r_peaks_mask,
             'label': labels_mask,
+            'r_peak_orig': original_r_peaks,
         }
 
     def filter_leads(self, signal, leads):
@@ -287,13 +289,17 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         patients = [item['patient_id'] for item in batch]
-        if 'r_peaks' not in batch[0].keys(): 
+        if 'r_peak' not in batch[0].keys(): 
             r_peaks = None
         else:
-            r_peaks = [item['r_peaks'] for item in batch]
+            r_peaks = [item['r_peak'] for item in batch]
             r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
 
         labels = [item['label'] for item in batch]
+
+
+        r_peaks_orig = [item['r_peak_orig'] for item in batch]
+        r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=0)
 
         # pad to same length and pad to match the patch size module
         if config.shuffle_baseline_wander_in_batch and split == 'train':
@@ -309,6 +315,7 @@ def make_collate_fn(config, split='train'):
             'patient_ids': torch.tensor(patients),
             'r_peak': r_peaks,
             'labels': labels,
+            'r_peak_orig': r_peaks_orig,
         }
 
     return collate_fn

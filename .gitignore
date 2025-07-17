@@ -13,3 +13,4 @@ logs
 checkpoints
 checkpoint
 configs/*
+figs

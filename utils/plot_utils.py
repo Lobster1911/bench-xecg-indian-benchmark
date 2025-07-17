@@ -140,3 +140,45 @@ def plot_generation(sample, model, patch_size, device, logdir, epoch, name):
         return path
 
 
+def plot_r_peaks(sample, model, device, logdir, epoch, name):
+    with torch.no_grad():
+        signal = sample['signal'].to(device).unsqueeze(0)
+        # print(f"Signal shape: {signal.shape}")
+
+        # Get the original R-peaks
+        # print(f"R-peaks shape: {r_peaks.shape}")
+
+        # Get the predicted R-peaks
+        r_peak_pos = model(signal)
+        r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
+        r_peak_pos = torch.sigmoid(r_peak_pos) > 0.5
+
+        # consider max 2000 time samples for plotting
+        if signal.shape[1] > 2000:
+            signal = signal[:, :2000, :]
+            r_peak_pos = r_peak_pos[:, :2000]
+
+        # print(f"Predicted R-peaks shape: {r_peak_pos.shape}")
+
+        # Plot the original and predicted R-peaks
+        fig, ax = plt.subplots(figsize=(20, 5))
+        to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()
+
+        ax.plot(to_plot, label='Original Signal')
+        # Plot vertical lines for predicted R-peaks
+        pred_peaks = np.where(r_peak_pos.cpu().squeeze().numpy())[0]
+        for peak in pred_peaks:
+            ax.axvline(peak, color='orange', linestyle='--', label='Predicted R-peak' if peak == pred_peaks[0] else "", alpha=0.5)
+
+        ax.set_title(f'R-peaks Prediction - {name}')
+        ax.set_xlabel('Time (samples)')
+        ax.set_ylabel('Amplitude')
+        ax.legend()
+
+        # mkdir if it does not exist
+        os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
+
+        path = f'{logdir}/epoch_{epoch}/r_peaks_{name}.png'
+        plt.savefig(path)
+        plt.close()
+        return path

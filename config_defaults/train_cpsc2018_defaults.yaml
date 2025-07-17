@@ -23,7 +23,7 @@ random_drop_leads: 0.0
 random_change_amplitude: 0.
 patience: 15
 num_reg_token: 0
-max_length_signal: 60
+max_length_signal: 6000
 monitor_metric: "val_auroc"
 monitor_mode: "max"
 

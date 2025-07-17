@@ -1,20 +1,13 @@
 import os
 from torch import utils
 import lightning as pl
-from lightning.pytorch.loggers import WandbLogger
-from models.mit_bih_models import xLSTMClassificationMIT_BIH
-import dataset.mit_bih as mit_bih
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingMIT_BIH_R_Peak
+from trainers.r_peaks_trainer import TrainingRPeak
 import torch
 import argparse
 import os
-from ecg_jepa.models import load_encoder
-import st_mem.encoder as encoder
 import dataset.intense_exercise as intense_exercise
 
 import utils.utils as utils
-from utils.utils import get_training_class_weights
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
 
@@ -26,6 +19,13 @@ parser.add_argument('--config_file', type=str, default='configs/train_high_inten
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
+
+    if config.use_class_weights:
+        print('Using weights for training')
+        weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
+    else:
+        weights = None
+
 
     train_dataset =  intense_exercise.ECGHighIntensity(config, split='train', global_augmentations=get_transforms(config))
     print(f"Train dataset size: {len(train_dataset)}")
@@ -42,7 +42,7 @@ def train(config, run=None, wandb=False):
 
     base_model = utils.get_base_model(config, feature_classification=True)
 
-    model = TrainingMIT_BIH_R_Peak(model=base_model, config=config, len_train_dataset=len(train_dataset))
+    model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     trainer = utils.get_trainer(config, model, "train-exercise-r_peak", wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

@@ -595,20 +595,17 @@ class ECGJepaClassifier(BaseModel):
         return params
 
 
-class ECGJepaFeatureClassifierMIT_BIH(BaseModel):
-    def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
+class ECGJepaFeatureClassifier(BaseModel):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, r_peaks_detection=False):
         super().__init__()
         self.encoder = encoder
         self.num_classes = num_classes
         self.linear_probing = linear_probing
+        self.r_peaks_detection = r_peaks_detection
         self.patch_size = patch_size
 
         self.head = nn.Sequential(
             nn.Linear(self.encoder.embed_dim, num_classes)
-        )
-
-        self.r_peak_pos_head = nn.Sequential(
-            nn.Linear(self.encoder.embed_dim, self.encoder.p)
         )
 
     def forward(self, x):
@@ -621,12 +618,14 @@ class ECGJepaFeatureClassifierMIT_BIH(BaseModel):
 
         # i need to group by 8 because i have one patch for each lead
         bs, patches, emb = out.shape
-        out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
+        if self.r_peaks_detection:
+            out = out.reshape(bs, 8, patches // 8, emb)[:, 1, :, :]  # (bs, patches // 8, emb)
+        else:
+            out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
 
         cls = self.head(out)
-        r_peak_pos = self.r_peak_pos_head(out)
-        return cls, r_peak_pos
-    
+        return cls
+
     def get_layers(self):
         return self.encoder.encoder_blocks.blocks
     
