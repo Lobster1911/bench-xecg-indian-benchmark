@@ -217,9 +217,9 @@ class TrainingRPeak(CommonTrainerDownstream):
 
     def predict_batch(self, batch):
         x = batch["signal"]
-        print(f"Signal shape: {x.shape}")
+        # print(f"Signal shape: {x.shape}")
         r_peaks = batch['r_peak'] # [bs, seq_len]
-        print(f"R-peaks shape: {r_peaks.shape}")
+        # print(f"R-peaks shape: {r_peaks.shape}")
         r_peaks_orig = batch['r_peak_orig']
         # print(f"R-peaks original: {r_peaks_orig}")
 
@@ -227,7 +227,7 @@ class TrainingRPeak(CommonTrainerDownstream):
             self.model.set_eval_linear_probing()
 
         r_peak_pos = self.model(x)
-        print(f"R-peaks prediction shape: {r_peak_pos.shape}")
+        # print(f"R-peaks prediction shape: {r_peak_pos.shape}")
         r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
 
         # print(r_peak_pos.shape, r_peaks.shape)
