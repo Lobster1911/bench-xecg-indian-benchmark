@@ -110,7 +110,8 @@ class ECGHighIntensity(PretrainDataset):
                     new_samples.append(sample[i:i + self.max_length_signal])
                     i_orig = i / freq_factor
                     new_r_peaks.append([r - i_orig for r in r_peaks if i_orig <= r <= (i_orig + self.max_length_signal / freq_factor)])
-                    # print the shapes of the new samples and r_peaks
+                    # print the shapes of the new samples and r_peaks    list_r_peaks = torch.tensor([int(r) / self.orig_freq for r in r_peaks_orig[i] if not torch.isnan(r)]).to(preds.device)
+
                     # print(new_samples[-1].shape, len(new_r_peaks[-1]))
 
             # pad with zeros if the last sample is shorter than max_length_signal

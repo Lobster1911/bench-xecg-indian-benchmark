@@ -63,6 +63,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
         self.is_recurrent = config.is_recurrent 
+        self.original_freq = 360
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -99,18 +100,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 r_peaks = [(r_peak, label) for r_peak, label in r_peaks if label in ['N', 'S', 'V']]
                 labels = [l for l in labels if l in ['N', 'S', 'V']]
 
-            # (f'Patient {patient} has {len(r_peaks)} r peaks')
-
-            return patient, signal, header, annotations, r_peaks, labels_orig, labels
+            return patient, signal, header, annotations, r_peaks, labels
 
         # results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
         results = [process_patient(patient) for patient in self.patients]
 
-        for patient, signal, header, annotations, r_peaks, labels_orig, labels in results:
+        for patient, signal, header, annotations, r_peaks, labels in results:
             if self.sampling_freq != header.fs:
                 signal = nk.signal_resample(signal, sampling_rate=header.fs, desired_sampling_rate=self.sampling_freq, method='FFT')
-                # I should interpolate the r_peak annotations to the new sampling rate
-                r_peaks = [(r_peak, label) for r_peak, label in r_peaks]
 
             self.signals[patient] = signal
             self.headers[patient] = header
@@ -124,14 +121,18 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
+            freq_factor = self.sampling_freq / self.original_freq
+            win_orig = self.win_len / freq_factor
+
             if subset == 'train' or not self.is_recurrent:
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
+
                     if (sample_class != last_class or skipped > 10 or sample_class != 'N') or not self.skip_majority_class_samples:
                         samples.append({
                             'patient': patient,
                             'r_peak': r_peak[0],
-                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - self.win_len < r <= r_peak[0] + self.win_len],
+                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - win_orig < r <= r_peak[0] + win_orig],
                         })
                         skipped = 0
                     else:
@@ -139,8 +140,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
                     last_class = sample_class
             else:
-                #for n in range(0, len(signal), self.win_len * 2):
-                #    around_r_peaks = [(r, l) for r, l in r_peaks if n - self.win_len < r <= n + self.win_len]
                 samples.append({
                     'patient': patient,
                     'r_peak': -1,
