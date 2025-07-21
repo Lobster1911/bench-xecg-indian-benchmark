@@ -337,9 +337,7 @@ class RPeakDistanceMetric(Metric):
                 # Se uno dei due è vuoto, assegna tensori vuoti per evitare crash
                 min_distances = torch.tensor([]).to(list_pred_peaks)
                 min_dist_r_peaks = torch.ones_like(list_r_peaks) * preds[i].shape[0] 
-
                 matched_rpeaks = torch.tensor([]).to(list_pred_peaks)
-                matched_mask = torch.tensor([]).to(list_pred_peaks)
             else:
                 distances = torch.abs(list_pred_peaks.unsqueeze(1) - list_r_peaks.unsqueeze(0))
                 # print(f"Distances: {distances.shape}")
@@ -362,7 +360,8 @@ class RPeakDistanceMetric(Metric):
 
             # Unique matches → equivalent to set-based count
             true_positives += len(torch.unique(matched_rpeaks))
-            false_positives += (~matched_mask).sum().item()
+            if list_pred_peaks.numel() != 0:
+                false_positives += (~matched_mask).sum().item()
             positives += len(list_r_peaks)
 
         self.total_distance += total_distance
