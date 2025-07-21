@@ -14,6 +14,9 @@ echo $CUDA_VISIBLE_DEVICES
 #source /home/$USER/.bashrc
 #conda init
 #conda activate xlstm_pretrained
+ulimit -n
+ulimit -n 16384
+ulimit -n
 
 # run script from above
 srun ~/.conda/envs/xlstm_pretrained/bin/python -u $1 --config_file $2
