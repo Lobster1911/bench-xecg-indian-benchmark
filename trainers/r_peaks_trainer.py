@@ -333,23 +333,32 @@ class RPeakDistanceMetric(Metric):
             if len(list_pred_peaks) == 0:
                 continue
 
-            distances = torch.abs(list_pred_peaks.unsqueeze(1) - list_r_peaks.unsqueeze(0))
-            # print(f"Distances: {distances.shape}")
-            # Find the minimum distance for each predicted peak
+            if list_pred_peaks.numel() == 0 or list_r_peaks.numel() == 0:
+                # Se uno dei due è vuoto, assegna tensori vuoti per evitare crash
+                min_distances = torch.tensor([]).to(list_pred_peaks)
+                min_dist_r_peaks = torch.ones_like(list_r_peaks) * preds[i].shape[0] 
 
-            # for every prediction I have a measure of how far is from the nearest r-peak
-            min_distances, _ = torch.min(distances, dim=1) 
-            # print(f"Min distances: {min_distances.shape}")
-            min_dist_r_peaks, _ = torch.min(distances, dim=0)  # For each original R-peak, find the closest prediction
-            # print(f"Min distances: {min_distances.shape}")
+                matched_rpeaks = torch.tensor([]).to(list_pred_peaks)
+                matched_mask = torch.tensor([]).to(list_pred_peaks)
+            else:
+                distances = torch.abs(list_pred_peaks.unsqueeze(1) - list_r_peaks.unsqueeze(0))
+                # print(f"Distances: {distances.shape}")
+                # Find the minimum distance for each predicted peak
+
+                # for every prediction I have a measure of how far is from the nearest r-peak
+                min_distances, _ = torch.min(distances, dim=1) 
+                # print(f"Min distances: {min_distances.shape}")
+                min_dist_r_peaks, _ = torch.min(distances, dim=0)  # For each original R-peak, find the closest prediction
+                # print(f"Min distances: {min_distances.shape}")
+                # Get predicted-to-R-peak assignments
+                matched_mask = min_distances <= self.threshold_window  # shape [num_preds]
+                matched_rpeaks = distances[matched_mask].argmin(dim=1)  # Get the indices of the closest R-peaks for each prediction
+
 
             total_distance += min_distances.sum().item()
             total_distance_rp += min_dist_r_peaks.sum().item()
             total_predictions += len(list_pred_peaks)
 
-            # Get predicted-to-R-peak assignments
-            matched_mask = min_distances <= self.threshold_window  # shape [num_preds]
-            matched_rpeaks = distances[matched_mask].argmin(dim=1)  # Get the indices of the closest R-peaks for each prediction
 
             # Unique matches → equivalent to set-based count
             true_positives += len(torch.unique(matched_rpeaks))

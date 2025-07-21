@@ -105,8 +105,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
             return patient, signal, header, annotations, r_peaks, labels
 
-        # results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
-        results = [process_patient(patient) for patient in self.patients]
+        results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
+        # results = [process_patient(patient) for patient in self.patients]
 
         for patient, signal, header, annotations, r_peaks, labels in results:
             if self.sampling_freq != header.fs:
@@ -164,7 +164,9 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
             return samples
 
-        results = [process_sample(patient, self.r_peaks[patient]) for patient in self.patients]
+        results = Parallel(n_jobs=-1)(
+            delayed(process_sample)(patient, self.r_peaks[patient]) for patient in self.patients
+        )
 
         # Flatten results and reindex with unique keys
         self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
