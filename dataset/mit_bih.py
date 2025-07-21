@@ -65,6 +65,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.is_recurrent = config.is_recurrent 
         self.original_freq = 360
         self.freq_factor = self.sampling_freq / self.original_freq
+        self.r_peaks_detection = config.r_peaks_detection
+        print(f"freq_factor: {self.freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}")
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -123,9 +125,22 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             last_class = None
             skipped = 0
             win_orig = self.win_len / self.freq_factor
+            len_signal = len(self.signals[patient])
             # print((f"win_orig: {win_orig}, freq_factor: {freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}"))
 
-            if subset == 'train' or not self.is_recurrent:
+            if self.r_peaks_detection:
+                # len signal and win_len are in the same frequency domain, r_peaks are not
+                for i in range(0, len_signal, self.win_len * 2):
+                    samples.append({
+                        'start': i,
+                        'end': min(i + self.win_len, len_signal),
+                        'patient': patient,
+                        'r_peak': -1,
+                        'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len) // self.freq_factor],
+                    })
+                    # print(samples[-1]['around_r_peaks'])
+                    # print around r_peaks
+            elif subset == 'train' or not self.is_recurrent:
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
 
@@ -149,11 +164,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
             return samples
 
-        results = Parallel(n_jobs=-1)(
-            delayed(process_sample)(
-                patient, self.r_peaks[patient]
-            ) for patient in tqdm(self.patients, desc="Processing patients")
-        )
+        results = [process_sample(patient, self.r_peaks[patient]) for patient in self.patients]
 
         # Flatten results and reindex with unique keys
         self.samples = {i: sample for i, sample in enumerate(sum(results, []))}
@@ -170,6 +181,40 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         else: raise ValueError(f'Unknown label {label}')
 
     def __getitem__(self, idx):
+        if self.r_peaks_detection:
+            return self.get_item_r_peaks(idx)
+        else:
+            return self.get_item_classification(idx)
+        
+
+    def get_item_r_peaks(self, idx):
+        sample = self.samples[idx]
+        patient = sample['patient']
+        header = self.headers[patient]
+        start = sample['start']
+        end = sample['end']
+        signal = self.signals[patient][start:end]
+        signal = torch.tensor(signal, dtype=torch.float32)
+
+        r_peaks_mask = torch.zeros(signal.shape[0], dtype=torch.float32)
+        indexes = np.round(np.array(sample['around_r_peaks']) * self.freq_factor).astype(int) - start
+        # print(f"indexes: {indexes}, start: {start}, freq_factor: {self.freq_factor}")
+        r_peaks_mask[indexes] = 1
+        signal = self.filter_leads(signal, header.__dict__['sig_name'])
+        if self.augmentations is not None:
+            signal = self.augmentations(signal)
+
+        orig_start = np.round(start / self.freq_factor)
+        around_r_peaks = torch.tensor([r - orig_start for r in sample['around_r_peaks']])
+
+        return {
+            'signal': signal,
+            'patient_id': patient,
+            'r_peak': r_peaks_mask,
+            'r_peak_orig': around_r_peaks
+        }
+
+    def get_item_classification(self, idx):
         sample = self.samples[idx]
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
@@ -210,15 +255,17 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
 
-        start_original = window_start / self.freq_factor
-        original_r_peaks = torch.tensor([r - start_original for r, _ in sample['around_r_peaks']], dtype=torch.float32)
+        # start_original = window_start / self.freq_factor
+        # original_r_peaks = torch.tensor([r - start_original for r, _ in sample['around_r_peaks']], dtype=torch.float32)
+        # print(f"Original r_peaks: {original_r_peaks}")
+        # print(f"Window signal shape: {window_signal.shape}, R peaks mask shape: {r_peaks_mask.shape}, Labels mask shape: {labels_mask.shape}")
 
         return {
             'signal': window_signal,
             'patient_id': patient,
             'r_peak': r_peaks_mask,
             'label': labels_mask,
-            'r_peak_orig': original_r_peaks,
+            # 'r_peak_orig': original_r_peaks,
         }
 
     def filter_leads(self, signal, leads):
@@ -290,17 +337,25 @@ def make_collate_fn(config, split='train'):
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
         patients = [item['patient_id'] for item in batch]
+        
         if 'r_peak' not in batch[0].keys(): 
             r_peaks = None
         else:
             r_peaks = [item['r_peak'] for item in batch]
             r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
 
-        labels = [item['label'] for item in batch]
+        if 'label' not in batch[0].keys():
+            labels = None
+        else:
+            labels = [item['label'] for item in batch]
+            labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
 
-        r_peaks_orig = [item['r_peak_orig'] for item in batch]
-        r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=torch.nan)
+        if 'r_peak_orig' not in batch[0].keys():
+            r_peaks_orig = None
+        else:
+            r_peaks_orig = [item['r_peak_orig'] for item in batch]
+            r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=torch.nan)
 
         # pad to same length and pad to match the patch size module
         if config.shuffle_baseline_wander_in_batch and split == 'train':
@@ -308,7 +363,6 @@ def make_collate_fn(config, split='train'):
         else:
             signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
             
-        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
         return {
             'signal': signals,

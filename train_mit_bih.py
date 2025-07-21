@@ -63,6 +63,7 @@ def train(config, run=None, wandb=False):
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
     val_batch_size = 1 if config.split_val_by_patient and config.is_recurrent else config.batch_size
     val_num_workers = 0 if config.split_val_by_patient and config.is_recurrent  else config.num_workers
+    print("Using val_batch_size:", val_batch_size, "and val_num_workers:", val_num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
 
     test_dataset = dataset_class(config, split='test', augmentations=get_transforms(config, split='test'))
