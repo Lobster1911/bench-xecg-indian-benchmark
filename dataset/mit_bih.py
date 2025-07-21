@@ -64,6 +64,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.leads_to_use = config.leads
         self.is_recurrent = config.is_recurrent 
         self.original_freq = 360
+        self.freq_factor = self.sampling_freq / self.original_freq
 
         self.load_patient_data(split)
         self.load_samples(split)
@@ -121,8 +122,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
-            freq_factor = self.sampling_freq / self.original_freq
-            win_orig = self.win_len / freq_factor
+            win_orig = self.win_len / self.freq_factor
+            # print((f"win_orig: {win_orig}, freq_factor: {freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}"))
 
             if subset == 'train' or not self.is_recurrent:
                 for i, r_peak in enumerate(r_peaks):
@@ -175,10 +176,10 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         header = self.headers[patient]
         r_peak = int(sample['r_peak'] * self.sampling_freq / header.fs)
         # print("around_r_peaks", sample['around_r_peaks'])
-        around_r_peaks = [(int(r * self.sampling_freq / header.fs), l) for r, l in sample['around_r_peaks']]
+        around_r_peaks = [(int(r * (self.sampling_freq / header.fs)), l) for r, l in sample['around_r_peaks']]
+        # print(f"r_peak: {r_peak}, around_r_peaks: {around_r_peaks}")
         # print("around_r_peaks after resampling", around_r_peaks)
         len_signal = signal.shape[0]
-
 
         if self.split == 'train' or not self.is_recurrent:
             window_start = max(0, r_peak - self.win_len)
@@ -209,7 +210,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
 
-        original_r_peaks = torch.tensor([r for r, _ in sample['around_r_peaks']], dtype=torch.float32)
+        start_original = window_start / self.freq_factor
+        original_r_peaks = torch.tensor([r - start_original for r, _ in sample['around_r_peaks']], dtype=torch.float32)
 
         return {
             'signal': window_signal,

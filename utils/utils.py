@@ -21,6 +21,7 @@ from ecg_founder.finetune_model import ft_12lead_ECGFounder, ft_1lead_ECGFounder
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
+import os
 
 
 def get_base_model(config, feature_classification=False):
@@ -169,11 +170,25 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         wand_logger.watch(model, log='gradients')
         trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip)
+        # need to save the config file to a new file in the wandb directory
     else:
         print(f"Using default logger for project {prj_string} and run {run}")
         trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip)
 
     return trainer
+
+def save_config(config, trainer):
+    # get the checkpoint callback form the trainer
+
+    checkpoint_callback = next((cb for cb in trainer.callbacks if isinstance(cb, ModelCheckpoint)), None)
+    if checkpoint_callback is None:
+        print("No ModelCheckpoint callback found in the trainer.")
+        return
+
+    config_path = os.path.join(checkpoint_callback.dirpath, 'config.yaml')
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f)
+    print(f"Config saved to {config_path}")
 
 def parse_sweep_config(config, default_config_file):
     with open(default_config_file, 'r') as file:
