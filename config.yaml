@@ -34,7 +34,6 @@ dictitems:
   linear_probing: true
   lr_head: 0.01
   lr_xlstm: 1.0e-05
-  max_distance_threshold: 0.01
   max_length_signal: 1000
   monitor_metric: val_f1
   monitor_mode: max

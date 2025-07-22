@@ -271,7 +271,6 @@ class RPeakDistanceMetric(Metric):
         Args:
             orig_freq: Original sampling frequency of the signal (Hz)
             pred_freq: Prediction sampling frequency (Hz) 
-            max_distance_threshold: Maximum distance in seconds to consider a match (optional)
         """
         super().__init__(
             dist_sync_on_step=dist_sync_on_step,
