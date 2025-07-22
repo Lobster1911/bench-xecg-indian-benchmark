@@ -136,7 +136,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                         'end': min(i + self.win_len * 2, len_signal),
                         'patient': patient,
                         'r_peak': -1,
-                        'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len) // self.freq_factor],
+                        'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len * 2) // self.freq_factor],
                     })
                     # print(samples[-1]['around_r_peaks'])
                     # print around r_peaks
