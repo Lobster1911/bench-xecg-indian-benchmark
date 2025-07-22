@@ -226,7 +226,7 @@ class TrainingRPeak(CommonTrainerDownstream):
         if self.linear_probing:
             self.model.set_eval_linear_probing()
 
-        r_peak_pos = self.model(x)
+        r_peak_pos= self.model(x)
         # print(f"R-peaks prediction shape: {r_peak_pos.shape}")
         r_peak_pos = r_peak_pos.view(r_peak_pos.shape[0], -1)
 

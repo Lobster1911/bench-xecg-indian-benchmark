@@ -43,7 +43,7 @@ class PretrainDataset(torch.utils.data.Dataset):
         if self.global_augmentations is not None:
             global_signals = [ self.global_augmentations(s) for _ in range(self.n_global_view)]
         else:
-            global_signals = s
+            global_signals = [s]
         
         if self.local_augmentations is not None and self.n_local_view > 0:
             local_signals = [ self.local_augmentations(s) for _ in range(self.n_local_view)]

@@ -133,7 +133,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 for i in range(0, len_signal, self.win_len * 2):
                     samples.append({
                         'start': i,
-                        'end': min(i + self.win_len, len_signal),
+                        'end': min(i + self.win_len * 2, len_signal),
                         'patient': patient,
                         'r_peak': -1,
                         'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len) // self.freq_factor],

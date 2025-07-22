@@ -158,12 +158,15 @@ class ST_MEM_ViT(BaseModel):
 
         if self.feature_classification:
             if self.r_peaks_detection:
+                # print('before getting the channel: ', x.shape)
                 # get only the second lead for r-peaks detection
                 x = x[:, 1, :, :]
+                # print('after getting the channel: ', x.shape)
             else:
                 x = x.mean(dim=1) 
 
             out = self.head(x)
+            # print(f"Output shape: {out.shape}")  # Debugging output
 
             return out
         return self.head(x)
