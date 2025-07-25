@@ -3,14 +3,32 @@ import torch
 import numpy as np
 from torch.nn import functional as F
 from xlstm.xlstm_large.model import mLSTMStateType
+import sparseconvnet as scn
+
+
+class SparseConvPatchEmbedding(nn.Module):
+    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, out_channels=128):
+        super().__init__()
+        self.num_channels = num_channels
+        self.conv1 = nn.Conv1d(num_channels, out_channels // 2, kernel_size=5, bias=True, padding=2)
+        self.conv2 = nn.Conv1d(out_channels // 2, out_channels, kernel_size=3, bias=True, padding=1)
+        self.linear_patch = LinearPatchEmbedding(patch_size, num_hiddens, num_channels=out_channels)
+
+    def forward(self, x):
+        x = x.permute(0, 2, 1) # put the channels in the middle
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.linear_patch(x, permute=False)
+        return x
+
 
 class LinearPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
         super().__init__()
         self.conv = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
 
-    def forward(self, x):
-        x = x.permute(0, 2, 1) # put the channels in the middle
+    def forward(self, x, permute=True):
+        if permute: x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.conv(x).flatten(2).transpose(1, 2)
         return x
     

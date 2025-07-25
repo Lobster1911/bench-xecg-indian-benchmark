@@ -37,6 +37,7 @@ bidirectional: false
 use_focal_loss: false
 sampling_freq: 250
 use_final_layer_norm: true
+proj_factor: 2
 cls_normalization: null
 
 normalize: true

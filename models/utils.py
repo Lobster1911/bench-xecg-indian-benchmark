@@ -34,6 +34,9 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'enriched':
         print('using enriched patch embedding')
         return EnrichedLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels, enrich_dim=num_hiddens //4, kernel_size=5)
+    if type == 'sparse_conv':
+        print('using sparse patch embedding')
+        return SparseConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels, out_channels=num_hiddens // 4)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 
@@ -75,7 +78,7 @@ def get_xlstm(config):
                 conv1d_kernel_size=4, 
                 qkv_proj_blocksize=config.num_heads, 
                 num_heads=config.num_heads,
-                proj_factor=2
+                proj_factor=config.proj_factor
             )
         ),
         slstm_block=sLSTMBlockConfig(

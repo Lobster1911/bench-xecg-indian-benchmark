@@ -12,12 +12,6 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.dataset_preparation_utils import load_datasets
 from trainers.common import DelayedCheckpoint
 import st_mem.encoder as encoder
-# from utils.utils import get_least_used_gpu
-
-# gpu_id = get_least_used_gpu()
-# os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_id)
-
-# torch.multiprocessing.set_sharing_strategy('file_system')
 
 # argparse
 import argparse

@@ -39,6 +39,7 @@ use_focal_loss: false
 sampling_freq: 100
 use_final_layer_norm: true
 cls_normalization: null
+proj_factor: 2
 
 normalize: false
 random_crop: 0

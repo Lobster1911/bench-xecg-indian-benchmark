@@ -1,20 +1,14 @@
 
-from sklearn.metrics import confusion_matrix
 from prettytable import PrettyTable  # Import PrettyTable for table formatting
 import torch
 import numpy as np
 import random
 from collections import Counter
-from models.simple_LSTM import ECG_LSTM, ECG_CONV1D_LSTM
-import torch.nn.functional as F
-from sklearn.metrics import accuracy_score, f1_score
-from tqdm import tqdm
 import yaml
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from torch.utils.data import Subset
 import numpy as np
 from models.classification import xLSTMClassification, xLSTMFeatureClassification
-from models.mit_bih_models import xLSTMClassificationMIT_BIH
 from ecg_jepa.models import load_encoder
 import st_mem.encoder as encoder
 from ecg_founder.finetune_model import ft_12lead_ECGFounder, ft_1lead_ECGFounder
@@ -22,6 +16,68 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Learning
 from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
 import os
+
+def parse_config(config_file, default_config_file):
+    with open(default_config_file, 'r') as file:
+        default_config = yaml.safe_load(file)
+
+    with open(config_file, 'r') as file:
+        config = yaml.safe_load(file)
+
+    merged_config = ConfigDict(default_config)
+    merged_config.update(config)
+    # print(merged_config)
+
+    # perform some checks
+    if merged_config.use_ecg_jepa:
+        merged_config.sampling_freq = 250
+        merged_config.patch_size = 50
+        merged_config.max_length_signal = 2500
+        merged_config.win_len = 1250
+        merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
+    elif merged_config.use_st_mem:
+        merged_config.sampling_freq = 250
+        merged_config.patch_size = 75
+        merged_config.max_length_signal = 2325
+        merged_config.win_len = 1125
+        merged_config.low_pass_filter = 40
+        merged_config.high_pass_filter = 0.67
+        merged_config.standardize = True
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
+    elif merged_config.use_ecg_founder:
+        merged_config.win_len = 2500
+        merged_config.sampling_freq = 500
+        merged_config.low_pass_filter = 30
+        merged_config.high_pass_filter = 0.5
+        merged_config.max_length_signal = 5000
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
+        merged_config.layerwise_lr_decay = 1.
+        merged_config.drop_path_prob = 0.
+    elif merged_config.encoder_type == 'transformer':
+        merged_config.win_len = 500 
+        merged_config.window_size_train = 1000
+        merged_config.window_size_val = 1000
+        merged_config.max_length_signal = 1000
+
+    if merged_config.linear_probing:
+        merged_config.layerwise_lr_decay = 0.
+        merged_config.drop_path_prob = False
+
+    merged_config.is_recurrent = not (merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.use_ecg_founder or merged_config.encoder_type == 'transformer')
+    
+    # ensure that for r_peaks detection, num_classes is equal to patch_size
+    if merged_config.r_peaks_detection:
+        if merged_config.use_ecg_founder:
+            merged_config.num_classes = merged_config.max_length_signal
+        else:
+            merged_config.num_classes = merged_config.patch_size
+    
+    return merged_config
+
 
 
 def get_base_model(config, feature_classification=False):
@@ -97,68 +153,6 @@ class ConfigDict(dict):
             else:
                 self[k] = v
 
-def parse_config(config_file, default_config_file):
-    with open(default_config_file, 'r') as file:
-        default_config = yaml.safe_load(file)
-
-    with open(config_file, 'r') as file:
-        config = yaml.safe_load(file)
-
-    merged_config = ConfigDict(default_config)
-    merged_config.update(config)
-    # print(merged_config)
-
-    # perform some checks
-    if merged_config.use_ecg_jepa:
-        merged_config.sampling_freq = 250
-        merged_config.patch_size = 50
-        merged_config.max_length_signal = 2500
-        merged_config.win_len = 1250
-        merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
-    elif merged_config.use_st_mem:
-        merged_config.sampling_freq = 250
-        merged_config.patch_size = 75
-        merged_config.max_length_signal = 2325
-        merged_config.win_len = 1125
-        merged_config.low_pass_filter = 40
-        merged_config.high_pass_filter = 0.67
-        merged_config.standardize = True
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
-    elif merged_config.use_ecg_founder:
-        merged_config.win_len = 2500
-        merged_config.sampling_freq = 500
-        merged_config.low_pass_filter = 30
-        merged_config.high_pass_filter = 0.5
-        merged_config.max_length_signal = 5000
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
-        merged_config.layerwise_lr_decay = 1.
-        merged_config.drop_path_prob = 0.
-    elif merged_config.encoder_type == 'transformer':
-        merged_config.win_len = 500 
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
-        merged_config.max_length_signal = 1000
-
-    if merged_config.linear_probing:
-        merged_config.layerwise_lr_decay = 0.
-        merged_config.drop_path_prob = False
-
-
-
-    merged_config.is_recurrent = not (merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.use_ecg_founder or merged_config.encoder_type == 'transformer')
-    
-    # ensure that for r_peaks detection, num_classes is equal to patch_size
-    if merged_config.r_peaks_detection:
-        if merged_config.use_ecg_founder:
-            merged_config.num_classes = merged_config.max_length_signal
-        else:
-            merged_config.num_classes = merged_config.patch_size
-    
-    return merged_config
 
 def get_trainer(config, model, prj_string, wandb=False, run=None):
     early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)

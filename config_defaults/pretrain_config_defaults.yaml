@@ -7,6 +7,15 @@ final_wd: 0.0001
 dropout: 0.3
 grad_clip: 0.5
 
+# optimize and scheduler
+optimizer: adamw
+use_scheduler: true
+num_epochs_warmup: 2
+num_epochs_warm_restart: 10
+sched_decay_factor: 0.8
+patience: 10
+
+
 # dataloaders
 batch_size: 192
 num_workers: 32
@@ -17,17 +26,9 @@ loss_type: mse_grad_min_max
 grad_loss_lambda: 1.0
 min_max_loss_lambda: 1.0
 
-# optimize and scheduler
-optimizer: adamw
-use_scheduler: true
-num_epochs_warmup: 2
-num_epochs_warm_restart: 10
-sched_decay_factor: 0.8
-patience: 10
-
 # model hyperparameters
-patch_size: 32
-embedding_size: 512
+patch_size: 25
+embedding_size: 128
 activation_fn: gelu
 xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
 wandb_log: false
@@ -43,6 +44,7 @@ monitor_delay_epochs: 2
 use_final_layer_norm: true
 use_cls_normalization: true
 max_length_signal: 1200
+proj_factor: 2
 
 use_transformer: false
 
@@ -64,7 +66,7 @@ keep_lead_II: true
 random_surrogate_prob: 0
 random_jitter_prob: 0
 random_change_amplitude: 0.
-pretrain_datasets: ['code15', 'mimic', 'ptbxl']
+pretrain_datasets: ['code', 'mimic', 'ptbxl']
 masking_type: 'random' # 'random' or 'block'
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
@@ -88,5 +90,4 @@ n_local_view: 0
 n_global_view: 2
 
 sampling_freq: 100
-nk_clean: true
 lambda_code_rate: 0.1
