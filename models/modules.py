@@ -3,7 +3,6 @@ import torch
 import numpy as np
 from torch.nn import functional as F
 from xlstm.xlstm_large.model import mLSTMStateType
-import sparseconvnet as scn
 
 
 class SparseConvPatchEmbedding(nn.Module):
