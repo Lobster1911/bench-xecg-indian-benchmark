@@ -10,6 +10,9 @@ import numpy as np
 import torch
 from trainers.common_trainer import CommonTrainerDownstream
 from utils.train_utils import focal_loss
+from torchmetrics import Metric
+from torch import Tensor
+from typing import Any
 
 
 class RegressionTrainer(CommonTrainerDownstream):
@@ -21,6 +24,8 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.train_mae = torchmetrics.MeanAbsoluteError()
         self.valid_mae = torchmetrics.MeanAbsoluteError()
         self.test_mae = torchmetrics.MeanAbsoluteError()
+
+        self.train_nmae = torchmetrics.()
 
         self.train_mse = torchmetrics.MeanSquaredError()
         self.valid_mse = torchmetrics.MeanSquaredError()
@@ -72,3 +77,54 @@ class RegressionTrainer(CommonTrainerDownstream):
         loss = nn.functional.mse_loss(results, targets)
 
         return loss, results, targets
+    
+
+
+class MeanAbsoluteError(Metric):
+    r"""`Computes Mean Absolute Error`_ (MAE):
+
+    .. math:: \text{MAE} = \frac{1}{N}\sum_i^N | y_i - \hat{y_i} |
+
+    Where :math:`y` is a tensor of target values, and :math:`\hat{y}` is a tensor of predictions.
+
+    Args:
+        kwargs: Additional keyword arguments, see :ref:`Metric kwargs` for more info.
+
+    Example:
+        >>> from torchmetrics import MeanAbsoluteError
+        >>> target = torch.tensor([3.0, -0.5, 2.0, 7.0])
+        >>> preds = torch.tensor([2.5, 0.0, 2.0, 8.0])
+        >>> mean_absolute_error = MeanAbsoluteError()
+        >>> mean_absolute_error(preds, target)
+        tensor(0.5000)
+    """
+    is_differentiable: bool = True
+    higher_is_better: bool = False
+    full_state_update: bool = False
+    sum_abs_error: Tensor
+    total: Tensor
+
+    def __init__(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+
+        self.add_state("sum_abs_error", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
+
+    def update(self, preds: Tensor, target: Tensor) -> None:  # type: ignore
+        """Update state with predictions and targets.
+
+        Args:
+            preds: Predictions from model
+            target: Ground truth values
+        """
+        sum_abs_error, n_obs = 0,0,0
+
+        self.sum_abs_error += sum_abs_error
+        self.total += n_obs
+
+    def compute(self) -> Tensor:
+        """Computes mean absolute error over state."""
+        return None
