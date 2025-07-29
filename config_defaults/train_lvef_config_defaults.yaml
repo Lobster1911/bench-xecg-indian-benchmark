@@ -1,63 +1,68 @@
-lr_head: 0.01
+# logging
+wandb_log: false
+wand_group: null
+
+# optimizer
+optimizer: adamw
+num_epochs_warmup: 3
+sched_decay_factor: 0.8
+use_class_weights: false
+use_focal_loss: false
+use_scheduler: true
+patience: 15
+grad_clip: 3.
+lr_head: 0.001
 lr_xlstm: 0.00001
-wd: 0.01
-batch_size: 512
+batch_size: 64
 num_workers: 32
 epochs: 30
+linear_probing: false
+
+# regularizers
+dropout: 0.
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 
+wd: 0.01
+
+# model
+use_ecg_founder: false
+use_st_mem: false
+use_ecg_jepa: false
+
 patch_size: 25
-dropout: 0.4
+sampling_freq: 100
+proj_factor: 2
+num_heads: 4
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+activation_fn: "gelu"
+cls_type: avg
 embedding_size: 1024
-deterministic: true
-is_sweep: false
-grad_clip: 3
+use_final_layer_norm: true
+patch_embedding: linear
+encoder_type: vanilla
+bidirectional: true
+num_reg_token: 0
+cls_normalization: null
+
+# augmentations
+random_surrogate_prob: 0.
+random_jitter_prob: 0.
+random_change_amplitude: 0.
+random_drop_leads: 0.
+random_resample: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: false
+nk_clean: false
+normalize: false
+random_crop: 1.
+
+# dataset
 num_classes: 1
 monitor_metric: valid_mse
 monitor_mode: min
-
-optimizer: "adamw"
-use_scheduler: true
-num_epochs_warmup: 1
-num_epochs_warm_restart: 15
-sched_decay_factor: 0.8
-random_surrogate_prob: 0.0
-random_jitter_prob: 0.0
-random_drop_leads: 0.0
-random_change_amplitude: 0.
 max_length_signal: 1200
-
-patience: 15
-
-activation_fn: "gelu"
-xlstm_config: ["m", "s", "m"]
-wandb_log: false
-num_heads: 4
-encoder_type: vanilla
-patch_embedding: non_linear
-bidirectional: false
-use_focal_loss: false
-sampling_freq: 250
-use_final_layer_norm: true
-cls_normalization: null
-proj_factor: 2
-
-normalize: true
-random_crop: 0.9
-nk_clean: true
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-
-data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
-labels_file_ptbxl: /media/Volume/data/PTB-XL/ptbxl_database.csv
 data_folder_mimic: /media/Volume/data/MIMIC_IV/
 labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
-checkpoint: null
-
-classification_taksk: 'diagnosis_superclass'
-
-strategy: masked_token_prediction
-num_reg_token: 0
-
 n_global_view: 1
 n_local_view: 0
-
-data_folder_code15: /media/Volume/data/CODE15/processed/
-labels_file_code15: /media/Volume/data/CODE15/processed/exams_filtered.csv

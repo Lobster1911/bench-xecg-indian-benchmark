@@ -17,8 +17,8 @@ class TrainingPTB_XL(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
 
-        self.classification_taksk = config.classification_task
-        self.num_classes = 23 if self.classification_taksk == 'diagnosis_subclass' else 5
+        self.classification_task = config.classification_task
+        self.num_classes = 23 if self.classification_task == 'diagnosis_subclass' else 5
 
         top_k = 1 if self.task == 'multiclass' else None
 

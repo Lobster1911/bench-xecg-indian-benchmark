@@ -101,7 +101,6 @@ class CommonClassifierTrainer(CommonTrainerDownstream):
     def __init__(self, model, config, len_train_dataset, weights=None):
         super().__init__(model, config, len_train_dataset, weights)
 
-        self.classification_taksk = config.classification_task
         self.num_classes = config.num_classes
         self.top_k = config.top_k
 

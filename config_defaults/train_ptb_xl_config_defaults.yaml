@@ -1,58 +1,73 @@
-lr_head: 0.01
+# logging
+wandb_log: false
+wand_group: null
+
+# optimizer
+optimizer: adamw
+num_epochs_warmup: 1
+sched_decay_factor: 0.8
+use_class_weights: true
+use_focal_loss: false
+use_scheduler: true
+patience: 20
+grad_clip: 3.
+lr_head: 0.001
 lr_xlstm: 0.00001
-wd: 0.01
 batch_size: 64
 num_workers: 32
 epochs: 30
-patch_size: 128
-dropout: 0.4
-embedding_size: 512
-deterministic: true
-is_sweep: false
-grad_clip: 0.5
-training_pct: 1.
+linear_probing: false
 
-optimizer: "adamw"
-use_scheduler: true
-num_epochs_warmup: 1
-num_epochs_warm_restart: 15
-sched_decay_factor: 0.8
-random_surrogate_prob: 0.0
-random_jitter_prob: 0.0
-random_drop_leads: 0.0
-random_change_amplitude: 0.
-max_length_signal: 1200
+# regularizers
+dropout: 0.
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 
+wd: 0.01
 
-patience: 15
+# model
+use_ecg_founder: false
+use_st_mem: false
+use_ecg_jepa: false
 
-activation_fn: "gelu"
-xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
-wandb_log: false
+patch_size: 25
+sampling_freq: 100
+proj_factor: 2
 num_heads: 4
-encoder_type: "small"
-patch_embedding: "linear"
-bidirectional: false
-use_focal_loss: false
-sampling_freq: 250
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+activation_fn: "gelu"
+cls_type: avg
+embedding_size: 1024
 use_final_layer_norm: true
+patch_embedding: linear
+encoder_type: vanilla
+bidirectional: true
+num_reg_token: 0
 cls_normalization: null
 
-normalize: true
-random_crop: 0.9
-nk_clean: true
-leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-proj_factor: 2
+# augmentations
+random_surrogate_prob: 0.
+random_jitter_prob: 0.
+random_change_amplitude: 0.
+random_drop_leads: 0.
+random_resample: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: false
+nk_clean: false
+normalize: false
+random_crop: 1.
 
+# dataset
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+max_length_signal: 1200
 data_folder_ptbxl: /media/Volume/data/PTB-XL/
 labels_file_ptbxl: /media/Volume/data/PTB-XL/ptbxl_database.csv
-
 checkpoint: null
-
-classification_taksk: 'diagnosis_superclass'
+classification_task: 'diagnosis_superclass'
 num_classes: 5
-
-strategy: masked_token_prediction
-num_reg_token: 0
-
+deterministic: true
+monitor_metric: 'val_auroc'
+monitor_mode: max
 n_global_view: 1
 n_local_view: 0
+training_pct: 1.
+task: multilabel
