@@ -66,3 +66,4 @@ data_folder_mimic: /media/Volume/data/MIMIC_IV/
 labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
 n_global_view: 1
 n_local_view: 0
+task: multiclass

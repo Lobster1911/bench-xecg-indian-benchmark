@@ -25,7 +25,21 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.valid_mae = torchmetrics.MeanAbsoluteError()
         self.test_mae = torchmetrics.MeanAbsoluteError()
 
-        self.train_nmae = torchmetrics.()
+        self.train_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
+        self.valid_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
+        self.test_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
+
+        self.train_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
+        self.valid_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
+        self.test_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
+
+        self.train_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
+        self.valid_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
+        self.test_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
+
+        self.train_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
+        self.valid_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
+        self.test_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
 
         self.train_mse = torchmetrics.MeanSquaredError()
         self.valid_mse = torchmetrics.MeanSquaredError()
@@ -39,6 +53,15 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.train_mse(preds, targets)
         self.log('train_mse', self.train_mse, prog_bar=True)
 
+        self.train_rsmape_1(preds, targets)
+        self.log('train_rsmape_1', self.train_rsmape_1, prog_bar=False)
+        self.train_rsmape_0(preds, targets)
+        self.log('train_rsmape_0', self.train_rsmape_0, prog_bar=False)
+        self.train_rsmape_2(preds, targets)
+        self.log('train_rsmape_2', self.train_rsmape_2, prog_bar=False)
+        self.train_rsmape_4(preds, targets)
+        self.log('train_rsmape_4', self.train_rsmape_4, prog_bar=False)
+
         self.log('train_loss', loss.detach().item(), prog_bar=True)
 
         return loss
@@ -51,6 +74,15 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.valid_mse(preds, targets)
         self.log('valid_mse', self.valid_mse, prog_bar=True)
 
+        self.valid_rsmape_1(preds, targets)
+        self.log('valid_rsmape_1', self.valid_rsmape_1, prog_bar=False)
+        self.valid_rsmape_0(preds, targets)
+        self.log('valid_rsmape_0', self.valid_rsmape_0, prog_bar=False)
+        self.valid_rsmape_2(preds, targets)
+        self.log('valid_rsmape_2', self.valid_rsmape_2, prog_bar=False)
+        self.valid_rsmape_4(preds, targets)
+        self.log('valid_rsmape_4', self.valid_rsmape_4, prog_bar=False)
+
         self.log('val_loss', loss.detach().item(), prog_bar=True)
         return loss
             
@@ -61,6 +93,15 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.log('test_mae', self.valid_mae, prog_bar=True)
         self.valid_mse(preds, targets)
         self.log('test_mse', self.valid_mse, prog_bar=True)
+
+        self.test_rsmape_1(preds, targets)
+        self.log('test_rsmape_1', self.test_rsmape_1, prog_bar=False)
+        self.test_rsmape_0(preds, targets)
+        self.log('test_rsmape_0', self.test_rsmape_0, prog_bar=False)
+        self.test_rsmape_2(preds, targets)
+        self.log('test_rsmape_2', self.test_rsmape_2, prog_bar=False)
+        self.test_rsmape_4(preds, targets)
+        self.log('test_rsmape_4', self.test_rsmape_4, prog_bar=False)   
 
         self.log('test_loss', loss.detach().item(), prog_bar=True)
         return loss     
@@ -80,23 +121,15 @@ class RegressionTrainer(CommonTrainerDownstream):
     
 
 
-class MeanAbsoluteError(Metric):
-    r"""`Computes Mean Absolute Error`_ (MAE):
+class RobustMeanAbsoluteError(Metric):
+    r"""`Computes e Robust Symmetric Mean Absolute Percentage Error`_ (RSMAPE):
 
-    .. math:: \text{MAE} = \frac{1}{N}\sum_i^N | y_i - \hat{y_i} |
+    .. math:: \text{RSMAPE} = \frac{1}{N}\sum_i^N | y_i - \hat{y_i} | / (|y_i| + |\hat{y_i}| + \epsilon)
 
     Where :math:`y` is a tensor of target values, and :math:`\hat{y}` is a tensor of predictions.
 
     Args:
         kwargs: Additional keyword arguments, see :ref:`Metric kwargs` for more info.
-
-    Example:
-        >>> from torchmetrics import MeanAbsoluteError
-        >>> target = torch.tensor([3.0, -0.5, 2.0, 7.0])
-        >>> preds = torch.tensor([2.5, 0.0, 2.0, 8.0])
-        >>> mean_absolute_error = MeanAbsoluteError()
-        >>> mean_absolute_error(preds, target)
-        tensor(0.5000)
     """
     is_differentiable: bool = True
     higher_is_better: bool = False
@@ -106,10 +139,12 @@ class MeanAbsoluteError(Metric):
 
     def __init__(
         self,
+        epsilon: float = 1e-6,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
 
+        self.epsilon = epsilon
         self.add_state("sum_abs_error", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
@@ -120,11 +155,15 @@ class MeanAbsoluteError(Metric):
             preds: Predictions from model
             target: Ground truth values
         """
-        sum_abs_error, n_obs = 0,0,0
+        abs_err = torch.abs(preds - target)
+        abs_pred = torch.abs(preds)
+        abs_target = torch.abs(target)
 
-        self.sum_abs_error += sum_abs_error
-        self.total += n_obs
+        err = abs_err / (abs_pred + abs_target + self.epsilon)
+
+        self.sum_abs_error += err.sum()
+        self.total += abs_pred.numel()
 
     def compute(self) -> Tensor:
         """Computes mean absolute error over state."""
-        return None
+        return self.sum_abs_error / self.total  
