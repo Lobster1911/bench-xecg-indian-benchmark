@@ -204,6 +204,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             cls = self.model(x)
 
             if cls.shape[1] > targets.shape[1]:
+                print(f"cls shape: {cls.shape}, targets shape: {targets.shape}")
                 cls = cls[:, :targets.shape[1], :]
 
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)

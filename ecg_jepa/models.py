@@ -25,8 +25,8 @@ def load_encoder(ckpt_dir, num_classes=5, leads=None, drop_path_rate=0.0, featur
     # check if all params require grad
 
     if feature_classification:
-        model = ECGJepaFeatureClassifier(encoder, num_classes, patch_size=75, linear_probing=linear_probing, r_peaks_detection=r_peaks_detection)
+        model = ECGJepaFeatureClassifier(encoder, num_classes, patch_size=50, linear_probing=linear_probing, r_peaks_detection=r_peaks_detection)
     else:
-        model = ECGJepaClassifier(encoder, num_classes, patch_size=75, linear_probing=linear_probing)
+        model = ECGJepaClassifier(encoder, num_classes, patch_size=50, linear_probing=linear_probing)
 
     return model
