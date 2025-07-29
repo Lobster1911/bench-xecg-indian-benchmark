@@ -236,11 +236,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
 
-        around_r_peaks = [(np.round(r * (self.sampling_freq / header.fs)), l) for r, l in sample['around_r_peaks']]
+        around_r_peaks = [(int(np.round(r * (self.sampling_freq / header.fs))), l) for r, l in sample['around_r_peaks']]
         len_signal = signal.shape[0]
 
         if self.is_recurrent and self.split == 'train':
-            r_peak = np.round(sample['r_peak'] * (self.sampling_freq / header.fs))
+            r_peak = int(np.round(sample['r_peak'] * (self.sampling_freq / header.fs)))
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
         elif not self.is_recurrent:
@@ -269,7 +269,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         for r, l in around_r_peaks:
             # print(r, l)
             if window_start <= r < window_end:
-                labels_mask[int(r) - window_start] = self.get_label_int(l)
+                labels_mask[r - window_start] = self.get_label_int(l)
             # else:
             #    print('r-peak out of window: ', r, l, window_start, window_end)
 
