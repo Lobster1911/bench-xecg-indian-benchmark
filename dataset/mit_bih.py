@@ -55,7 +55,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.patch_size = config.patch_size
         self.normalize = config.normalize
         self.num_classes = config.num_classes 
-        self.win_len = config.win_len
+        self.win_len = config.win_len # defined in timepoints of model's frequency
         self.skip_majority_class_samples = config.skip_majority_class_samples
         self.bidirectional = config.bidirectional
         self.split_val_by_patient = config.split_val_by_patient
@@ -124,7 +124,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
-            win_orig = self.win_len / self.freq_factor
+            win_orig = np.round(self.win_len / self.freq_factor)
             len_signal = len(self.signals[patient])
             # print((f"win_orig: {win_orig}, freq_factor: {freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}"))
 
@@ -148,7 +148,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                         samples.append({
                             'patient': patient,
                             'r_peak': r_peak[0],
-                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - win_orig < r <= r_peak[0] + win_orig],
+                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - win_orig <= r < r_peak[0] + win_orig - 1],
                         })
                         skipped = 0
                     else:
@@ -221,7 +221,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         patient = sample['patient']
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
-        r_peak = int(sample['r_peak'] * self.sampling_freq / header.fs)
+        r_peak = int(sample['r_peak'] * (self.sampling_freq / header.fs))
         # print("around_r_peaks", sample['around_r_peaks'])
         around_r_peaks = [(int(r * (self.sampling_freq / header.fs)), l) for r, l in sample['around_r_peaks']]
         # print(f"r_peak: {r_peak}, around_r_peaks: {around_r_peaks}")
@@ -256,12 +256,16 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             # print(r, l)
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
+            # else:
+            #    print('r-peak out of window: ', r, l, window_start, window_end)
 
         # start_original = window_start / self.freq_factor
         # original_r_peaks = torch.tensor([r - start_original for r, _ in sample['around_r_peaks']], dtype=torch.float32)
         # print(f"Original r_peaks: {original_r_peaks}")
         # print(f"Window signal shape: {window_signal.shape}, R peaks mask shape: {r_peaks_mask.shape}, Labels mask shape: {labels_mask.shape}")
 
+        # print('window signal shape', window_signal.shape)
+        # print('annotations', labels_mask)
         return {
             'signal': window_signal,
             'patient_id': patient,
