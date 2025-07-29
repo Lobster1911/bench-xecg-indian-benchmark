@@ -1,61 +1,68 @@
+# logging
+wandb_log: false
+wand_group: null
+
+# optimizer
+optimizer: adamw
+num_epochs_warmup: 3
+sched_decay_factor: 0.8
+use_class_weights: false
+use_focal_loss: false
+use_scheduler: true
+patience: 5
+grad_clip: 3.
 lr_head: 0.001
 lr_xlstm: 0.00001
-wd: 0.01
 batch_size: 64
 num_workers: 32
 epochs: 30
-patch_size: 128
-dropout: 0.0
-drop_path_prob: 0.0
-embedding_size: 512
-deterministic: true
-is_sweep: false
-grad_clip: 0.5
-task: multiclass
-original_freq: 250
+linear_probing: false
 
-optimizer: "adamw"
-use_scheduler: true
-num_epochs_warmup: 1
-num_epochs_warm_restart: 15
-sched_decay_factor: 0.8
-random_surrogate_prob: 0.0
-random_jitter_prob: 0.0
-random_drop_leads: 0.0
-random_change_amplitude: 0.
-max_length_signal: 2500
-data_pct: 1.0
-monitor_metric: val_auroc
-patience: 5
+# regularizers
+dropout: 0.
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 
+wd: 0.01
 
-activation_fn: "gelu"
-xlstm_config: ["m", "s", "m", "m", "m", "m", "m"]
-wandb_log: false
-num_heads: 4
-encoder_type: "small"
-patch_embedding: "linear"
-bidirectional: false
-use_focal_loss: false
+# model
+use_ecg_founder: false
+use_st_mem: false
+use_ecg_jepa: false
+
+patch_size: 25
 sampling_freq: 100
-use_final_layer_norm: true
-cls_normalization: null
 proj_factor: 2
-
-normalize: false
-random_crop: 0
-nk_clean: false
-leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-
-data_folder_deepbeat: ../../../data/DeepBeat_PPG/
-
-checkpoint: null
-
-num_classes: 2
-
-strategy: masked_token_prediction
+num_heads: 4
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+activation_fn: "gelu"
+cls_type: avg
+embedding_size: 1024
+use_final_layer_norm: true
+patch_embedding: linear
+encoder_type: vanilla
+bidirectional: true
 num_reg_token: 0
+cls_normalization: null
 
+# augmentations
+random_surrogate_prob: 0.
+random_jitter_prob: 0.
+random_change_amplitude: 0.
+random_drop_leads: 0.
+random_resample: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: false
+nk_clean: false
+normalize: false
+random_crop: 1.
+
+# dataset
+monitor_metric: val_auroc
+monitor_mode: max
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+task: multiclass
+num_classes: 2
 n_global_view: 1
 n_local_view: 0
-
 data_folder_high_intensity: /media/Volume/data/ECG_high_intensity_exercise
+original_freq: 250
