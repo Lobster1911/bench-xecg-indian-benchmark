@@ -140,7 +140,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                     })
                     # print(samples[-1]['around_r_peaks'])
                     # print around r_peaks
-            elif subset == 'train' and self.is_recurrent:
+            elif subset == 'train':
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
 
@@ -239,7 +239,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         around_r_peaks = [(int(np.round(r * (self.sampling_freq / header.fs))), l) for r, l in sample['around_r_peaks']]
         len_signal = signal.shape[0]
 
-        if self.is_recurrent and self.split == 'train':
+        if self.split == 'train':
             r_peak = int(np.round(sample['r_peak'] * (self.sampling_freq / header.fs)))
             window_start = max(0, r_peak - self.win_len)
             window_end = min(r_peak + self.win_len, len_signal)
