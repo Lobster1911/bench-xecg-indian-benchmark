@@ -28,6 +28,7 @@ wd: 0.01
 use_ecg_founder: false
 use_st_mem: false
 use_ecg_jepa: false
+use_batch_norm_jepa: false
 
 patch_size: 25
 sampling_freq: 100
@@ -43,7 +44,6 @@ encoder_type: vanilla
 bidirectional: true
 num_reg_token: 0
 cls_normalization: null
-use_batch_norm_jepa: true
 
 # augmentations
 random_surrogate_prob: 0.

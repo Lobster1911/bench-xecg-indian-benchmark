@@ -138,8 +138,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                         'r_peak': -1,
                         'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len * 2) // self.freq_factor],
                     })
-                    # print(samples[-1]['around_r_peaks'])
-                    # print around r_peaks
             elif subset == 'train':
                 for i, r_peak in enumerate(r_peaks):
                     sample_class = r_peaks[i][1]
@@ -251,7 +249,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             window_start = 0
             window_end = len_signal
 
-        # print(f"Window start: {window_start}, Window end: {window_end}, Signal length: {len_signal}")
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
 

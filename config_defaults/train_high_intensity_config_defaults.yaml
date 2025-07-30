@@ -6,7 +6,7 @@ wand_group: null
 optimizer: adamw
 num_epochs_warmup: 1
 sched_decay_factor: 0.8
-use_class_weights: false
+use_class_weights: true
 use_focal_loss: false
 use_scheduler: true
 patience: 5
@@ -28,6 +28,7 @@ wd: 0.01
 use_ecg_founder: false
 use_st_mem: false
 use_ecg_jepa: false
+use_batch_norm_jepa: true
 
 patch_size: 25
 sampling_freq: 100
@@ -57,7 +58,7 @@ normalize: false
 random_crop: 1.
 
 # dataset
-monitor_metric: val_auroc
+monitor_metric: val_f1
 monitor_mode: max
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 task: multiclass
@@ -66,3 +67,4 @@ n_global_view: 1
 n_local_view: 0
 data_folder_high_intensity: /media/Volume/data/ECG_high_intensity_exercise
 original_freq: 250
+max_length_signal: 2500

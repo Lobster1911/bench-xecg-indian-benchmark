@@ -33,9 +33,9 @@ def train(config, run=None, wandb=False):
 
     if config.split_val_by_patient:
         train_dataset =  dataset_class(config, split='train', augmentations=get_transforms(config))
-        print(f"Train dataset size: {len(train_dataset)}")
+        print(f"Train dataset size (split by patient): {len(train_dataset)}")
         val_dataset = dataset_class(config, split='val', augmentations=get_transforms(config, split='val'))
-        print(f"Val dataset size: {len(val_dataset)}")
+        print(f"Val dataset size (split by patient): {len(val_dataset)}")
     else:
         dataset = dataset_class(config, split='train', augmentations=get_transforms(config))
         dataset_len = len(dataset)
@@ -61,8 +61,8 @@ def train(config, run=None, wandb=False):
         weights = None
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
-    val_batch_size = 1 if config.is_recurrent else config.batch_size
-    val_num_workers = 0 if config.is_recurrent  else config.num_workers
+    val_batch_size = 1 if config.is_recurrent and not config.r_peaks_detection else config.batch_size
+    val_num_workers = 0 if config.is_recurrent and not config.r_peaks_detection else config.num_workers
     print("Using val_batch_size:", val_batch_size, "and val_num_workers:", val_num_workers)
     val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
 
