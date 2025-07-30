@@ -4,7 +4,7 @@ wand_group: null
 
 # optimizer
 optimizer: adamw
-num_epochs_warmup: 3
+num_epochs_warmup: 0
 sched_decay_factor: 0.8
 use_class_weights: false
 use_focal_loss: false
@@ -43,6 +43,7 @@ encoder_type: vanilla
 bidirectional: true
 num_reg_token: 0
 cls_normalization: null
+use_batch_norm_jepa: true
 
 # augmentations
 random_surrogate_prob: 0.
@@ -67,3 +68,4 @@ labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
 n_global_view: 1
 n_local_view: 0
 task: multiclass
+

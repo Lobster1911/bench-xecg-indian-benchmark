@@ -1,10 +1,10 @@
 import torch
 from ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier
 
-def load_encoder(ckpt_dir, num_classes=5, leads=None, drop_path_rate=0.0, feature_classification=False, linear_probing=False, r_peaks_detection=False):
+def load_encoder(ckpt_dir, config, feature_classification=False):
 
-    if leads is None:
-        leads = [0,1,2,3,4,5,6,7]
+    if config.leads is None:
+        config.leads = [0,1,2,3,4,5,6,7]
 
     params = {
         'encoder_embed_dim': 768,
@@ -16,8 +16,8 @@ def load_encoder(ckpt_dir, num_classes=5, leads=None, drop_path_rate=0.0, featur
         'c': 8,
         'pos_type': 'sincos',
         'mask_scale': (0, 0),
-        'leads': leads,
-        'drop_path_rate': drop_path_rate,
+        'leads': config.leads,
+        'drop_path_rate': config.drop_path_prob,
     }
     encoder = ecg_jepa(**params).encoder
     ckpt = torch.load(ckpt_dir)
@@ -25,8 +25,20 @@ def load_encoder(ckpt_dir, num_classes=5, leads=None, drop_path_rate=0.0, featur
     # check if all params require grad
 
     if feature_classification:
-        model = ECGJepaFeatureClassifier(encoder, num_classes, patch_size=50, linear_probing=linear_probing, r_peaks_detection=r_peaks_detection)
+        model = ECGJepaFeatureClassifier(
+            encoder, 
+            config.num_classes, 
+            patch_size=config.patch_size, 
+            linear_probing=config.linear_probing, 
+            r_peaks_detection=config.r_peaks_detection
+        )
     else:
-        model = ECGJepaClassifier(encoder, num_classes, patch_size=50, linear_probing=linear_probing)
+        model = ECGJepaClassifier(
+            encoder, 
+            config.num_classes, 
+            patch_size=config.patch_size, 
+            linear_probing=config.linear_probing, 
+            use_batch_norm_jepa=config.use_batch_norm_jepa
+        )
 
     return model

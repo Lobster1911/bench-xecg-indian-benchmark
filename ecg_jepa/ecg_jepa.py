@@ -557,17 +557,21 @@ class ecg_jepa(nn.Module):
     
 
 class ECGJepaClassifier(BaseModel):
-    def __init__(self, encoder, num_classes, patch_size, linear_probing=True):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, use_batch_norm_jepa=True):
         super().__init__()
         self.encoder = encoder
         self.num_classes = num_classes
         self.linear_probing = linear_probing
         self.patch_size = patch_size
 
-        self.head = nn.Sequential(
-            nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
-            nn.Linear(self.encoder.embed_dim, num_classes)
-        )
+        if use_batch_norm_jepa:
+            self.head = nn.Sequential(
+                nn.BatchNorm1d(self.encoder.embed_dim, affine=False),
+                nn.Linear(self.encoder.embed_dim, num_classes)
+            )
+        else:
+            self.head = nn.Linear(self.encoder.embed_dim, num_classes)
+            
 
     def forward(self, x):
         x = x.transpose(1, 2)
