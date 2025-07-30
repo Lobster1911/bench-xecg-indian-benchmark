@@ -573,7 +573,6 @@ class ECGJepaClassifier(BaseModel):
         x = x.transpose(1, 2)
         if self.linear_probing:
             with torch.no_grad():
-                print("Using linear probing")
                 repr = self.encoder.representation(x)
         else:
             repr = self.encoder.representation(x)
