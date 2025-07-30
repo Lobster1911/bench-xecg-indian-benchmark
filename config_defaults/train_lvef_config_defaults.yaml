@@ -4,7 +4,7 @@ wand_group: null
 
 # optimizer
 optimizer: adamw
-num_epochs_warmup: 0
+num_epochs_warmup: 1
 sched_decay_factor: 0.8
 use_class_weights: false
 use_focal_loss: false
