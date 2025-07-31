@@ -18,7 +18,7 @@ num_workers: 32
 epochs: 15
 linear_probing: false
 
-monitor_metric: val_auroc
+monitor_metric: val_f1
 monitor_mode: max
 
 # regularizers

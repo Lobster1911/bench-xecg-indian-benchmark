@@ -42,7 +42,7 @@ mask_ratio: 0.5 # only for masked_token_prediction
 monitor_metric: val_nrmse
 monitor_delay_epochs: 2
 use_final_layer_norm: true
-use_cls_normalization: true
+cls_normalization: null
 max_length_signal: 1200
 proj_factor: 2
 
