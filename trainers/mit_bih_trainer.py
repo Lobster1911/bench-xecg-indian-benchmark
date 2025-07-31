@@ -8,12 +8,16 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-
+from ecg_jepa.models import load_encoder
+import os
+import matplotlib.pyplot as plt
+import lightning.pytorch as pl
 
 class TrainingMIT_BIH(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
             
+        self.plot_test_predictions = config.plot_test_predictions
 
         self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
         self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
@@ -191,8 +195,30 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
         return loss_cls 
     
+    def on_test_epoch_end(self):
+        super().on_test_epoch_end()
+
+        if self.plot_test_predictions:
+            try:
+                sample_1 = self.trainer.test_dataloaders.dataset[2]
+                sample_2 = self.trainer.test_dataloaders.dataset[3]
+                log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
+                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1')
+                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2')
+
+                if isinstance(self.logger, pl.loggers.WandbLogger):
+                    self.logger.log_image(key="reconstructions_train", images=[img_1, img_2])
+            except Exception as e:
+                # print stack trace
+                import traceback
+                traceback.print_exc()
+                print(f"Error plotting R-peaks: {e}")
+    
+    
+    
     def predict_batch(self, batch):
         x = batch["signal"]
+        # print(f"x shape: {x.shape}")
 
         if self.linear_probing:
             self.model.set_eval_linear_probing()
@@ -202,9 +228,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             # get one hot encoding
 
             cls = self.model(x)
-
+            # print(f"cls shape: {cls.shape}, targets shape: {targets.shape}")
             if cls.shape[1] > targets.shape[1]:
-                print(f"cls shape: {cls.shape}, targets shape: {targets.shape}")
                 cls = cls[:, :targets.shape[1], :]
 
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
@@ -231,3 +256,77 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         preds = preds[mask]
         
         return loss_cls, preds, targets, cls 
+    
+
+
+
+def plot_mit_bih_pred(sample, model, device, logdir, epoch, name, max_length=3000):
+    with torch.no_grad():
+        signal = sample['signal'].to(device).unsqueeze(0)
+        target = sample['label'].to(device).unsqueeze(0)
+
+        predicted = model(signal)
+
+        # consider max 2000 time samples for plotting
+        if signal.shape[1] > max_length:
+            signal = signal[:, :max_length, :]
+            target = target[:, :max_length]
+
+        targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
+        fig, ax = plt.subplots(figsize=(25, 5))
+
+        to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()
+
+        ax.plot(to_plot, label='Original Signal')
+
+        # Plot vertical lines at each patch
+        for j in range(0, signal.shape[1], model.patch_size):
+            ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
+
+        # inside each patch plot the prediction above and the target below
+        print("shape of targets", targets.shape)
+        for i in range(targets.shape[1]):
+            patch_start = i * model.patch_size
+            patch_end = patch_start + model.patch_size
+
+            # get the max index of the prediction
+            pred_class = torch.argmax(predicted[0, i]).item()
+            ax.text((patch_start + patch_end) / 2, 0.5,
+                    f'{get_label(pred_class)}',
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=7,
+                    color='green',
+                    bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+            # plot the target class below the patch
+            target_class = targets[0, i].item()
+            ax.text((patch_start + patch_end) / 2, -0.5,
+                    f'{get_label(target_class)}',  
+                    horizontalalignment='center',
+                    verticalalignment='center',
+                    fontsize=7,
+                    color='orange',
+                    bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+            
+        ax.set_title('MIT-BIH ECG Signal with Predictions and Targets')
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Amplitude')
+        ax.legend()
+
+        # mkdir if it does not exist
+        os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
+
+        path = f'{logdir}/epoch_{epoch}/r_peaks_{name}.png'
+        plt.savefig(path)
+        plt.close()
+        return path
+    
+
+def get_label(label):
+    if label == 0: return 'N'
+    if label == 1: return 'S'
+    if label == 2: return 'V'
+    if label == 3: return 'F'
+    if label == 4: return 'Q'
+    if label == -1: return 'X'
+    else: raise ValueError(f'Unknown label {label}')
