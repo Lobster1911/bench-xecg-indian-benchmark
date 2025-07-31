@@ -1,6 +1,19 @@
 import pandas as pd
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+import pandas as pd
+import argparse
 
-csv= pd.read_csv('/media/Volume/data/MIMIC_IV/discharge.csv.gz')
+parser = argparse.ArgumentParser(description="Parse LVEF values from discharge CSV.")
+parser.add_argument("csv_path", type=str, help="Path to the discharge CSV file (can be .gz)", default="/media/Volume/data/MIMIC_IV/discharge.csv.gz")
+parser.add_argument("--model_id", type=str, default="google/gemma-2-9b-it", help="Model ID for the LVEF parsing model")
+parser.add_argument("--device", type=str, default="cuda", help="Device to run the  model on (e.g., 'cuda' or 'cpu')")
+parser.add_argument("--output_path", type=str, default="/media/Volume/data/MIMIC_IV/discharge_lvef.csv", help="Path to the output CSV file")
+parser.add_argument('--test', action='store_true', help='Run in test mode with a small subset of data')
+
+args = parser.parse_args()
+
+csv = pd.read_csv(args.csv_path)
 print(csv.head())
 # print unique subject IDs
 unique_subject_ids = csv['subject_id'].unique()
@@ -11,17 +24,14 @@ print("Total number of ecgs:", len(csv))
 
 csv['lvef'] = None
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-import pandas as pd
+
 
 # Choose a light model
-model_id = "google/gemma-2-9b-it"
 
 # Load tokenizer and model (4-bit quantized)
-tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(args.model_id)
 model = AutoModelForCausalLM.from_pretrained(
-    model_id,
+    args.model_id,
     device_map="cuda",
     torch_dtype=torch.float16,
     load_in_4bit=True  # needs bitsandbytes
@@ -48,6 +58,7 @@ for i, text in enumerate(csv["text"]):
     answer = decoded.replace(prompt, "").strip()
     print(f"Row {i}: {answer}")
     csv.at[i, 'lvef'] = answer
-    break
+    if args.test:
+        break
 
-csv.to_csv('/media/Volume/data/MIMIC_IV/discharge_lvef.csv')
+csv.to_csv(args.output_path)
