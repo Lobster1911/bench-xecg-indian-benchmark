@@ -196,9 +196,7 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     
     def predict_batch(self, batch):
         x = batch["signals"]
-        print("X shape:", x.shape)
         targets = batch['labels']
-        print("Targets shape:", targets.shape)
 
         segment_ids = batch['segment_ids']  # patient ids are not used in the training, but we keep them for consistency
 
@@ -209,9 +207,6 @@ class TrainingSleepApnea(CommonTrainerDownstream):
 
         logits = self.model(x).squeeze(-1) 
         preds = (torch.sigmoid(logits) > 0.5).float()
-        print("Logits shape:", logits.shape)
-        print("Preds shape:", preds.shape)
-
 
         if not self.is_recurrent:
             targets = targets.squeeze(-1)
