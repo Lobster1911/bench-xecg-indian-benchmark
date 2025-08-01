@@ -6,7 +6,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Parse LVEF values from discharge CSV.")
 parser.add_argument("csv_path", type=str, help="Path to the discharge CSV file (can be .gz)", default="/media/Volume/data/MIMIC_IV/discharge.csv.gz")
-parser.add_argument("--model_id", type=str, default="google/gemma-2-9b-it", help="Model ID for the LVEF parsing model")
+parser.add_argument("--model_id", type=str, default="mode", help="Model ID for the LVEF parsing model")
 parser.add_argument("--device", type=str, default="cuda", help="Device to run the  model on (e.g., 'cuda' or 'cpu')")
 parser.add_argument("--output_path", type=str, default="/media/Volume/data/MIMIC_IV/discharge_lvef.csv", help="Path to the output CSV file")
 parser.add_argument('--test', action='store_true', help='Run in test mode with a small subset of data')
@@ -61,4 +61,7 @@ for i, text in enumerate(csv["text"]):
     if args.test:
         break
 
+# remove column 'text'
+
+csv.drop(columns=['text'], inplace=True)
 csv.to_csv(args.output_path)
