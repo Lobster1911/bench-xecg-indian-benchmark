@@ -46,7 +46,7 @@ def train(config, run=None, wandb=False):
 
     trainer = utils.get_trainer(config, model, "train-exercise-r_peak", wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
-    trainer.test(model=model, dataloaders=test_dataloader)
+    trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
 # if main
 if __name__ == '__main__':

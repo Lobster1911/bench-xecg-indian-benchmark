@@ -1,26 +1,15 @@
-import os
-from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMFeatureClassification
-
-import dataset.sleep_apnea as sleep_apnea
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-
-from trainers.sleep_apnea_trainer import TrainingSleepApnea
 import torch
 import argparse
-import os
-import numpy as np
-from tqdm import tqdm
 import utils.utils as utils
+from torch.utils.data import DataLoader
+
 from utils.utils import get_training_class_weights
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from torchvision import transforms
 from dataset.generic_utils import get_transforms
-from ecg_jepa.models import load_encoder
-import st_mem.encoder as encoder
+from trainers.sleep_apnea_trainer import TrainingSleepApnea
+
+import dataset.sleep_apnea as sleep_apnea
+
 
 
 import argparse
@@ -55,7 +44,7 @@ def train(config, run=None, wandb=False):
 
     trainer = utils.get_trainer(config, model, 'train-sleep-apnea', wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
-    trainer.test(model=model, dataloaders=test_dataloader)
+    trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
 
 # if main

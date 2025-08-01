@@ -1,22 +1,14 @@
-import os
 from torch import utils
 import lightning as pl
-from lightning.pytorch.loggers import WandbLogger
-from models.mit_bih_models import xLSTMClassificationMIT_BIH
-import dataset.mit_bih as mit_bih
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from trainers.mit_bih_trainer import TrainingMIT_BIH
-from trainers.r_peaks_trainer import TrainingRPeak
 import torch
 import argparse
-import os
-from ecg_jepa.models import load_encoder
-import st_mem.encoder as encoder
+from torch.utils.data import DataLoader
 
 import utils.utils as utils
-from utils.utils import get_training_class_weights
-from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
+import dataset.mit_bih as mit_bih
+from trainers.mit_bih_trainer import TrainingMIT_BIH
+from trainers.r_peaks_trainer import TrainingRPeak
 
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
@@ -80,7 +72,7 @@ def train(config, run=None, wandb=False):
     trainer = utils.get_trainer(config, model, prj_string, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
-    trainer.test(model=model, dataloaders=test_dataloader)
+    trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
 # if main
 if __name__ == '__main__':

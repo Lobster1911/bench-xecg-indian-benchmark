@@ -16,9 +16,7 @@ class pretrainedxLSTM(BaseModel):
         super(pretrainedxLSTM, self).__init__()
         self.dropout = nn.Dropout(config.dropout)
         self.patch_size = config.patch_size
-        self.weight_tying = config.weight_tying
         self.bidirectional = config.bidirectional
-        self.training_strategy = config.strategy
         self.use_teacher_student = config.use_teacher_student
         self.mask_ratio = config.mask_ratio
         self.embedding_size = config.embedding_size
@@ -34,10 +32,8 @@ class pretrainedxLSTM(BaseModel):
             self.core = get_transformer(config)
         else:
             self.core = get_xlstm(config)
-        
 
-        if self.training_strategy == 'masked_token_prediction':
-            self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+        self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
         
         if self.cls_type == 'token' or self.cls_type == 'token_2':
             self.cls_token = nn.Parameter(torch.zeros(1, 1, config.embedding_size))
@@ -124,7 +120,7 @@ class pretrainedxLSTM(BaseModel):
             x = self.add_reg_tokens(x)
 
         # pass to xlstm
-        need_expansion = self.training_strategy == 'next_token_prediction' and self.bidirectional
+        need_expansion = False
         out = self.core(x, need_expansion = need_expansion) # [batch_size, embedding_dim]
 
         if self.num_reg_tokens > 0:
@@ -220,8 +216,7 @@ class pretrainedxLSTM(BaseModel):
         return mask & ~padding_mask
     
     def generate(self, x, length=10):
-        if self.training_strategy != 'next_token_prediction':
-            raise ValueError('Only next token prediction is supported for generation')
+
          
         # i do not need to drop the leads here
         x = self.patch_embedding(x, augment=False)

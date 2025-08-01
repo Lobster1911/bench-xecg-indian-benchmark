@@ -1,27 +1,18 @@
-import os
 from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMClassification
+
 
 import dataset.code_dataset as code
 import dataset.ptb_xl as ptbxl
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
+
 
 from trainers.regression_trainer import TrainingAge
 import torch
 import argparse
-import os
-import numpy as np
-from tqdm import tqdm
+
 import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from torchvision import transforms
+from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
-import st_mem.encoder as encoder
-from ecg_jepa.models import load_encoder
 
 
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
@@ -56,7 +47,7 @@ def train(config, run=None, wandb=False):
 
     trainer = utils.get_trainer(config, model, 'train-age', wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
-    trainer.test(model=model, dataloaders=test_dataloader)
+    trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
 
 # if main
