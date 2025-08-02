@@ -19,3 +19,7 @@ New length: 344699
 - *drop_path*: smaller values seems to work better
 
 THE PARAMETERS ABOVE ARE GOOD FOR TRAINING BUT FOR THE KNN THESE OBSERVATION ARE USELESS
+
+## Python version
+
+We tested it with python 3.11.11
