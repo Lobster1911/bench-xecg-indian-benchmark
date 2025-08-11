@@ -9,11 +9,11 @@ sched_decay_factor: 0.8
 use_class_weights: true
 use_focal_loss: false
 use_scheduler: true
-patience: 5
+patience: 15
 grad_clip: 3.
 lr_head: 0.001
 lr_xlstm: 0.00001
-batch_size: 64
+batch_size: 8
 num_workers: 32
 epochs: 30
 linear_probing: false
