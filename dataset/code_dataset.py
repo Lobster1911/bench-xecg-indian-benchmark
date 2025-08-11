@@ -117,15 +117,3 @@ class ECGCODEDataset(PretrainDataset):
         }
     
 
-def make_collate_fn(config):
-    def collate_fn(batch):
-        signals = [item['global_signals'][0] for item in batch]
-        signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
-            
-        tortn = {
-            'signals': signals,
-            'age': torch.stack([item['age'] for item in batch])
-        }
-        return tortn
-
-    return collate_fn

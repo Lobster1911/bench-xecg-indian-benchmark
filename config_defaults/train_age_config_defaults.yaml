@@ -68,3 +68,12 @@ n_global_view: 1
 n_local_view: 0
 data_folder_code15: /media/Volume/data/CODE15/processed/
 labels_file_code15: /media/Volume/data/CODE15/processed/exams_filtered.csv
+
+data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
+labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
+
+data_folder_mimic: /media/Volume/data/MIMIC_IV/
+labels_file_mimic: /media/Volume/data/MIMIC_IV/exams_filtered.csv
+
+data_folder_cpsc2018: /media/Volume/data/CPSC2018/
+labels_file_cpsc2018: /media/Volume/data/CPSC2018/exams_filtered.csv

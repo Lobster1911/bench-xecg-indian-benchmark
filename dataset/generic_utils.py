@@ -103,6 +103,24 @@ def make_collate_fn(config):
 
     return collate_fn
 
+
+def make_collate_fn_age(config):
+    def collate_fn(batch):
+        if 'signal' in batch[0]:
+            # If 'signal' is present, use it
+            signals = [item['signal'] for item in batch]
+            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+        else:
+            signals = [item['global_signals'][0] for item in batch]
+            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+
+        return {
+            'signals': signals,
+            'age': torch.stack([item['age'] for item in batch])
+        }
+
+    return collate_fn
+
 def pad(x, patch_size):
     if x.dim() == 2:
         x = x.unsqueeze(-1)

@@ -31,6 +31,11 @@ class ECGCPSC2018Dataset(PretrainDataset):
             self.records = [record for record in self.records if 'g6' in record]
         elif self.split == 'test':
             self.records = [record for record in self.records if 'g7' in record]
+        elif self.split == 'all':
+            pass
+        
+        self.tab_data = self.tab_data[self.tab_data['file_name'].isin(self.records)]
+        print('CPSC2018:', self.tab_data.head())
 
 
     def load_labels(self, task='multilabel'):
@@ -109,3 +114,51 @@ def make_collate_fn(config, split='train'):
             'class_labels': torch.stack(class_labels),
         }
     return collate_fn
+
+
+class ECGCPSC2018AgeDataset(ECGCPSC2018Dataset):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        """
+        Args:
+            records (list): List of records of ECG traces
+        """
+        super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
+        self.filter_valid_records()
+
+    def filter_valid_records(self):
+        # filter records that have age in the comments
+        valid_records = []
+        for record in self.records:
+            info = wfdb.rdheader(os.path.join(self.data_folder, record))
+            age = None
+            for comment in info.comments:
+                if comment.startswith('Age:'):
+                    age = comment.split(': ')[1]
+                    try:
+                        int_age = int(age)
+                        if int_age < 0 or int_age > 120:
+                            print(f'Invalid age {age} in record {record}')
+                        else:
+                            valid_records.append(record)
+                    except:
+                        print(f'Invalid age {age} in record {record}')
+                    break
+        self.records = valid_records
+        print(f'Filtered to {len(self.records)} records with age information')
+
+    def __getitem__(self, idx):
+        obj = super().__getitem__(idx)
+        info = wfdb.rdheader(os.path.join(self.data_folder, self.records[idx]))
+        info.comments
+        # regex 'Age: (\d+)' to extract age from comments
+        age = None
+        for comment in info.comments:
+            if comment.startswith('Age:'):
+                age = int(comment.split(': ')[1])
+                break
+        if age is None:
+            raise ValueError(f'Age not found in comments for record {self.records[idx]}')
+
+        obj['age'] = torch.tensor(age, dtype=torch.float32)
+        return obj
+

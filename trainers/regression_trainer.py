@@ -16,10 +16,11 @@ from typing import Any
 
 
 class RegressionTrainer(CommonTrainerDownstream):
-    def __init__(self, model, config,  len_train_dataset, target_key='age', weights=None):
+    def __init__(self, model, config,  len_train_dataset, target_key='age', weights=None, map_idx_dataloader=None):
         super().__init__(model, config,  len_train_dataset, weights)
 
         self.target_key = target_key
+        self.map_idx_dataloader = map_idx_dataloader
 
         self.train_mae = torchmetrics.MeanAbsoluteError()
         self.valid_mae = torchmetrics.MeanAbsoluteError()
@@ -86,25 +87,53 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.log('val_loss', loss.detach().item(), prog_bar=True)
         return loss
             
-    def test_step(self, batch, _):
+    def test_step(self, batch, batch_idx=0, dataloader_idx=0):
+
+            # Detect start of a new dataset
+        if batch_idx == 0:
+            print(f"Resetting metrics for dataloader {dataloader_idx}")
+            self.test_mae.reset()
+            self.test_mse.reset()
+            self.test_rsmape_1.reset()
+            self.test_rsmape_0.reset()
+            self.test_rsmape_2.reset()
+            self.test_rsmape_4.reset()
+
         loss, preds, targets = self.predict_batch(batch)
-
-        self.valid_mae(preds, targets)
-        self.log('test_mae', self.valid_mae, prog_bar=True)
-        self.valid_mse(preds, targets)
-        self.log('test_mse', self.valid_mse, prog_bar=True)
-
-        self.test_rsmape_1(preds, targets)
-        self.log('test_rsmape_1', self.test_rsmape_1, prog_bar=False)
+        
+        self.test_mae(preds, targets)
+        self.test_mse(preds, targets)
+        # self.test_rsmape_1(preds, targets)
         self.test_rsmape_0(preds, targets)
-        self.log('test_rsmape_0', self.test_rsmape_0, prog_bar=False)
-        self.test_rsmape_2(preds, targets)
-        self.log('test_rsmape_2', self.test_rsmape_2, prog_bar=False)
-        self.test_rsmape_4(preds, targets)
-        self.log('test_rsmape_4', self.test_rsmape_4, prog_bar=False)   
+        # self.test_rsmape_2(preds, targets)
+        # self.test_rsmape_4(preds, targets)
 
-        self.log('test_loss', loss.detach().item(), prog_bar=True)
-        return loss     
+
+        # if the number of dataloader is bigger than 1
+        if len(self.trainer.test_dataloaders) > 1:
+            dataloader_idx = self.map_idx_dataloader[dataloader_idx] if self.map_idx_dataloader else dataloader_idx
+
+            self.log(f'test_mae_{dataloader_idx}', self.test_mae, prog_bar=True)
+            self.log(f'test_mse_{dataloader_idx}', self.test_mse, prog_bar=True)
+            # self.log(f'test_rsmape_1_{dataloader_idx}', self.test_rsmape_1, prog_bar=False)
+            self.log(f'test_rsmape_0_{dataloader_idx}', self.test_rsmape_0, prog_bar=False)
+            # self.log(f'test_rsmape_2_{dataloader_idx}', self.test_rsmape_2, prog_bar=False)
+            # self.log(f'test_rsmape_4_{dataloader_idx}', self.test_rsmape_4, prog_bar=False)
+            self.log(f'test_loss_{dataloader_idx}', loss.detach().item(), prog_bar=True)
+            
+        # if the number of dataloader is 1
+        else:
+            self.log('test_mae', self.valid_mae, prog_bar=True)
+            self.log('test_mse', self.valid_mse, prog_bar=True)
+
+            # self.log('test_rsmape_1', self.test_rsmape_1, prog_bar=False)
+            self.log('test_rsmape_0', self.test_rsmape_0, prog_bar=False)
+            # self.log('test_rsmape_2', self.test_rsmape_2, prog_bar=False)
+            # self.log('test_rsmape_4', self.test_rsmape_4, prog_bar=False)   
+
+            self.log('test_loss', loss.detach().item(), prog_bar=True)
+        return loss  
+   
     
     def predict_batch(self, batch):
         x = batch["signals"]

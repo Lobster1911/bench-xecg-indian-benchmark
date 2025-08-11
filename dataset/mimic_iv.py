@@ -9,7 +9,7 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 
 class ECGMIMICDataset(PretrainDataset):
 
-    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None, downstream_task=False):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None, downstream_task=None):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_mimic
         self.labels_file = config.labels_file_mimic
@@ -28,6 +28,9 @@ class ECGMIMICDataset(PretrainDataset):
         elif split == 'test':
             # get all the tab data index where the fold is 19
             self.tab_data = self.tab_data[self.tab_data['fold'] == 19]
+        elif split == 'all':
+            # keep all the tab data index
+            self.tab_data = self.tab_data
 
         self.unique_patients = list(self.tab_data['subject_id'].unique())
         self.patient_to_records = self.tab_data.groupby("subject_id")["file_name"].apply(list).to_dict()
@@ -50,9 +53,16 @@ class ECGMIMICDataset(PretrainDataset):
             # add lvef labels to the tabular data
             self.tab_data = self.tab_data.merge(self.lvef[['file_name', 'LVEF']], on='file_name', how='left')
 
+        elif self.downstream_task == 'age':
+            # remove nan, negative and unrealistic ages
+            initial_count = self.tab_data.shape[0]
+            self.tab_data = self.tab_data[self.tab_data['age'].notna()]
+            self.tab_data = self.tab_data[self.tab_data['age'] >= 0]
+            self.tab_data = self.tab_data[self.tab_data['age'] <= 120]
+            print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
 
-            # print the unique number of stratified folds
-            print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
+        # print the unique number of stratified folds
+        print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
 
         print("MIMIC-IV: tabular data fields", self.tab_data.head())
         print(f'MIMIC-IV: colums {self.tab_data.columns}')
@@ -68,24 +78,39 @@ class ECGMIMICDataset(PretrainDataset):
         if not self.downstream_task:
             # for downstream task, we return the number of unique patients
             return self.get_item_pretraining(idx)
-        else:
+        elif self.downstream_task == 'lvef':
             # for pretraining, we return the number of records
-            return self.get_item_downstream(idx)
-
-    def get_item_downstream(self, idx):
+            return self.get_item_lvef(idx)
+        elif self.downstream_task == 'age':
+            # for age prediction, we return the number of records
+            return self.get_item_age(idx)
+        
+    def get_signal(self, idx):
         record = self.tab_data.iloc[idx]['file_name']
         signal, info = wfdb.rdsamp(os.path.join(self.data_folder, record))
         signal = self.map_leads_and_clean(signal, info)
         signal = self.resample_if_needed(signal, info)
 
-        lvef = self.tab_data.iloc[idx]['LVEF']
-
         if self.global_augmentations is not None:
             signal = self.global_augmentations(signal)
+        return signal
+
+    def get_item_lvef(self, idx):
+        signal = self.get_signal(idx)
+        lvef = self.tab_data.iloc[idx]['LVEF']
 
         return {
-            'signals': signal,
+            'signal': signal,
             'lvef': torch.tensor(lvef, dtype=torch.float32),
+        }
+    
+    def get_item_age(self, idx):
+        signal = self.get_signal(idx)
+        age = self.tab_data.iloc[idx]['age']
+
+        return {
+            'signal': signal,
+            'age': torch.tensor(age, dtype=torch.float32),
         }
     
     def get_item_pretraining(self, idx):
