@@ -49,3 +49,10 @@ done
 for i in {1..5}; do
     sbatch --job-name=xlstm_ft_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_ft.yaml
 done 
+
+
+## supervised
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_supervised.yaml
+done 

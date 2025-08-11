@@ -90,3 +90,9 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl/xlstm_ft.yaml
 done 
+
+## supervised
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_sup_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl/xlstm_supervised.yaml
+done 

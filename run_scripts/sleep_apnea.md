@@ -49,3 +49,9 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/xlstm_ft.yaml
 done 
+
+## supervised
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_sup_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/xlstm_supervised.yaml
+done 

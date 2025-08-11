@@ -143,7 +143,13 @@ class ECGHighIntensity(PretrainDataset):
         r_peaks = r_peaks * self.sampling_freq / self.info_dict['fs']
         r_peaks = [int(r) for r in r_peaks if not pd.isna(r)]
         r_peaks_tensor = torch.zeros(len(signal), dtype=torch.float32)
+
+        # if one r-peak is at len(signal) do -1
+        if r_peaks and r_peaks[-1] == len(signal):
+            r_peaks[-1] -= 1
+ 
         r_peaks_tensor[r_peaks] = 1.0
+
 
         if self.global_augmentations is not None:
             signal = self.global_augmentations(signal)
