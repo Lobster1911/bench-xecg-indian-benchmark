@@ -74,7 +74,8 @@ for start in range(0, len(texts), batch_size):
         out = output[0]["generated_text"][-1]["content"].strip()
         if out != "-":
             print(f"Row {row_idx}: {out}")
-        csv.at[row_idx, "lvef"] = out
+        csv.iloc[row_idx, csv.columns.get_loc("lvef")] = out
+
 
     if args.test and end > 1000:
         break

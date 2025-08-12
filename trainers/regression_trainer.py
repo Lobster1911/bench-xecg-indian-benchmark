@@ -132,6 +132,7 @@ class RegressionTrainer(CommonTrainerDownstream):
             # self.log('test_rsmape_4', self.test_rsmape_4, prog_bar=False)   
 
             self.log('test_loss', loss.detach().item(), prog_bar=True)
+            
         return loss  
    
     

@@ -14,7 +14,7 @@ grad_clip: 3.
 lr_head: 0.001
 lr_xlstm: 0.00001
 batch_size: 64
-num_workers: 32
+num_workers: 64
 epochs: 30
 linear_probing: false
 

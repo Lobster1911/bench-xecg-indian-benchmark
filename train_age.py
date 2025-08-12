@@ -16,8 +16,6 @@ from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms, make_collate_fn_age
 from trainers.regression_trainer import RegressionTrainer
 
-
-
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
@@ -29,7 +27,6 @@ def train(config, run=None, wandb=False):
     if config.deterministic: L.seed_everything(42)
     
     code_dataset = code.ECGCODE15AgeDataset(config, split='train', global_augmentations=get_transforms(config))
-    # code_dataset = cpsc2018.ECGCPSC2018AgeDataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
 
     # split the dataset in val and train
     pct = 0.8
@@ -58,7 +55,7 @@ def train(config, run=None, wandb=False):
 
     trainer = utils.get_trainer(config, model, 'train-age', wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
-    trainer.test(model=model, dataloaders=[test_ptbxl, test_mimic, test_cpsc]) #, ckpt_path='best')
+    trainer.test(model=model, dataloaders=[test_ptbxl, test_mimic, test_cpsc], ckpt_path='best')
 
 
 # if main
