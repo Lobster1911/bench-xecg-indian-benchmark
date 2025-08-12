@@ -21,26 +21,15 @@ class RegressionTrainer(CommonTrainerDownstream):
 
         self.target_key = target_key
         self.map_idx_dataloader = map_idx_dataloader
+        self.use_log = config.use_log
 
         self.train_mae = torchmetrics.MeanAbsoluteError()
         self.valid_mae = torchmetrics.MeanAbsoluteError()
         self.test_mae = torchmetrics.MeanAbsoluteError()
 
-        self.train_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
-        self.valid_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
-        self.test_rsmape_1 = RobustMeanAbsoluteError(epsilon=1)
-
         self.train_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
         self.valid_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
         self.test_rsmape_0 = RobustMeanAbsoluteError(epsilon=0)
-
-        self.train_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
-        self.valid_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
-        self.test_rsmape_2 = RobustMeanAbsoluteError(epsilon=2)
-
-        self.train_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
-        self.valid_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
-        self.test_rsmape_4 = RobustMeanAbsoluteError(epsilon=4)
 
         self.train_mse = torchmetrics.MeanSquaredError()
         self.valid_mse = torchmetrics.MeanSquaredError()
@@ -54,14 +43,8 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.train_mse(preds, targets)
         self.log('train_mse', self.train_mse, prog_bar=True)
 
-        self.train_rsmape_1(preds, targets)
-        self.log('train_rsmape_1', self.train_rsmape_1, prog_bar=False)
         self.train_rsmape_0(preds, targets)
         self.log('train_rsmape_0', self.train_rsmape_0, prog_bar=False)
-        self.train_rsmape_2(preds, targets)
-        self.log('train_rsmape_2', self.train_rsmape_2, prog_bar=False)
-        self.train_rsmape_4(preds, targets)
-        self.log('train_rsmape_4', self.train_rsmape_4, prog_bar=False)
 
         self.log('train_loss', loss.detach().item(), prog_bar=True)
 
@@ -75,14 +58,8 @@ class RegressionTrainer(CommonTrainerDownstream):
         self.valid_mse(preds, targets)
         self.log('valid_mse', self.valid_mse, prog_bar=True)
 
-        self.valid_rsmape_1(preds, targets)
-        self.log('valid_rsmape_1', self.valid_rsmape_1, prog_bar=False)
         self.valid_rsmape_0(preds, targets)
         self.log('valid_rsmape_0', self.valid_rsmape_0, prog_bar=False)
-        self.valid_rsmape_2(preds, targets)
-        self.log('valid_rsmape_2', self.valid_rsmape_2, prog_bar=False)
-        self.valid_rsmape_4(preds, targets)
-        self.log('valid_rsmape_4', self.valid_rsmape_4, prog_bar=False)
 
         self.log('val_loss', loss.detach().item(), prog_bar=True)
         return loss
@@ -94,20 +71,13 @@ class RegressionTrainer(CommonTrainerDownstream):
             print(f"Resetting metrics for dataloader {dataloader_idx}")
             self.test_mae.reset()
             self.test_mse.reset()
-            self.test_rsmape_1.reset()
             self.test_rsmape_0.reset()
-            self.test_rsmape_2.reset()
-            self.test_rsmape_4.reset()
 
         loss, preds, targets = self.predict_batch(batch)
         
         self.test_mae(preds, targets)
         self.test_mse(preds, targets)
-        # self.test_rsmape_1(preds, targets)
         self.test_rsmape_0(preds, targets)
-        # self.test_rsmape_2(preds, targets)
-        # self.test_rsmape_4(preds, targets)
-
 
         # if the number of dataloader is bigger than 1
         if len(self.trainer.test_dataloaders) > 1:
@@ -115,10 +85,7 @@ class RegressionTrainer(CommonTrainerDownstream):
 
             self.log(f'test_mae_{dataloader_idx}', self.test_mae, prog_bar=True)
             self.log(f'test_mse_{dataloader_idx}', self.test_mse, prog_bar=True)
-            # self.log(f'test_rsmape_1_{dataloader_idx}', self.test_rsmape_1, prog_bar=False)
             self.log(f'test_rsmape_0_{dataloader_idx}', self.test_rsmape_0, prog_bar=False)
-            # self.log(f'test_rsmape_2_{dataloader_idx}', self.test_rsmape_2, prog_bar=False)
-            # self.log(f'test_rsmape_4_{dataloader_idx}', self.test_rsmape_4, prog_bar=False)
             self.log(f'test_loss_{dataloader_idx}', loss.detach().item(), prog_bar=True)
             
         # if the number of dataloader is 1
@@ -126,10 +93,7 @@ class RegressionTrainer(CommonTrainerDownstream):
             self.log('test_mae', self.valid_mae, prog_bar=True)
             self.log('test_mse', self.valid_mse, prog_bar=True)
 
-            # self.log('test_rsmape_1', self.test_rsmape_1, prog_bar=False)
             self.log('test_rsmape_0', self.test_rsmape_0, prog_bar=False)
-            # self.log('test_rsmape_2', self.test_rsmape_2, prog_bar=False)
-            # self.log('test_rsmape_4', self.test_rsmape_4, prog_bar=False)   
 
             self.log('test_loss', loss.detach().item(), prog_bar=True)
             
@@ -145,7 +109,11 @@ class RegressionTrainer(CommonTrainerDownstream):
             self.model.set_eval_linear_probing()
 
         results = self.model(x).squeeze()
-        loss = nn.functional.mse_loss(results, targets)
+        if self.use_log:
+            loss = nn.functional.mse_loss(results, torch.log(targets))
+            results = torch.exp(results)
+        else:
+            loss = nn.functional.mse_loss(results, targets)
 
         return loss, results, targets
     

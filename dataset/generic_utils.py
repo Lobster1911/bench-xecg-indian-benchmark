@@ -104,7 +104,7 @@ def make_collate_fn(config):
     return collate_fn
 
 
-def make_collate_fn_age(config):
+def make_collate_fn_task(config, task='age'):
     def collate_fn(batch):
         if 'signal' in batch[0]:
             # If 'signal' is present, use it
@@ -116,7 +116,7 @@ def make_collate_fn_age(config):
 
         return {
             'signals': signals,
-            'age': torch.stack([item['age'] for item in batch])
+            task: torch.stack([item[task] for item in batch])
         }
 
     return collate_fn

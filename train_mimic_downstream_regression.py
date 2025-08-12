@@ -33,31 +33,26 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
     
-    train_dataset =  mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='lvef')
+    train_dataset =  mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task=config.task)
     print(f"Train dataset size: {len(train_dataset)}")
-    val_dataset = mimic.ECGMIMICDataset(config, split='val', global_augmentations=get_transforms(config, split='val'), downstream_task='lvef')
+    val_dataset = mimic.ECGMIMICDataset(config, split='val', global_augmentations=get_transforms(config, split='val'), downstream_task=config.task)
     print(f"Val dataset size: {len(val_dataset)}")
 
-    if config.use_class_weights:
-        weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-    else:
-        weights = None
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, config.task))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, config.task))
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-
-    test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='lvef')
+    test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task=config.task)
     print(f"Test dataset size: {len(test_dataset)}")
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, config.task))
 
     base_model = utils.get_base_model(config)
 
     log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
     print(f"Logging every {log_every_n_steps} steps")
 
-    model = RegressionTrainer(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights, target_key='lvef')
+    model = RegressionTrainer(model=base_model, config=config, len_train_dataset=len(train_dataset), target_key=config.task)
 
-    trainer = utils.get_trainer(config, model, 'train-lvef', wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, model, f'train-{config.task}', wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
@@ -68,6 +63,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_lvef_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'config_defaults/train_mimic_config_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

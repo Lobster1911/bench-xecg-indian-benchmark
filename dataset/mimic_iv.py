@@ -6,6 +6,7 @@ from dataset.pretraining_dataset import PretrainDataset
 import numpy as np
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+nt_pro_bnp_event_id = 50963
 
 class ECGMIMICDataset(PretrainDataset):
 
@@ -61,11 +62,77 @@ class ECGMIMICDataset(PretrainDataset):
             self.tab_data = self.tab_data[self.tab_data['age'] <= 120]
             print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
 
+        elif self.downstream_task == 'nt_pro_bnp':
+            self.load_nt_pro_bnp_labels(split=self.split)
+
         # print the unique number of stratified folds
         print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
 
         print("MIMIC-IV: tabular data fields", self.tab_data.head())
         print(f'MIMIC-IV: colums {self.tab_data.columns}')
+
+    def load_nt_pro_bnp_labels(self, split='train'):
+        """
+        Load the tabular data from a cached file.
+        Args:
+            path (str): Path to the cached file.
+        """
+        path_cache = os.path.join(self.data_folder, f'labevents_processed_{split}.csv')
+        if not os.path.exists(path_cache):
+            print(f'MIMIC-IV: cached tabular data not found at {path_cache}, loading from scratch...')
+            path = os.path.join(self.data_folder, 'labevents.csv.gz')
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"NT-proBNP file not found at {path}")
+            
+            lab_events = pd.read_csv(path)
+            print(f'MIMIC-IV: loaded {len(lab_events)} lab events from {path}')
+            nt_pro_bnp_events = lab_events[lab_events['itemid'] == nt_pro_bnp_event_id]
+
+            subject_set = set(nt_pro_bnp_events['subject_id']) & set(self.tab_data['subject_id'])
+            lab_events = nt_pro_bnp_events[nt_pro_bnp_events['subject_id'].isin(subject_set)].copy()
+            self.tab_data = self.tab_data[self.tab_data['subject_id'].isin(subject_set)]
+
+            # convert to datetime
+            lab_events['charttime'] = pd.to_datetime(lab_events['charttime'])
+            self.tab_data['ecg_time'] = pd.to_datetime(self.tab_data['ecg_time'])
+
+            # order by charttime and ecg_time
+            lab_events.sort_values(['charttime'], inplace=True)
+            self.tab_data.sort_values(['ecg_time'], inplace=True)
+
+            merged = pd.merge_asof(
+                lab_events,
+                self.tab_data,
+                left_on='charttime',
+                right_on='ecg_time',
+                by='subject_id',
+                direction='nearest',
+            )
+            # dropna on valuenum 
+            merged = merged.dropna(subset=['valuenum'])
+            print(f'Merged {len(merged)} records from lab events and ECG data')
+
+            # calculate the time difference
+            merged['time_diff'] = merged['charttime'] - merged['ecg_time']
+
+            # keep only pairs with less than 12 hours difference
+            merged = merged[merged['time_diff'].abs() < pd.Timedelta(hours=12)]
+            print(f'Filtered {len(merged)} records with less than 12 hours difference')
+
+            try:
+                # save the merged data to a csv file
+                merged.to_csv(path_cache, index=False)
+                print(f'MIMIC-IV: saved merged tabular data to {path_cache}')
+                # update the tab_data attribute
+                self.tab_data = merged
+            except Exception as e:
+                print(f'MIMIC-IV: failed to save merged tabular data to {path}, error: {e}')
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f'MIMIC-IV: loading cached tabular data from {path_cache}')
+            self.tab_data = pd.read_csv(path_cache)
+        
 
     def __len__(self):
         if not self.downstream_task:
@@ -84,6 +151,11 @@ class ECGMIMICDataset(PretrainDataset):
         elif self.downstream_task == 'age':
             # for age prediction, we return the number of records
             return self.get_item_age(idx)
+        elif self.downstream_task == 'nt_pro_bnp':
+            # for NT-proBNP prediction, we return the number of records
+            return self.get_item_nt_pro_bnp(idx)
+        else:
+            raise ValueError(f"Unknown downstream task: {self.downstream_task}")
         
     def get_signal(self, idx):
         record = self.tab_data.iloc[idx]['file_name']
@@ -111,6 +183,28 @@ class ECGMIMICDataset(PretrainDataset):
         return {
             'signal': signal,
             'age': torch.tensor(age, dtype=torch.float32),
+        }
+    
+    def get_item_nt_pro_bnp(self, idx):
+        signal = self.get_signal(idx)
+        nt_pro_bnp_value = self.tab_data.iloc[idx]['valuenum']
+
+        return {
+            'signal': signal,
+            'nt_pro_bnp': torch.tensor(nt_pro_bnp_value, dtype=torch.float32),
+        }
+    
+    def get_item_NT_pro_BNP(self, idx):
+        signal = self.get_signal(idx)
+        # get the item id corresponding to NT-proBNP
+        nt_pro_bnp_id = self.tab_data.iloc[idx]['nt_pro_bnp_id']
+        # get the value of NT-proBNP
+        nt_pro_bnp_value = self.tab_data.iloc[idx]['nt_pro_bnp_value']
+
+        return {
+            'signal': signal,
+            'nt_pro_bnp_id': torch.tensor(nt_pro_bnp_id, dtype=torch.int64),
+            'nt_pro_bnp_value': torch.tensor(nt_pro_bnp_value, dtype=torch.float32),
         }
     
     def get_item_pretraining(self, idx):
