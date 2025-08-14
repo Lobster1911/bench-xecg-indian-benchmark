@@ -35,15 +35,15 @@ def train(config, run=None, wandb=False):
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Val dataset size: {len(val_dataset)}")
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, task='age'))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, task='age'))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
 
     test_ptbxl = ptbxl.ECGPTBXLAgeDataset(config, split='all', global_augmentations=get_transforms(config, split='test'))
     test_mimic = mimic_iv.ECGMIMICDataset(config, split='all', global_augmentations=get_transforms(config, split='test'), downstream_task='age')
     test_cpsc = cpsc2018.ECGCPSC2018AgeDataset(config, split='all', global_augmentations=get_transforms(config, split='test'))
-    test_ptbxl = DataLoader(test_ptbxl, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, task='age'))
-    test_mimic = DataLoader(test_mimic, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, task='age'))
-    test_cpsc = DataLoader(test_cpsc, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, task='age'))
+    test_ptbxl = DataLoader(test_ptbxl, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
+    test_mimic = DataLoader(test_mimic, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
+    test_cpsc = DataLoader(test_cpsc, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
 
     base_model = utils.get_base_model(config)
 

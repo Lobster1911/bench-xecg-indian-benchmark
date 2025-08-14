@@ -52,6 +52,6 @@ done
 
 ## supervised
 
-for i in {1..5}; do
+for i in {1..4}; do
     sbatch --job-name=xlstm_sup_age slurm_train_l40s.sh train_age.py configs/age/xlstm_supervised.yaml
 done 
