@@ -21,42 +21,42 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         self.label_list = config.label_list
 
         self.train_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
         self.train_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))  
         ]
         self.train_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
-            for _ in range(len(config.label_list))  
+            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _ in range(len(config.label_list))
         ]
 
         self.val_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
         self.val_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
         
         self.val_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro',task='multiclass', top_k=1).to(self.device)
+            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
 
         self.test_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
         self.test_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
-            for _ in range(len(config.label_list))  
+            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _ in range(len(config.label_list))
         ]
         self.test_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1).to(self.device)
+            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
             for _ in range(len(config.label_list))
         ]
 
