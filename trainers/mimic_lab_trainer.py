@@ -70,7 +70,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             acc.update(preds[:, i], targets[:, i])
         # get the average accuracy
         avg_acc = torch.mean(torch.tensor([acc.compute() for acc in self.train_accs]))
-        self.log("train_acc_avg", avg_acc, on_epoch=True, prog_bar=True)
+        self.log("train_acc_avg", avg_acc, prog_bar=True)
         
         # update aurocs
         for i, auroc in enumerate(self.train_aurocs):
@@ -78,7 +78,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             auroc.update(logits[:, i], targets[:, i])
         # get the average auroc
         avg_auroc = torch.mean(torch.tensor([auroc.compute() for auroc in self.train_aurocs]))
-        self.log("train_auroc_avg", avg_auroc, on_epoch=True, prog_bar=True)
+        self.log("train_auroc_avg", avg_auroc, prog_bar=True)
 
         # update f1 scores
         for i, f1 in enumerate(self.train_f1s):
@@ -86,9 +86,9 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             f1.update(preds[:, i], targets[:, i])
         # get the average f1 score
         avg_f1 = torch.mean(torch.tensor([f1.compute() for f1 in self.train_f1s]))
-        self.log("train_f1_avg", avg_f1, on_epoch=True, prog_bar=False)
+        self.log("train_f1_avg", avg_f1, prog_bar=False)
 
-        self.log("train_loss", loss, on_epoch=True, prog_bar=True)
+        self.log("train_loss", loss, prog_bar=True)
 
         return loss
     
@@ -101,7 +101,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             acc.update(preds[:, i], targets[:, i])
         # get the average accuracy
         avg_acc = torch.mean(torch.tensor([acc.compute() for acc in self.val_accs]))
-        self.log("val_acc_avg", avg_acc, on_epoch=True, prog_bar=False)
+        self.log("val_acc_avg", avg_acc, prog_bar=False)
 
         # update aurocs
         for i, auroc in enumerate(self.val_aurocs):
@@ -109,7 +109,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             auroc.update(logits[:, i], targets[:, i])
         # get the average auroc
         avg_auroc = torch.mean(torch.tensor([auroc.compute() for auroc in self.val_aurocs]))
-        self.log("val_auroc_avg", avg_auroc, on_epoch=True, prog_bar=True)
+        self.log("val_auroc_avg", avg_auroc, prog_bar=True)
 
         # update f1 scores
         for i, f1 in enumerate(self.val_f1s):
@@ -117,9 +117,9 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             f1.update(preds[:, i], targets[:, i])
         # get the average f1 score
         avg_f1 = torch.mean(torch.tensor([f1.compute() for f1 in self.val_f1s]))
-        self.log("val_f1_avg", avg_f1, on_epoch=True, prog_bar=False)
+        self.log("val_f1_avg", avg_f1, prog_bar=False)
 
-        self.log("val_loss", loss, on_epoch=True, prog_bar=True)
+        self.log("val_loss", loss, prog_bar=True)
 
         return loss
             
@@ -133,10 +133,10 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         # log the accuracy for each label
         accs = [acc.compute() for acc in self.test_accs]
         for i, acc in enumerate(accs):
-            self.log(f"{self.label_list[i]}/test_acc", acc, on_epoch=True, prog_bar=True)
+            self.log(f"{self.label_list[i]}/test_acc", acc, prog_bar=True)
         # get the average accuracy
         avg_acc = torch.mean(torch.tensor(accs))
-        self.log("test_acc_avg", avg_acc, on_epoch=True, prog_bar=True)
+        self.log("test_acc_avg", avg_acc, prog_bar=True)
 
         # update aurocs
         for i, auroc in enumerate(self.test_aurocs):
@@ -145,10 +145,10 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         # log the auroc for each label
         aurocs = [auroc.compute() for auroc in self.test_aurocs]
         for i, auroc in enumerate(aurocs):
-            self.log(f"{self.label_list[i]}/test_auroc", auroc, on_epoch=True, prog_bar=True)
+            self.log(f"{self.label_list[i]}/test_auroc", auroc, prog_bar=True)
         # get the average auroc
         avg_auroc = torch.mean(torch.tensor(aurocs))
-        self.log("test_auroc_avg", avg_auroc, on_epoch=True, prog_bar=True)
+        self.log("test_auroc_avg", avg_auroc, prog_bar=True)
 
         # update f1 scores
         for i, f1 in enumerate(self.test_f1s):
@@ -157,12 +157,12 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         # log the f1 score for each label
         f1s = [f1.compute() for f1 in self.test_f1s]
         for i, f1 in enumerate(f1s):
-            self.log(f"{self.label_list[i]}/test_f1", f1, on_epoch=True, prog_bar=True)
+            self.log(f"{self.label_list[i]}/test_f1", f1, prog_bar=True)
         # get the average f1 score
         avg_f1 = torch.mean(torch.tensor(f1s))
-        self.log("test_f1_avg", avg_f1, on_epoch=True, prog_bar=True)
+        self.log("test_f1_avg", avg_f1, prog_bar=True)
 
-        self.log("test_loss", loss, on_epoch=True, prog_bar=True)
+        self.log("test_loss", loss, prog_bar=True)
         return loss
             
     def predict_batch(self, batch):
@@ -184,7 +184,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
 
         # print(f"Logits shape: {logits.shape}, Targets shape: {targets.shape}, Logits flat shape: {logits_flat.shape}, Targets flat shape: {targets_flat.shape}")
 
-        loss = nn.functional.cross_entropy(logits_flat, targets_flat, weight=self.weights)
+        loss = nn.functional.cross_entropy(logits_flat, targets_flat, weight=self.weights, ignore_index=-1)
         preds = torch.argmax(logits, dim=-1)
     
         return loss, logits, preds, targets_indices
