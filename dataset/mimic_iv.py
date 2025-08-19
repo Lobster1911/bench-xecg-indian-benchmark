@@ -4,6 +4,7 @@ import pandas as pd
 import wfdb
 from dataset.pretraining_dataset import PretrainDataset
 import numpy as np
+from datetime import timedelta
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 nt_pro_bnp_event_id = 50963
@@ -57,7 +58,7 @@ class ECGMIMICDataset(PretrainDataset):
             self.load_mortality_labels()
 
         # print the unique number of stratified folds
-        print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
+        # print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
 
         print("MIMIC-IV: tabular data fields", self.tab_data.head())
         print(f'MIMIC-IV: colums {self.tab_data.columns}')
@@ -81,20 +82,64 @@ class ECGMIMICDataset(PretrainDataset):
         print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
 
     def load_mortality_labels(self):
-        self.tab_data['ecg_time'] = pd.to_datetime(self.tab_data['ecg_time'], errors='coerce')
-        self.tab_data['dod'] = pd.to_datetime(self.tab_data['dod'], errors='coerce')
-        
-        last_ecg_per_patient = self.tab_data.sort_values(by=['subject_id', 'ecg_time']).groupby('subject_id').last().reset_index()
-        last_ecg_per_patient = last_ecg_per_patient[['subject_id', 'ecg_time']]
-        last_ecg_per_patient.rename(columns={'ecg_time': 'last_ecg_time'}, inplace=True)
+        machine_measurement_path = os.path.join(self.data_folder, 'machine_measurements.csv')
+        if not os.path.exists(machine_measurement_path):
+            raise FileNotFoundError(f"MIMIC-IV: machine measurements file not found at {machine_measurement_path}")
+        dat_ecg = pd.read_csv(machine_measurement_path)
 
-        merged = pd.merge(self.tab_data, last_ecg_per_patient, on='subject_id', how='left')
-        merged['timey'] = merged['dod'].copy()
-        merged['death'] = merged['dod'].notna()
-        merged['timey'] = merged['timey'].fillna(merged['last_ecg_time'] + pd.Timedelta(days=365))
-        # convert timey to number of years
-        merged['timey'] = (merged['timey'] - merged['ecg_time']).dt.total_seconds() / (365.25 * 24 * 60 * 60)
-        self.tab_data = merged
+        record_list_path = os.path.join(self.data_folder, 'record_list.csv')
+        if not os.path.exists(record_list_path):
+            raise FileNotFoundError(f"MIMIC-IV: record list file not found at {record_list_path}")
+        dat_record = pd.read_csv(record_list_path)
+
+        patients_path = os.path.join(self.data_folder, 'patients.csv.gz')
+        if not os.path.exists(patients_path):
+            raise FileNotFoundError(f"MIMIC-IV: patients file not found at {patients_path}")
+        dat_patients = pd.read_csv(patients_path)
+        dat_patients['dod'] = pd.to_datetime(dat_patients['dod'], errors='coerce')
+
+        admission_path = os.path.join(self.data_folder, 'admissions.csv.gz')
+        if not os.path.exists(admission_path):
+            raise FileNotFoundError(f"MIMIC-IV: admissions file not found at {admission_path}")
+        dat_admissions = pd.read_csv(admission_path)
+
+        # the last discharge date
+        max_disch_time = dat_admissions.sort_values(["subject_id",'dischtime']).groupby("subject_id").last().reset_index()
+        max_disch_time = max_disch_time[['subject_id', 'dischtime']]
+        max_disch_time.rename(columns={'dischtime': 'max_disch_time'}, inplace=True)
+        max_disch_time = max_disch_time.reset_index()
+
+        dat_ecg['ecg_time'] = pd.to_datetime(dat_ecg['ecg_time'], errors='coerce')  # Convert to datetime, handle errors
+        dat_ecg['ecg_date'] = dat_ecg['ecg_time'].dt.date
+
+        # the last ecg time
+        max_ecg_time = dat_record.sort_values(by=['subject_id', 'ecg_time']).groupby('subject_id').last().reset_index()
+        max_ecg_time.rename(columns={'ecg_time': 'max_ecg_time'}, inplace=True)
+        max_ecg_time = max_ecg_time[['subject_id', 'max_ecg_time']]
+        max_ecg_time = max_ecg_time.reset_index()
+
+        dat = pd.merge(dat_ecg, dat_record, on=["subject_id", "study_id"])
+        dat = dat.rename(columns={"ecg_time_y":"ecg_time", "ecg_date_y":"ecg_date"})
+        dat = pd.merge(dat, dat_patients, how="inner", on="subject_id")
+        dat = pd.merge(dat, max_ecg_time, how="left", on="subject_id")
+        dat['ecg_time'] = pd.to_datetime(dat['ecg_time'], errors='coerce')  # Convert to datetime, handle errors
+        dat = pd.merge(dat, max_disch_time, how="left", on="subject_id")
+        dat['max_disch_time'] = pd.to_datetime(dat['max_disch_time'], errors='coerce')  # Convert to datetime, handle errors
+        dat['max_ecg_time'] = pd.to_datetime(dat['max_ecg_time'], errors='coerce')  # Convert to datetime, handle errors
+        dat["death"] = ~pd.isna(dat["dod"])
+
+        dat['dod'] = pd.to_datetime(dat['dod'], errors='coerce')  # Convert to datetime, handle errors
+        dat["timey"] = dat['dod'].dt.date - dat["ecg_time"].dt.date
+        dat['timey'] = dat['timey'].fillna(dat["max_disch_time"].dt.date - dat["ecg_time"].dt.date + timedelta(days=365))
+        dat['timey'] = dat['timey'].fillna(dat["max_ecg_time"].dt.date - dat["ecg_time"].dt.date)
+        dat['timey'] = dat['timey'].dt.days / 365
+
+        # fix file name to align with previous implementation
+        dat['file_name'] = dat['path']
+
+        # get only ecgs with timey > 0
+        self.tab_data = dat[dat["timey"].notna() & (dat["timey"] > 0)]
+        print(self.tab_data.head())
 
     def load_nt_pro_bnp_labels(self, split='train'):
         """

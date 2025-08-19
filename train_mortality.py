@@ -43,7 +43,7 @@ def train(config, run=None, wandb=False):
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
-    test_dataset = mimic.ECGMIMICDataset(config, split='all', global_augmentations=get_transforms(config, split='test'), downstream_task='mortality')
+    test_dataset = mimic.ECGMIMICDataset(config, split='all', global_augmentations=get_transforms(config, split='all'), downstream_task='mortality')
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
