@@ -83,8 +83,8 @@ def get_xlstm(config):
         ),
         slstm_block=sLSTMBlockConfig(
             slstm=sLSTMLayerConfig(
-                backend="cuda",
                 num_heads=config.num_heads,
+                backend=config.backend if config.backend else "cuda",
                 conv1d_kernel_size=4,
                 bias_init="powerlaw_blockdependent",
             ),

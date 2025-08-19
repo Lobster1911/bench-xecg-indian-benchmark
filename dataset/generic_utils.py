@@ -114,9 +114,18 @@ def make_collate_fn_task(config, key_label='age'):
             signals = [item['global_signals'][0] for item in batch]
             signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
 
+        if isinstance(key_label, list):
+            return {
+                'signals': signals,
+                **{k: torch.stack([item[k] for item in batch]) for k in key_label}
+            }
+        elif key_label is not None:
+            return {
+                'signals': signals,
+                key_label: torch.stack([item[key_label] for item in batch])
+            }
         return {
-            'signals': signals,
-            key_label: torch.stack([item[key_label] for item in batch])
+            'signals': signals
         }
 
     return collate_fn

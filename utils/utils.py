@@ -112,6 +112,12 @@ def get_base_model(config, feature_classification=False):
         if config.checkpoint is not None and config.checkpoint != '':   
             checkpoint = torch.load(config.checkpoint, weights_only=False)
             new_state_dict = {format_keys(k): v for k, v in checkpoint['state_dict'].items()}
+
+            if config.backend == 'vanilla':
+                for k, v in new_state_dict.items():
+                    if "slstm_cell._recurrent_kernel_" in k:
+                        new_state_dict[k] = v.permute(0, 2, 1)
+
             # remove the fc layer
             new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
             message = base_model.load_state_dict(new_state_dict, strict=False) 
@@ -156,20 +162,27 @@ class ConfigDict(dict):
 
 
 def get_trainer(config, model, prj_string, wandb=False, run=None):
+    callbacks = []
     early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
-    nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
-    lr_monitor = LearningRateMonitor(logging_interval='step')
+    callbacks.append(early_stopping)
+
+    if config.monitor_metric != 'val_loss':
+        nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
+        callbacks.append(nan_stop)
 
     if wandb:
         print(f"Using WandbLogger for project {prj_string} and run {run}")
         checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
+        callbacks.append(checkpoint_callback)
+        lr_monitor = LearningRateMonitor(logging_interval='step')
+        callbacks.append(lr_monitor)
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         wand_logger.watch(model, log='gradients')
-        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=[early_stopping, lr_monitor, checkpoint_callback, nan_stop], gradient_clip_val=config.grad_clip)
+        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip)
         # need to save the config file to a new file in the wandb directory
     else:
         print(f"Using default logger for project {prj_string} and run {run}")
-        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=[early_stopping, nan_stop], gradient_clip_val=config.grad_clip)
+        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip)
 
     return trainer
 

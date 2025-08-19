@@ -9,7 +9,6 @@ leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V
 nt_pro_bnp_event_id = 50963
 
 class ECGMIMICDataset(PretrainDataset):
-
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None, downstream_task=None):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_mimic
@@ -47,33 +46,55 @@ class ECGMIMICDataset(PretrainDataset):
         self.tab_data = pd.read_csv(self.labels_file)
 
         if self.downstream_task == 'lvef':
-            # load levf labels
-            self.lvef = pd.read_csv(os.path.join(self.data_folder, 'lvef.csv'))
-            # rename the columns waveform_path to file_name match the tabular data
-            self.lvef.rename(columns={'waveform_path': 'file_name'}, inplace=True)
-            # filter the tabular data to keep only the patients that have lvef
-            self.tab_data = self.tab_data[self.tab_data['file_name'].isin(self.lvef['file_name'])]
-            # add lvef labels to the tabular data
-            self.tab_data = self.tab_data.merge(self.lvef[['file_name', 'LVEF']], on='file_name', how='left')
-
+            self.load_lvef_labels()
         elif self.downstream_task == 'age':
-            # remove nan, negative and unrealistic ages
-            initial_count = self.tab_data.shape[0]
-            self.tab_data = self.tab_data[self.tab_data['age'].notna()]
-            self.tab_data = self.tab_data[self.tab_data['age'] >= 0]
-            self.tab_data = self.tab_data[self.tab_data['age'] <= 120]
-            print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
-
+            self.load_age_labels()
         elif self.downstream_task == 'nt_pro_bnp':
             self.load_nt_pro_bnp_labels(split=self.split)
         elif self.downstream_task == 'lab':
             self.load_lab_labels(split=self.split)
+        elif self.downstream_task == 'mortality':
+            self.load_mortality_labels()
 
         # print the unique number of stratified folds
         print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
 
         print("MIMIC-IV: tabular data fields", self.tab_data.head())
         print(f'MIMIC-IV: colums {self.tab_data.columns}')
+
+    def load_lvef_labels(self):
+        # load levf labels
+        self.lvef = pd.read_csv(os.path.join(self.data_folder, 'lvef.csv'))
+        # rename the columns waveform_path to file_name match the tabular data
+        self.lvef.rename(columns={'waveform_path': 'file_name'}, inplace=True)
+        # filter the tabular data to keep only the patients that have lvef
+        self.tab_data = self.tab_data[self.tab_data['file_name'].isin(self.lvef['file_name'])]
+        # add lvef labels to the tabular data
+        self.tab_data = self.tab_data.merge(self.lvef[['file_name', 'LVEF']], on='file_name', how='left')
+
+    def load_age_labels(self):
+        # remove nan, negative and unrealistic ages
+        initial_count = self.tab_data.shape[0]
+        self.tab_data = self.tab_data[self.tab_data['age'].notna()]
+        self.tab_data = self.tab_data[self.tab_data['age'] >= 0]
+        self.tab_data = self.tab_data[self.tab_data['age'] <= 120]
+        print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
+
+    def load_mortality_labels(self):
+        self.tab_data['ecg_time'] = pd.to_datetime(self.tab_data['ecg_time'], errors='coerce')
+        self.tab_data['dod'] = pd.to_datetime(self.tab_data['dod'], errors='coerce')
+        
+        last_ecg_per_patient = self.tab_data.sort_values(by=['subject_id', 'ecg_time']).groupby('subject_id').last().reset_index()
+        last_ecg_per_patient = last_ecg_per_patient[['subject_id', 'ecg_time']]
+        last_ecg_per_patient.rename(columns={'ecg_time': 'last_ecg_time'}, inplace=True)
+
+        merged = pd.merge(self.tab_data, last_ecg_per_patient, on='subject_id', how='left')
+        merged['timey'] = merged['dod'].copy()
+        merged['death'] = merged['dod'].notna()
+        merged['timey'] = merged['timey'].fillna(merged['last_ecg_time'] + pd.Timedelta(days=365))
+        # convert timey to number of years
+        merged['timey'] = (merged['timey'] - merged['ecg_time']).dt.total_seconds() / (365.25 * 24 * 60 * 60)
+        self.tab_data = merged
 
     def load_nt_pro_bnp_labels(self, split='train'):
         """
@@ -274,6 +295,9 @@ class ECGMIMICDataset(PretrainDataset):
         elif self.downstream_task == 'lab':
             # for lab events prediction, we return the number of records
             return self.get_item_lab(idx)
+        elif self.downstream_task == 'mortality':
+            # for mortality prediction, we return the number of records
+            return self.get_item_mortality(idx)
         else:
             raise ValueError(f"Unknown downstream task: {self.downstream_task}")
         
@@ -354,6 +378,17 @@ class ECGMIMICDataset(PretrainDataset):
             'nt_pro_bnp_value': torch.tensor(nt_pro_bnp_value, dtype=torch.float32),
         }
     
+    def get_item_mortality(self, idx):
+        signal = self.get_signal(idx)
+        timey = self.tab_data.iloc[idx]['timey']
+        death = self.tab_data.iloc[idx]['death']
+
+        return {
+            'signal': signal,
+            'timey': torch.tensor(timey, dtype=torch.float32),
+            'death': torch.tensor(death, dtype=torch.bool),
+        }
+
     def get_item_pretraining(self, idx):
         patient = str(self.unique_patients[idx])
         records = self.patient_to_records[int(patient)]

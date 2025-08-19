@@ -45,6 +45,25 @@ class ECGCODE15AgeDataset(ECGCODE15Dataset):
         obj = super().__getitem__(idx)
         obj['age'] = torch.tensor(self.tab_data.loc[self.records[idx], 'age'], dtype=torch.float32)
         return obj
+    
+class ECGCODE15MortalityDataset(ECGCODE15Dataset):
+    def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
+        """
+        Args:
+            records (list): List of records of ECG traces
+        """
+        super().__init__(config, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
+        # drop rows that has nan in timey or death and count how many dropped
+        original_count = self.tab_data.shape[0]
+        self.tab_data = self.tab_data.dropna(subset=['timey', 'death'])
+        print(f'dropped {original_count - self.tab_data.shape[0]} rows')
+        self.records = self.tab_data.index.tolist()
+
+    def __getitem__(self, idx):
+        obj = super().__getitem__(idx)
+        obj['death'] = torch.tensor(self.tab_data.loc[self.records[idx], 'death'], dtype=torch.bool)
+        obj['timey'] = torch.tensor(self.tab_data.loc[self.records[idx], 'timey'], dtype=torch.float32)
+        return obj
 
 class ECGCODEDataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
