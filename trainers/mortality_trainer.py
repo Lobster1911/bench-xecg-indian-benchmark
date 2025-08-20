@@ -80,6 +80,9 @@ class TrainerMortality(CommonTrainerDownstream):
         # if i have nan print
         if torch.isnan(x).any():
             print("NaN found in input signals")
+            nan_count = torch.sum(torch.isnan(x)).item()
+            print(f"Number of NaNs in input signals: {nan_count}")
+
         death = batch["death"]
         if torch.isnan(death).any():
             print("NaN found in death labels")

@@ -349,6 +349,10 @@ class ECGMIMICDataset(PretrainDataset):
     def get_signal(self, idx):
         record = self.tab_data.iloc[idx]['file_name']
         signal, info = wfdb.rdsamp(os.path.join(self.data_folder, record))
+
+        # remove nans
+        signal = np.nan_to_num(signal)
+
         signal = self.map_leads_and_clean(signal, info)
         signal = self.resample_if_needed(signal, info)
 
@@ -425,6 +429,11 @@ class ECGMIMICDataset(PretrainDataset):
     
     def get_item_mortality(self, idx):
         signal = self.get_signal(idx)
+
+        if torch.isnan(signal).any():
+            print(f'Nan found on file: {self.tab_data.iloc[idx]["file_name"]}')
+
+
         timey = self.tab_data.iloc[idx]['timey']
         death = self.tab_data.iloc[idx]['death']
 
