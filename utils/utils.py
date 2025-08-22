@@ -189,10 +189,10 @@ def get_precision():
     props = torch.cuda.get_device_properties(device)
     if props.major > 8:  # Ampere or newer architecture
         print("Using transformer-engine fp8 precision")
-        return 'transformer-engine'
+        return 'transformer-engine-float16'
 
-    print("Using bf16-mixed precision")
-    return 'bf16-mixed'
+    print("Using f16-mixed precision")
+    return '16-mixed'
 
 def save_config(config, trainer):
     # get the checkpoint callback form the trainer
