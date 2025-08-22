@@ -33,8 +33,6 @@ class xLSTMClassification(pretrainedxLSTM):
         res = self.head(cls)
         return res
 
-    
-
 class xLSTMFeatureClassification(pretrainedxLSTM):
     def __init__(
             self, 

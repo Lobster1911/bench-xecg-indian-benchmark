@@ -169,7 +169,6 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
     if config.monitor_metric != 'val_loss':
         nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
         callbacks.append(nan_stop)
-
     if wandb:
         print(f"Using WandbLogger for project {prj_string} and run {run}")
         checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
@@ -178,17 +177,25 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         callbacks.append(lr_monitor)
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         wand_logger.watch(model, log='gradients')
-        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip)
+        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=get_precision())
         # need to save the config file to a new file in the wandb directory
     else:
         print(f"Using default logger for project {prj_string} and run {run}")
-        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip)
-
+        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=get_precision())
     return trainer
+
+def get_precision():
+    device = torch.device('cuda')
+    props = torch.cuda.get_device_properties(device)
+    if props.major > 8:  # Ampere or newer architecture
+        print("Using transformer-engine fp8 precision")
+        return 'transformer-engine'
+
+    print("Using bf16-mixed precision")
+    return 'bf16-mixed'
 
 def save_config(config, trainer):
     # get the checkpoint callback form the trainer
-
     checkpoint_callback = next((cb for cb in trainer.callbacks if isinstance(cb, ModelCheckpoint)), None)
     if checkpoint_callback is None:
         print("No ModelCheckpoint callback found in the trainer.")

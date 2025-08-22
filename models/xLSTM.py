@@ -143,7 +143,12 @@ class pretrainedxLSTM(BaseModel):
         if masking:
             batch_size, tokens_num, _ = x.shape
             patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
-            x_emb[patched_mask] = self.mask_token
+            x_emb = torch.where(
+                patched_mask.unsqueeze(-1), 
+                self.mask_token.expand_as(x_emb),
+                x_emb
+            )
+            # x_emb[patched_mask] = self.mask_token
 
         
         cls, out = self.forward_core(x_emb, padding_mask=padding_mask)

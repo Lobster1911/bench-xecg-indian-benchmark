@@ -43,6 +43,7 @@ class PretrainedNetwork(L.LightningModule):
         self.num_epochs_warmup = config.num_epochs_warmup
         self.sched_decay_factor = config.sched_decay_factor
         self.grad_loss_lambda = config.grad_loss_lambda
+        self.grad_clip = config.grad_clip
         self.min_max_loss_lambda = config.min_max_loss_lambda
         self.pretraining_strategy = config.strategy
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
@@ -81,15 +82,15 @@ class PretrainedNetwork(L.LightningModule):
 
             train_head = self.current_epoch >= self.start_train_head_at_epoch
             
-            opt_core.zero_grad()
-            self.manual_backward(jepa_loss, retain_graph=train_head)
-            self.clip_gradients(opt_core, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
+            opt_core.zero_grad(set_to_none=True)
+            self.manual_backward(jepa_loss, retain_graph=False)
+            self.clip_gradients(opt_core, gradient_clip_val=self.grad_clip, gradient_clip_algorithm="norm")
 
             opt_core.step()
             sched_core.step()
 
             if train_head:
-                opt_head.zero_grad()
+                opt_head.zero_grad(set_to_none=True)
                 self.manual_backward(rec_loss)
                 opt_head.step()
                 sched_head.step()

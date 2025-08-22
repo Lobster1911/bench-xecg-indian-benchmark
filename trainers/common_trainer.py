@@ -61,6 +61,9 @@ class CommonTrainerDownstream(pl.LightningModule):
     
     def get_lr(self):
         return self.lr_head
+
+    def optimizer_zero_grad(self, epoch, batch_idx, optimizer):
+        optimizer.zero_grad(set_to_none=True)
         
     def configure_optimizers(self):
         if self.optimizer == 'adam':

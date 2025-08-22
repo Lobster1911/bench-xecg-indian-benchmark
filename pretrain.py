@@ -32,19 +32,19 @@ def pretrain(config, run=None, wandb=False):
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
-    
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True, pin_memory=True)
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True, pin_memory=True)
+
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), drop_last=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), drop_last=True, pin_memory=True)
     len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
     # if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), pin_memory=True)
     base_model = pretrainedxLSTM(config=config, num_channels=len(config.leads))
-
+    base_model.compile()
 
     if config.checkpoint != None:
         model = PretrainedNetwork.load_from_checkpoint(
@@ -61,12 +61,13 @@ def pretrain(config, run=None, wandb=False):
             len_train_dataset=len_train_dataset,
             config=config, 
             knn_train_dataloader=knn_train_dataloader, 
-            knn_val_dataloader=knn_val_dataloader
+            knn_val_dataloader=knn_val_dataloader,
         )
         
     checkpoint_callback = DelayedCheckpoint(delay_epochs=config.monitor_delay_epochs, monitor=config.monitor_metric, mode=config.monitor_mode)
     early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
     num_gpus = os.environ.get('NUM_GPUS', 1)
+    print(f"Number of GPUs: {num_gpus}")
 
     if wandb:
         lr_monitor = LearningRateMonitor(logging_interval='step')
@@ -80,8 +81,9 @@ def pretrain(config, run=None, wandb=False):
             gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
             devices=num_gpus,
-            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto'
-            sync_batchnorm=True,   # Sync batch norm across GPUs (if using BatchNorm)
+            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto', 
+            sync_batchnorm=True if num_gpus > 1 else False,
+            precision=utils.get_precision()
         )
     else:
         trainer = L.Trainer(
@@ -92,7 +94,9 @@ def pretrain(config, run=None, wandb=False):
             gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
             devices=num_gpus,
-            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto'
+            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto',
+            sync_batchnorm=True if num_gpus > 1 else False,
+            precision=utils.get_precision()
         )
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
@@ -104,7 +108,7 @@ def pretrain(config, run=None, wandb=False):
 
 # if main
 if __name__ == '__main__':
-    torch.set_float32_matmul_precision('low')
+    torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
     config = utils.parse_config(args.config_file, 'config_defaults/pretrain_config_defaults.yaml')
