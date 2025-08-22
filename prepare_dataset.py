@@ -12,7 +12,8 @@ from joblib import Parallel, delayed
 import json
 import wfdb.processing as wp
 from pandarallel import pandarallel
-pandarallel.initialize(progress_bar=True)
+
+pandarallel.initialize(progress_bar=False, verbose=0)
 
 # CODE:  python prepare_dataset.py --data_folder /media/Volume/data/CODE15/processed/ --label_file /media/Volume/data/CODE15/exams.csv --dataset code15
 # PTB-XL: python prepare_dataset.py --data_folder /media/Volume/data/PTB-XL/ --label_file /media/Volume/data/PTB-XL/ptbxl_database.csv --dataset ptbxl

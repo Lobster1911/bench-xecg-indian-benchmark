@@ -176,8 +176,11 @@ class vanillaxLSTMWrapper(nn.Module):
                 # flip the sequence
                 if i > 0:
                     x = x.flip(1)
-
-            x = self.drop_path(x, block, self.dropout_rates[i])
+            
+            if self.dropout_rates[i] == 0. or not self.training:
+                x = block(x)
+            else:
+                x = self.drop_path(x, block, self.dropout_rates[i])
             # x = block(x)
 
         if self.bidirectional and expanded:

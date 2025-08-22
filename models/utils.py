@@ -87,16 +87,19 @@ def get_xlstm(config):
                 backend=config.backend if config.backend else "cuda",
                 conv1d_kernel_size=4,
                 bias_init="powerlaw_blockdependent",
+                batch_size=config.batch_size,
             ),
             feedforward=FeedForwardConfig(proj_factor=1.3, act_fn=config.activation_fn),
         ),
         context_length=8000,
         num_blocks=len(config.xlstm_config),
         embedding_dim=config.embedding_size,
-        slstm_at=[idx if b == 's' else 0 for idx, b in enumerate(config.xlstm_config)],
+        slstm_at=[idx for idx, b in enumerate(config.xlstm_config) if b == 's'],
         dropout=config.dropout,
+
         add_post_blocks_norm=config.use_final_layer_norm
     )
+    print('creating xlstm with slstm at: ', [idx for idx, b in enumerate(config.xlstm_config) if b == 's'])
     blocks = xLSTMBlockStack(cfg)
     return vanillaxLSTMWrapper(blocks, dropout=config.dropout, bidirectional=config.bidirectional, drop_path=config.drop_path_prob)
 

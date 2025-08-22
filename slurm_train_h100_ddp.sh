@@ -1,8 +1,9 @@
 #!/bin/bash
-#SBATCH --job-name=train_model
+#SBATCH --job-name=pretrain
 #SBATCH --partition=h100
-#SBATCH --gpus=1
-#SBATCH --ntasks=1
+#SBATCH --gres=gpu:2
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=2
 #SBATCH --cpus-per-task=128
 #SBATCH --mem-per-cpu=512M
 #SBATCH --time=14-00:00:00
@@ -13,6 +14,8 @@ echo "Node: $SLURM_NODELIST"
 echo "Visible GPUs: $CUDA_VISIBLE_DEVICES"
 echo "SLURM_GPUS_ON_NODE: $SLURM_GPUS_ON_NODE"
 echo "SLURM_LOCALID: $SLURM_LOCALID"
+
+export NUM_GPUS=2
 
 #source /home/$USER/.bashrc
 #conda init

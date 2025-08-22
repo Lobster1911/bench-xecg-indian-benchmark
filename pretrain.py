@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
 from dataset.dataset_preparation_utils import load_datasets
 from trainers.common import DelayedCheckpoint
 import st_mem.encoder as encoder
+import torch.distributed as dist
+import time
 
 # argparse
 import argparse
@@ -30,8 +32,8 @@ def pretrain(config, run=None, wandb=False):
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
     
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
@@ -41,8 +43,8 @@ def pretrain(config, run=None, wandb=False):
     # cat the two dataloaders
     # if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config))
-
     base_model = pretrainedxLSTM(config=config, num_channels=len(config.leads))
+
 
     if config.checkpoint != None:
         model = PretrainedNetwork.load_from_checkpoint(
@@ -64,29 +66,33 @@ def pretrain(config, run=None, wandb=False):
         
     checkpoint_callback = DelayedCheckpoint(delay_epochs=config.monitor_delay_epochs, monitor=config.monitor_metric, mode=config.monitor_mode)
     early_stopping = EarlyStopping(monitor=config.monitor_metric, patience=config.patience, mode=config.monitor_mode)
+    num_gpus = os.environ.get('NUM_GPUS', 1)
 
     if wandb:
         lr_monitor = LearningRateMonitor(logging_interval='step')
         wand_logger = WandbLogger(project="pretrain-xLSTM", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(
+            num_sanity_val_steps=0,
             max_epochs=config.epochs, 
             logger=wand_logger, 
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
             gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
-            devices=1,
-            strategy='auto'
+            devices=num_gpus,
+            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto'
+            sync_batchnorm=True,   # Sync batch norm across GPUs (if using BatchNorm)
         )
     else:
         trainer = L.Trainer(
+            num_sanity_val_steps=0,
             logger=False,
             max_epochs=config.epochs, 
             callbacks=[checkpoint_callback, early_stopping], 
             gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
             accelerator='gpu',
-            devices=1,
-            strategy='auto'
+            devices=num_gpus,
+            strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto'
         )
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
@@ -95,11 +101,11 @@ def pretrain(config, run=None, wandb=False):
     #test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=generic_utils.collate_fn, num_workers=config.num_workers)
     #trainer.test(model=model, dataloaders=test_dataloader)
 
+
 # if main
 if __name__ == '__main__':
-    torch.set_float32_matmul_precision('medium')
+    torch.set_float32_matmul_precision('low')
 
     args = parser.parse_args()
     config = utils.parse_config(args.config_file, 'config_defaults/pretrain_config_defaults.yaml')
-
     pretrain(config, wandb=config.wandb_log)
