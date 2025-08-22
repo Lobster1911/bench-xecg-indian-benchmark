@@ -185,11 +185,11 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
     return trainer
 
 def get_precision():
-    device = torch.device('cuda')
-    props = torch.cuda.get_device_properties(device)
-    if props.major > 8:  # Ampere or newer architecture
-        print("Using transformer-engine fp8 precision")
-        return 'transformer-engine-float16'
+    #device = torch.device('cuda')
+    #props = torch.cuda.get_device_properties(device)
+    #if props.major > 8:  # Ampere or newer architecture
+    #    print("Using transformer-engine fp8 precision")
+    #    return 'transformer-engine-float16'
 
     print("Using f16-mixed precision")
     return '16-mixed'
