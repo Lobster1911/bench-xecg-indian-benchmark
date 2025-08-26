@@ -32,14 +32,17 @@ class ECGPTBXLDataset(PretrainDataset):
             # keep only the records with sum == 1
             self.tab_data = self.tab_data[self.tab_data['num_labels'] == 1]
         
-        self.records = self.tab_data['filename_hr'].values.tolist()
-        self.records = [os.path.join(self.data_folder, record.split('/')[1], record.split('/')[2]) for record in self.records]
+        self.records = self.get_records()
 
         print("Tabular data fields for PTB-XL: ", self.tab_data.head())
         # for each label count the number of occurrences
         table_count = self.tab_data['diagnostic_superclass'].explode().value_counts()
         print("Number of occurrences for each label in PTB-XL: ")
         print(table_count)
+
+    def get_records(self):
+        records = self.tab_data['filename_hr'].values.tolist()
+        return [os.path.join(self.data_folder, record.split('/')[1], record.split('/')[2]) for record in records]
 
     def load_tabular_data(self):
         # get the csv file with the tabular data
@@ -99,6 +102,10 @@ class ECGPTBXLAgeDataset(ECGPTBXLDataset):
         super().__init__(config, split, global_augmentations, local_augmentations)
         # remove data with missing age information
         self.tab_data = self.tab_data[self.tab_data['age'].notna() & (self.tab_data['age'] < 100)]
+
+        # refresh the records after changing tab data
+        self.records = self.get_records()
+
 
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
