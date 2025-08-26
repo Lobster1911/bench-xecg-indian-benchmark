@@ -97,6 +97,8 @@ class ECGPTBXLDataset(PretrainDataset):
 class ECGPTBXLAgeDataset(ECGPTBXLDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
         super().__init__(config, split, global_augmentations, local_augmentations)
+        # remove data with missing age information
+        self.tab_data = self.tab_data[self.tab_data['age'].notna() & (self.tab_data['age'] < 100)]
 
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
