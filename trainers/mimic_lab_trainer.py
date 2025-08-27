@@ -177,7 +177,12 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         logits = logits.view(logits.shape[0], self.num_classes // 3, 3)  # [bs, num_classes // 3, 3]
         targets = targets.view(targets.shape[0], self.num_classes // 3, 3)  # [bs, num_classes // 3, 3]
 
-        targets_indices = torch.argmax(targets, dim=-1)  # [bs, num_tasks]
+        def argmax_with_ignore(targets, ignore_value=-1, dim=-1):
+            all_ignore_mask = torch.all(targets == ignore_value, dim=dim)
+            argmax_result = torch.argmax(targets, dim=dim)
+            return torch.where(all_ignore_mask,  torch.full_like(argmax_result, -1), argmax_result)
+
+        targets_indices = argmax_with_ignore(targets, dim=-1)  # [bs, num_tasks]
 
         logits_flat = logits.view(-1, 3)
         targets_flat = targets_indices.view(-1)  # [bs * num_tasks]
@@ -188,3 +193,4 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         preds = torch.argmax(logits, dim=-1)
     
         return loss, logits, preds, targets_indices
+    

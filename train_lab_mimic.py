@@ -1,25 +1,14 @@
-import os
 from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMClassification
 
 import dataset.mimic_iv as mimic
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 
 import torch
 import argparse
-import os
-import numpy as np
-from tqdm import tqdm
 import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
+from torch.utils.data import DataLoader
 from torchvision import transforms
-from dataset.generic_utils import get_transforms
-import st_mem.encoder as encoder
-from ecg_jepa.models import load_encoder
+from dataset.generic_utils import get_transforms, make_collate_fn_task
 from trainers.mimic_lab_trainer import TrainingMIMIC_LAB
 
 
@@ -41,12 +30,12 @@ def train(config, run=None, wandb=False):
     val_dataset = mimic.ECGMIMICDataset(config, split='val', global_augmentations=get_transforms(config, split='val'), downstream_task='lab')
     print(f"Val dataset size: {len(val_dataset)}")
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, 'labels'))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, 'labels'))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
 
     test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='lab')
     print(f"Test dataset size: {len(test_dataset)}")
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, 'labels'))
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
 
     base_model = utils.get_base_model(config)
 

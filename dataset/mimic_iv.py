@@ -226,6 +226,7 @@ class ECGMIMICDataset(PretrainDataset):
             label_fds = []
             for label in self.label_list:
                 label_fds.append(labitem[labitem['label'] == label])
+                
             item_ids_to_keep = pd.concat(label_fds).drop_duplicates()
             filtered_labevent = labevent[labevent['itemid'].isin(item_ids_to_keep['itemid'])]
             filtered_labevent = filtered_labevent.dropna(subset=['valuenum', 'charttime'])
