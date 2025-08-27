@@ -30,12 +30,12 @@ def train(config, run=None, wandb=False):
     val_dataset = mimic.ECGMIMICDataset(config, split='val', global_augmentations=get_transforms(config, split='val'), downstream_task='lab')
     print(f"Val dataset size: {len(val_dataset)}")
 
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'), drop_last=True, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'), pin_memory=True)
 
     test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='lab')
     print(f"Test dataset size: {len(test_dataset)}")
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'))
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'), pin_memory=True)
 
     base_model = utils.get_base_model(config)
     base_model.compile()
