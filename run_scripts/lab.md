@@ -2,7 +2,7 @@
 
 ## ecg founder OK
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=fm_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/ecgfm_ft.yaml 
 done
 

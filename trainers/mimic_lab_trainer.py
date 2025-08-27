@@ -19,145 +19,128 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         self.classification_task = config.classification_task
         self.num_classes = len(config.label_list) * 3
         self.label_list = config.label_list
+        self.label_keys = list(self.label_list.keys())
 
         self.train_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.Accuracy(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         self.train_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))  
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         self.train_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.F1Score(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
 
         self.val_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.Accuracy(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         self.val_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         
         self.val_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.F1Score(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
 
         self.test_accs = [
-            torchmetrics.Accuracy(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.Accuracy(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         self.test_aurocs = [
-            torchmetrics.AUROC(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
         self.test_f1s = [
-            torchmetrics.F1Score(num_classes=3, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
-            for _ in range(len(config.label_list))
+            torchmetrics.F1Score(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            for _, num_classes in self.label_list.items()
         ]
 
+    def update_metrics(self, accs, aurocs, f1s, targets, logits):
+        for i, (k, n_class) in enumerate(self.label_list.items()):
+            accs[i].to(logits.device)
+            aurocs[i].to(logits.device)
+            f1s[i].to(logits.device)
+
+            if n_class == 3:
+                preds = logits[:, i].argmax(dim=-1)
+                accs[i].update(preds, targets[:, i])
+                aurocs[i].update(logits[:, i], targets[:, i])
+                f1s[i].update(preds, targets[:, i])
+            elif n_class == 2:
+                preds = logits[:, i, 1:].argmax(dim=-1)
+                # do not consider the class below
+                ignore = targets[:, i] == -1
+                reduced_target = targets[:, i] -1
+                reduced_target[ignore] = -1
+
+                accs[i].update(preds, reduced_target)
+                aurocs[i].update(logits[:, i, 1:], reduced_target)
+                f1s[i].update(preds, reduced_target)
+            else:
+                raise ValueError(f"Number of classes {n_class} not supported")
+
+    def log_metrics(self, accs, aurocs, f1s, step='train'):
+        avg_acc = torch.mean(torch.tensor([acc.compute().mean() for acc in accs]))
+        avg_auroc = torch.mean(torch.tensor([auroc.compute().mean() for auroc in aurocs]))
+        avg_f1 = torch.mean(torch.tensor([f1.compute().mean() for f1 in f1s]))
+
+        self.log(f"{step}_acc_avg", avg_acc, prog_bar=True)
+        self.log(f"{step}_auroc_avg", avg_auroc, prog_bar=True)
+        self.log(f"{step}_f1_avg", avg_f1, prog_bar=False)
 
     def training_step(self, batch, _):
-        loss, logits, preds, targets = self.predict_batch(batch)
+        loss, logits, targets = self.predict_batch(batch)
 
-        # update the accuracy metrics
-        for i, acc in enumerate(self.train_accs):
-            acc.to(loss.device)
-            acc.update(preds[:, i], targets[:, i])
-        # get the average accuracy
-        avg_acc = torch.mean(torch.tensor([acc.compute() for acc in self.train_accs]))
-        self.log("train_acc_avg", avg_acc, prog_bar=True)
-        
-        # update aurocs
-        for i, auroc in enumerate(self.train_aurocs):
-            auroc.to(loss.device)
-            auroc.update(logits[:, i], targets[:, i])
-        # get the average auroc
-        avg_auroc = torch.mean(torch.tensor([auroc.compute() for auroc in self.train_aurocs]))
-        self.log("train_auroc_avg", avg_auroc, prog_bar=True)
+        self.update_metrics(self.train_accs, self.train_aurocs, self.train_f1s, targets, logits)
 
-        # update f1 scores
-        for i, f1 in enumerate(self.train_f1s):
-            f1.to(loss.device)
-            f1.update(preds[:, i], targets[:, i])
-        # get the average f1 score
-        avg_f1 = torch.mean(torch.tensor([f1.compute() for f1 in self.train_f1s]))
-        self.log("train_f1_avg", avg_f1, prog_bar=False)
+        self.log_metrics(self.train_accs, self.train_aurocs, self.train_f1s, step='train')
 
         self.log("train_loss", loss, prog_bar=True)
 
         return loss
     
     def validation_step(self, batch, _):
-        loss, logits, preds, targets = self.predict_batch(batch)
+        loss, logits, targets = self.predict_batch(batch)
 
-        # update the accuracy metrics
-        for i, acc in enumerate(self.val_accs):
-            acc.to(loss.device)
-            acc.update(preds[:, i], targets[:, i])
-        # get the average accuracy
-        avg_acc = torch.mean(torch.tensor([acc.compute() for acc in self.val_accs]))
-        self.log("val_acc_avg", avg_acc, prog_bar=False)
+        self.update_metrics(self.val_accs, self.val_aurocs, self.val_f1s, targets, logits)
 
-        # update aurocs
-        for i, auroc in enumerate(self.val_aurocs):
-            auroc.to(loss.device)
-            auroc.update(logits[:, i], targets[:, i])
-        # get the average auroc
-        avg_auroc = torch.mean(torch.tensor([auroc.compute() for auroc in self.val_aurocs]))
-        self.log("val_auroc_avg", avg_auroc, prog_bar=True)
-
-        # update f1 scores
-        for i, f1 in enumerate(self.val_f1s):
-            f1.to(loss.device)
-            f1.update(preds[:, i], targets[:, i])
-        # get the average f1 score
-        avg_f1 = torch.mean(torch.tensor([f1.compute() for f1 in self.val_f1s]))
-        self.log("val_f1_avg", avg_f1, prog_bar=False)
+        self.log_metrics(self.val_accs, self.val_aurocs, self.val_f1s, step='val')
 
         self.log("val_loss", loss, prog_bar=True)
 
         return loss
             
     def test_step(self, batch, _):
-        loss, logits, preds, targets = self.predict_batch(batch)
+        loss, logits, targets = self.predict_batch(batch)
 
-        # update the accuracy metrics
-        for i, acc in enumerate(self.test_accs):
-            acc.to(loss.device)
-            acc.update(preds[:, i], targets[:, i])
+        self.update_metrics(self.test_accs, self.test_aurocs, self.test_f1s, targets, logits)
+
         # log the accuracy for each label
         accs = [acc.compute() for acc in self.test_accs]
         for i, acc in enumerate(accs):
-            self.log(f"{self.label_list[i]}/test_acc", acc, prog_bar=True)
+            self.log(f"{self.label_keys[i]}/test_acc", acc, prog_bar=True)
         # get the average accuracy
         avg_acc = torch.mean(torch.tensor(accs))
         self.log("test_acc_avg", avg_acc, prog_bar=True)
 
-        # update aurocs
-        for i, auroc in enumerate(self.test_aurocs):
-            auroc.to(loss.device)
-            auroc.update(logits[:, i], targets[:, i]) 
         # log the auroc for each label
         aurocs = [auroc.compute() for auroc in self.test_aurocs]
         for i, auroc in enumerate(aurocs):
-            self.log(f"{self.label_list[i]}/test_auroc", auroc, prog_bar=True)
+            self.log(f"{self.label_keys[i]}/test_auroc", auroc, prog_bar=True)
         # get the average auroc
         avg_auroc = torch.mean(torch.tensor(aurocs))
         self.log("test_auroc_avg", avg_auroc, prog_bar=True)
 
-        # update f1 scores
-        for i, f1 in enumerate(self.test_f1s):
-            f1.to(loss.device)
-            f1.update(preds[:, i], targets[:, i])
         # log the f1 score for each label
         f1s = [f1.compute() for f1 in self.test_f1s]
         for i, f1 in enumerate(f1s):
-            self.log(f"{self.label_list[i]}/test_f1", f1, prog_bar=True)
+            self.log(f"{self.label_keys[i]}/test_f1", f1, prog_bar=True)
         # get the average f1 score
         avg_f1 = torch.mean(torch.tensor(f1s))
         self.log("test_f1_avg", avg_f1, prog_bar=True)
@@ -190,7 +173,6 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
         # print(f"Logits shape: {logits.shape}, Targets shape: {targets.shape}, Logits flat shape: {logits_flat.shape}, Targets flat shape: {targets_flat.shape}")
 
         loss = nn.functional.cross_entropy(logits_flat, targets_flat, weight=self.weights, ignore_index=-1)
-        preds = torch.argmax(logits, dim=-1)
     
-        return loss, logits, preds, targets_indices
+        return loss, logits, targets_indices
     

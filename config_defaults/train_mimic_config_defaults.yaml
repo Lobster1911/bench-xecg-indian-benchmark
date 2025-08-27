@@ -69,8 +69,8 @@ n_global_view: 1
 n_local_view: 0
 task: multiclass
 
-label_list: ['NTproBNP', 'Urea Nitrogen', 'Hemoglobin', 'Creatinine',
-             'Ferritin', 'Hematocrit', 'Albumin', 'RDW-SD', 'Anion Gap',
-             'RDW', 'Bicarbonate', 'Bilirubin, Total', 'INR(PT)',
-             'Red Blood Cells', 'PT', 'Creatine Kinase (CK)', 'MCHC',
-             'Calcium, Total', 'Lymphocytes']
+label_list: {'NTproBNP':2, 'Urea Nitrogen':3, 'Hemoglobin':3, 'Creatinine':3,
+             'Ferritin':3, 'Hematocrit':3, 'Albumin':3, 'RDW-SD':3, 'Anion Gap':3,
+             'RDW':3, 'Bicarbonate':3, 'Bilirubin, Total':2, 'INR(PT)':3,
+             'Red Blood Cells':3, 'PT':3, 'Creatine Kinase (CK)':3, 'MCHC':3,
+             'Calcium, Total':3, 'Lymphocytes':3}

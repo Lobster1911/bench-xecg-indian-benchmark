@@ -224,9 +224,9 @@ class ECGMIMICDataset(PretrainDataset):
             labitem = labitem[labitem['fluid'].str.lower() == 'blood']
 
             label_fds = []
-            for label in self.label_list:
+            for label in self.label_list.keys():
                 label_fds.append(labitem[labitem['label'] == label])
-                
+
             item_ids_to_keep = pd.concat(label_fds).drop_duplicates()
             filtered_labevent = labevent[labevent['itemid'].isin(item_ids_to_keep['itemid'])]
             filtered_labevent = filtered_labevent.dropna(subset=['valuenum', 'charttime'])
@@ -393,7 +393,7 @@ class ECGMIMICDataset(PretrainDataset):
         # extract the one hot encoding of the signal
         row = self.tab_data.iloc[idx]
         # print(f"Row for lab item {idx}: {row}")
-        one_hot_values = one_hot_values = row[self.label_list].astype(float).fillna(-2)
+        one_hot_values = one_hot_values = row[self.label_list.keys()].astype(float).fillna(-2)
         one_hot_values = one_hot_values + 1
 
         encoding = {
