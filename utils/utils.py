@@ -122,6 +122,8 @@ def get_base_model(config, feature_classification=False):
             new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
             message = base_model.load_state_dict(new_state_dict, strict=False) 
             print(message) 
+
+    base_model.compile()
     return base_model
 
 

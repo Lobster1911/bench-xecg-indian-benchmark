@@ -38,7 +38,6 @@ def train(config, run=None, wandb=False):
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'), pin_memory=True)
 
     base_model = utils.get_base_model(config)
-    base_model.compile()
 
     log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
     print(f"Logging every {log_every_n_steps} steps")
