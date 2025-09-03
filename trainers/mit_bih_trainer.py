@@ -19,26 +19,27 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             
         self.plot_test_predictions = config.plot_test_predictions
 
-        self.train_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average='micro', ignore_index=-1)
-        self.test_acc_no_avg = torchmetrics.classification.accuracy.MulticlassAccuracy(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.train_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average='macro', ignore_index=-1)
-        self.valid_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average='macro', ignore_index=-1)
-        self.test_f1 = torchmetrics.classification.MulticlassF1Score(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.train_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)  
-        self.valid_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
-        self.test_auroc = torchmetrics.classification.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1)
+        self.train_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
+        self.valid_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
+        self.test_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
+        self.test_acc_no_avg = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average=None, ignore_index=-1, top_k=1)
+        self.train_f1 = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes, average='macro', ignore_index=-1, top_k=1)
+        self.valid_f1 = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes, average='macro', ignore_index=-1, top_k=1)
+        self.test_f1 = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes, average=None, ignore_index=-1, top_k=1)
+
+        self.train_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
+        self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
+        self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
 
         self.single_hb = config.use_ecg_founder
 
         # add sensitivity and specificity for the first class
-        self.val_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_spec = torchmetrics.classification.specificity.MulticlassSpecificity(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.val_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_recall = torchmetrics.classification.precision_recall.MulticlassRecall(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.val_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
-        self.test_precision = torchmetrics.classification.precision_recall.MulticlassPrecision(num_classes=self.num_classes, average=None, ignore_index=-1)
+        self.val_spec = torchmetrics.Specificity(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
+        self.test_spec = torchmetrics.Specificity(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
+        self.val_recall = torchmetrics.Recall(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
+        self.test_recall = torchmetrics.Recall(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
+        self.val_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
+        self.test_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
 
     def training_step(self, batch, _):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
@@ -248,17 +249,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             gamma = .25
             loss_cls = (alpha * (1-pt)**gamma * loss_cls)
         
-
-        # return the masked target and cls
-        mask = targets != -1
-        targets = targets[mask]
-        cls = cls[mask]
-        preds = preds[mask]
-        
-        return loss_cls, preds, targets, cls 
-    
-
-
+        return loss_cls, preds, targets, cls.permute(0, 2, 1)
 
 def plot_mit_bih_pred(sample, model, device, logdir, epoch, name, max_length=3000):
     with torch.no_grad():

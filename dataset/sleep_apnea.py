@@ -47,12 +47,16 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             records = [record for i, record in enumerate(records) if i not in test_idxs]
             # keep the 90% of the records
             records = records[:int(len(records) * 0.8)]
+            print(f"Training records: {records}")
         elif self.split == 'val':
-            records = [record for i, record in enumerate(records) if i in test_idxs]
+            records = [record for i, record in enumerate(records) if not i in test_idxs]
             # keep the 10% of the records
             records = records[int(len(records) * 0.8):]
+            print(f"Validation records: {records}")
+
         elif self.split == 'test':
             records = [record for i, record in enumerate(records) if i in test_idxs]
+            print(f"Test records: {records}")
 
         self.records = [os.path.join(self.data_folder, record) for record in records]
 
