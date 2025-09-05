@@ -38,7 +38,7 @@ def train(config, run=None, wandb=False):
     test_dataset = sleep_apnea.ECGSleepApneaDataset(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='test'))
 
-    base_model = utils.get_base_model(config, feature_classification=config.is_recurrent)
+    base_model = utils.get_base_model(config, feature_classification=config.is_recurrent, minute_aggregation=True)
             
     model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 

@@ -23,6 +23,7 @@ class pretrainedxLSTM(BaseModel):
         self.cls_type = config.cls_type
         self.masking_type = config.masking_type
         self.encoder_type = config.encoder_type
+        self.sampling_freq = config.sampling_freq
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 

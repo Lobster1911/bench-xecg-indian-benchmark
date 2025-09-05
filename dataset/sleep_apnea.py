@@ -17,10 +17,8 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         self.split = split
         self.leads = config.leads
         self.patch_size = config.patch_size
-        if self.split == 'train':
-            self.window_size = config.window_size_train
-        else:
-            self.window_size = config.window_size_val
+        self.window_size = config.window_size * 100
+
         self.augmentations = augmentations
         self.segment_size = 6000  # 60 seconds in samples
 
@@ -70,25 +68,24 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         # for each ecg record, read the signal and annotations
         for record in tqdm(self.records, desc='Loading samples'):
             # read the record
-            signal, info = wfdb.rdsamp(record)
+            signal, _ = wfdb.rdsamp(record)
             ann = wfdb.rdann(record, 'apn')
 
-            # get the length of the signal
-            length = len(signal)
+            # get the length of the signal (considering it only as a multiple of segment_size)
+            length = len(signal) - (len(signal) % self.window_size)
 
             # divide the signal into window_size segments
             count = 0
             if self.window_size < self.segment_size: count_2 = 0
 
             for i in range(0, length, self.window_size):
-                # append the segment to the samples list
-                self.samples.append(signal[i:min(length, i + self.window_size)])
+                # append the segment  of window_size to the samples list
+                sample = signal[i:min(length, i + self.window_size)]
 
-                annotations = []
                 # get the annotations for the segment
-
+                annotations = []
                 while count < len(ann.sample) and ann.sample[count] < i + self.window_size:
-                    annotations.append((ann.sample[count] - i * count, ann.symbol[count]))
+                    annotations.append(1. if ann.symbol[count] == 'A' else 0.)
                     self.segment_id.append((record, count))
                     if self.window_size < self.segment_size: 
                         count_2 += 1
@@ -99,48 +96,51 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                     else:
                         count += 1
 
-                if len(annotations) == 0:
-                    # do not add the segment
-                    self.samples.pop()
-                    continue
+                if len(annotations) > 0:
+                    num_minutes = sample.shape[0] // self.segment_size
+                    if len(annotations) < num_minutes:
+                        print(f"Warning: Less annotations ({len(annotations)}) than expected ({num_minutes}) for record {record}, segment {i}, cropping")
+                        sample = sample[:len(annotations) * self.segment_size]
 
-                # appending list of annotation for the segment
-                self.annotations.append(annotations)
-        
+                    self.samples.append(sample)
+                    self.annotations.append(torch.tensor(annotations))
+                else:
+                    print(f"Warning: No annotations found for segment {i} in record {record}, skipping... (This should not happen)")
 
-        patches_in_segment = min(self.segment_size, self.window_size) // ((100 / self.sampling_freq) * self.patch_size)
+        # patches_in_segment = min(self.segment_size, self.window_size) // ((100 / self.sampling_freq) * self.patch_size)
+        # # print(f'Patches in segment: {patches_in_segment}')
 
-        annotations_tmp = []
-        # covnert the annotations to torch tensors
-        for i, ann_list in enumerate(self.annotations):
-            ann = []
-            for pos, label in ann_list:
-                if label == 'A':
-                    ann.append(torch.ones(1, dtype=torch.float32))
-                elif label == 'N':
-                    ann.append(torch.zeros(1, dtype=torch.float32))
-                else:   
-                    raise ValueError(f"Unknown label {label}")
-            ann = torch.cat(ann, dim=0)
+        # annotations_tmp = []
+        # # convert the annotations to torch tensors
+        # for i, ann_list in enumerate(self.annotations):
+        #     ann = []
+        #     for label in ann_list:
+        #         if label == 'A':
+        #             ann.append(torch.ones(1, dtype=torch.float32))
+        #         elif label == 'N':
+        #             ann.append(torch.zeros(1, dtype=torch.float32))
+        #         else:   
+        #             raise ValueError(f"Unknown label {label}")
+        #     ann = torch.cat(ann, dim=0)
 
-            if len(ann) * patches_in_segment > len(self.samples[i]) // self.patch_size:
-                ann = ann[:len(self.samples[i]) // self.patch_size]
-                # print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}')
-            elif len(ann) * patches_in_segment < len(self.samples[i]) // self.patch_size:
-                self.samples[i] = self.samples[i][:len(ann) * self.patch_size]
-                print(f'ann shape: {ann.shape} should match {len(self.samples[i]) / self.patch_size}, should never see this')
+        #     if len(ann) * patches_in_segment > len(self.samples[i]) // self.patch_size:
+        #         print(f'ann shape: {ann.shape} should match {(len(self.samples[i]) / self.patch_size) // patches_in_segment}, more annotations than expected, should never see this')
+        #         ann = ann[:len(self.samples[i]) // self.patch_size]
+        #     elif len(ann) * patches_in_segment < len(self.samples[i]) // self.patch_size:
+        #         print(f'ann shape: {ann.shape} should match {(len(self.samples[i]) / self.patch_size) // patches_in_segment}, probably annotation for last minute is missing.. Removing signal at the end')
+        #         self.samples[i] = self.samples[i][:len(ann) * self.patch_size]
                 
-            annotations_tmp.append(ann)
-        self.annotations = annotations_tmp
+        #     annotations_tmp.append(ann)
+        # self.annotations = annotations_tmp
 
         # count annotation distribution
-        annotation_count = {}
-        for ann_list in self.annotations:
-            for label in ann_list:
-                if label.item() not in annotation_count.keys():
-                    annotation_count[label.item()] = 0
-                annotation_count[label.item()] += 1
-        print(annotation_count)
+        # annotation_count = {}
+        # for ann_list in self.annotations:
+        #     for label in ann_list:
+        #         if label.item() not in annotation_count.keys():
+        #             annotation_count[label.item()] = 0
+        #         annotation_count[label.item()] += 1
+        # print(annotation_count)
             
 
     def __len__(self):

@@ -8,7 +8,7 @@ class xLSTMClassification(pretrainedxLSTM):
             self, 
             config,
             num_classes,
-            num_channels
+            num_channels,
         ): 
         self.linear_probing = config.linear_probing
         super(xLSTMClassification, self).__init__(num_channels, config, reconstruction=False)
@@ -38,8 +38,10 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
             self, 
             config,
             num_classes,
-            num_channels
+            num_channels,
+            minute_aggregation=False,
         ): 
+        self.minute_aggregation = minute_aggregation
         self.linear_probing = config.linear_probing
         super(xLSTMFeatureClassification, self).__init__(num_channels, config, reconstruction=False)
 
@@ -58,6 +60,23 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
             x = self.patch_embedding(x)
             _, features = self.forward_core(x)
 
+        if self.minute_aggregation:
+            features = self.aggregate_per_minute(features)
+
         res = self.head(features)
         return res
+    
+    def aggregate_per_minute(self, features):
+        patches_per_segment = (60 * self.sampling_freq) // self.patch_size
+        n_minutes = int(features.size(1)) // patches_per_segment  
+
+        features = features.reshape(
+            features.shape[0],
+            n_minutes,
+            patches_per_segment,
+            features.shape[-1]
+        )
+        features = features.permute(0, 2, 1, 3).contiguous()
+        features, _ = self.pooling(features)
+        return features
 

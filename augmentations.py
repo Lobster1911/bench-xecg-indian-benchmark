@@ -215,6 +215,8 @@ class CropFixedLen(nn.Module):
         self.length = length
 
     def forward(self, signal):
+        if self.length is None:
+            return signal
         # Get the size of the signal
         if signal.shape[0] > self.length:
             return  signal[:self.length, ...]

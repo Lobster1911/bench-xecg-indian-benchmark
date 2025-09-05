@@ -81,7 +81,7 @@ def parse_config(config_file, default_config_file):
 
 
 
-def get_base_model(config, feature_classification=False):
+def get_base_model(config, feature_classification=False, minute_aggregation=False):
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob, feature_classification=feature_classification, r_peaks_detection=config.r_peaks_detection)
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
@@ -105,7 +105,7 @@ def get_base_model(config, feature_classification=False):
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     else:
         if feature_classification:
-            base_model = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+            base_model = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads), minute_aggregation=minute_aggregation)
         else:
             base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         
@@ -123,7 +123,9 @@ def get_base_model(config, feature_classification=False):
             message = base_model.load_state_dict(new_state_dict, strict=False) 
             print(message) 
 
-    base_model.compile()
+    # this gives problem due to reshaping
+    if not minute_aggregation:
+        base_model.compile()
     return base_model
 
 

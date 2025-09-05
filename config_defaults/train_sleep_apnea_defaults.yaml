@@ -68,3 +68,7 @@ n_local_view: 0
 
 monitor_metric: val_auc
 monitor_mode: max
+
+
+window_size: 1800 # 30 minutes in samples
+max_length_signal: 180000

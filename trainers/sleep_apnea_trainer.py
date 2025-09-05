@@ -15,245 +15,266 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
 
-        self.train_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
-        self.valid_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
-        self.test_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
+        self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
 
-        self.train_feature_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-        self.valid_feature_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-        self.test_feature_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        self.train_acc = torchmetrics.Accuracy(task='binary', ignore_index=-1)
+        self.valid_acc = torchmetrics.Accuracy(task='binary', ignore_index=-1)
+        self.test_acc = torchmetrics.Accuracy(task='binary', ignore_index=-1)
 
-        self.train_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
-        self.valid_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
-        self.test_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
+        self.train_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        self.valid_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        self.test_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
 
         self.is_recurrent = config.is_recurrent
 
-        if self.is_recurrent:
-            self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-            self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-            self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        # if self.is_recurrent:
+        #     self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        #     self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        #     self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
 
-            self.train_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
-            self.valid_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
-            self.test_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.train_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.valid_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.test_feature_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
 
-            self.train_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
-            self.valid_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
-            self.test_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.train_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.valid_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
+        #     self.test_auc = torchmetrics.AUROC(task='binary', ignore_index=-1)
 
-            self.val_per_patient_metric = PerPatientMetric()
-            self.test_per_patient_metric = PerPatientMetric()
-        else: 
-            # Initialize metrics for validation and test
-            self.val_metric = ECG10secSegmentMetric()
-            self.test_metric = ECG10secSegmentMetric()
+        #     # self.val_per_patient_metric = PerPatientMetric()
+        #     # self.test_per_patient_metric = PerPatientMetric()
+        # else: 
+        #     # Initialize metrics for validation and test
+        #     self.val_metric = ECGSegmentMetric()
+        #     self.test_metric = ECGSegmentMetric()
 
+        # self.train_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
+        # self.valid_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
+        # self.test_feature_acc = torchmetrics.classification.accuracy.BinaryAccuracy(ignore_index=-1)
 
     def training_step(self, batch, _):
-        loss, logits, preds, targets, seg_ids = self.predict_batch(batch)
+        loss, logits, preds, targets = self.predict_batch(batch)
 
-        train_feature_acc = self.train_feature_acc.to(preds.device)
-        train_feature_acc(preds, targets)
-        self.log('train_feature_acc', train_feature_acc, prog_bar=False)
+        train_acc = self.train_acc.to(preds.device)
+        train_acc(preds, targets)
+        self.log('train_acc', train_acc, prog_bar=False)
         self.log('train_loss', loss.detach().item(), prog_bar=True)
 
-        train_feature_f1 = self.train_feature_f1.to(preds.device)
-        train_feature_f1(preds, targets)
-        self.log('train_feature_f1', train_feature_f1, prog_bar=False)
+        train_f1 = self.train_f1.to(preds.device)
+        train_f1(preds, targets)
+        self.log('train_f1', train_f1, prog_bar=False)
 
-        if self.is_recurrent:
-            preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
-            train_acc = self.train_acc.to(preds.device)
-            train_acc(preds_segment, targets_segment)
-            self.log('train_acc', train_acc, prog_bar=True)
+        train_auc = self.train_auc.to(preds.device)
+        train_auc(logits, targets)
+        self.log('train_auc', train_auc, prog_bar=False)
 
-            train_f1 = self.train_f1.to(preds.device)
-            train_f1(preds_segment, targets_segment)
-            self.log('train_f1', train_f1, prog_bar=True)
+        # if self.is_recurrent:
+        #     preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
+        #     train_acc = self.train_acc.to(preds.device)
+        #     train_acc(preds_segment, targets_segment)
+        #     self.log('train_acc', train_acc, prog_bar=True)
 
-            train_feature_auc = self.train_feature_auc.to(preds.device)
-            train_feature_auc(logits, targets)
-            self.log('train_feature_auc', train_feature_auc, prog_bar=False)
+        #     train_f1 = self.train_f1.to(preds.device)
+        #     train_f1(preds_segment, targets_segment)
+        #     self.log('train_f1', train_f1, prog_bar=True)
 
-            train_auc = self.train_auc.to(preds.device)
-            train_auc(logits_segment, targets_segment)
-            self.log('train_auc', train_auc, prog_bar=False)
+        #     train_feature_auc = self.train_feature_auc.to(preds.device)
+        #     train_feature_auc(logits, targets)
+        #     self.log('train_feature_auc', train_feature_auc, prog_bar=False)
+
+        #     train_auc = self.train_auc.to(preds.device)
+        #     train_auc(logits_segment, targets_segment)
+        #     self.log('train_auc', train_auc, prog_bar=False)
 
         return loss
     
     def validation_step(self, batch, _):
-        loss, logits, preds, targets, seg_ids = self.predict_batch(batch)
+        loss, logits, preds, targets = self.predict_batch(batch)
 
-        valid_feature_acc = self.valid_feature_acc.to(preds.device)
-        valid_feature_acc(preds, targets)
-        self.log('val_feature_acc', valid_feature_acc, prog_bar=False)
-        self.log('val_loss', loss.detach().item(), prog_bar=True)
+        val_acc = self.valid_acc.to(preds.device)
+        val_acc(preds, targets)
+        self.log('val_acc', val_acc, prog_bar=False)
+        self.log('val_loss', loss.detach().item(), prog_bar=False)
 
-        valid_feature_f1 = self.valid_feature_f1.to(preds.device)
-        valid_feature_f1(preds, targets)
-        self.log('val_feature_f1', valid_feature_f1, prog_bar=False)
+        val_f1 = self.valid_f1.to(preds.device)
+        val_f1(preds, targets)
+        self.log('val_f1', val_f1, prog_bar=True)
 
-        if self.is_recurrent:
-            preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
-            valid_acc = self.valid_acc.to(preds.device)
-            valid_acc(preds_segment, targets_segment)
-            self.log('val_acc', valid_acc, prog_bar=True)
+        val_auc = self.valid_auc.to(preds.device)
+        val_auc(logits, targets)
+        self.log('val_auc', val_auc, prog_bar=True)
 
-            valid_f1 = self.valid_f1.to(preds.device)
-            valid_f1(preds_segment, targets_segment)
-            self.log('val_f1', valid_f1, prog_bar=True)
+        # if self.is_recurrent:
+            # preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
+            # valid_acc = self.valid_acc.to(preds.device)
+            # valid_acc(preds_segment, targets_segment)
+            # self.log('val_acc', valid_acc, prog_bar=True)
 
-            valid_feature_auc = self.valid_feature_auc.to(preds.device)
-            valid_feature_auc(logits, targets)
-            self.log('val_feature_auc', valid_feature_auc, prog_bar=False)
+            # valid_f1 = self.valid_f1.to(preds.device)
+            # valid_f1(preds_segment, targets_segment)
+            # self.log('val_f1', valid_f1, prog_bar=True)
 
-            valid_auc = self.valid_auc.to(preds.device)
-            valid_auc(logits_segment, targets_segment)
-            self.log('val_auc', valid_auc, prog_bar=False)
+            # valid_feature_auc = self.valid_feature_auc.to(preds.device)
+            # valid_feature_auc(logits, targets)
+            # self.log('val_feature_auc', valid_feature_auc, prog_bar=False)
 
-            self.val_per_patient_metric.update(preds_segment, targets_segment, seg_ids)
-        else:
-            # Update the segment metric with current batch
-            self.val_metric.update(preds, targets, seg_ids)
+            # valid_auc = self.valid_auc.to(preds.device)
+            # valid_auc(logits_segment, targets_segment)
+            # self.log('val_auc', valid_auc, prog_bar=False)
+
+            # self.val_per_patient_metric.update(preds_segment, targets_segment, seg_ids)
+        # else:
+        #     # Update the segment metric with current batch
+        #     self.val_metric.update(preds, targets, seg_ids)
 
         return loss
             
     def test_step(self, batch, _):
-        loss, logits, preds, targets, seg_ids = self.predict_batch(batch)
+        loss, logits, preds, targets = self.predict_batch(batch)
 
-        test_feature_acc = self.test_feature_acc.to(preds.device)
-        test_feature_acc(preds, targets)
-        self.log('test_feature_acc', test_feature_acc, prog_bar=False)
+        test_acc = self.test_acc.to(preds.device)
+        test_acc(preds, targets)
+        self.log('test_acc', test_acc, prog_bar=False)
         self.log('test_loss', loss.detach().item(), prog_bar=False)
+
+        test_f1 = self.test_f1.to(preds.device)
+        test_f1(preds, targets)
+        self.log('test_f1', test_f1, prog_bar=False)
 
         test_feature_f1 = self.test_feature_f1.to(preds.device)
         test_feature_f1(preds, targets)
         self.log('test_feature_f1', test_feature_f1, prog_bar=False)
 
-        if self.is_recurrent:
-            preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
-            test_acc = self.test_acc.to(preds.device)
-            test_acc(preds_segment, targets_segment)   
-            self.log('test_acc', test_acc, prog_bar=False)
+        test_auc = self.test_auc.to(preds.device)
+        test_auc(logits, targets)
+        self.log('test_auc', test_auc, prog_bar=False)
+
+        # if self.is_recurrent:
+        #     preds_segment, targets_segment, logits_segment = format_to_segment(preds, targets, self.patch_size)
+        #     test_acc = self.test_acc.to(preds.device)
+        #     test_acc(preds_segment, targets_segment)   
+        #     self.log('test_acc', test_acc, prog_bar=False)
             
-            test_f1 = self.test_f1.to(preds.device)
-            test_f1(preds_segment, targets_segment)
-            self.log('test_f1', test_f1, prog_bar=False)
+        #     test_f1 = self.test_f1.to(preds.device)
+        #     test_f1(preds_segment, targets_segment)
+        #     self.log('test_f1', test_f1, prog_bar=False)
 
-            test_feature_auc = self.test_feature_auc.to(preds.device)
-            test_feature_auc(logits, targets)
-            self.log('test_feature_auc', test_feature_auc, prog_bar=False)
+        #     test_feature_auc = self.test_feature_auc.to(preds.device)
+        #     test_feature_auc(logits, targets)
+        #     self.log('test_feature_auc', test_feature_auc, prog_bar=False)
 
-            test_auc = self.test_auc.to(preds.device)
-            test_auc(logits_segment, targets_segment)
-            self.log('test_auc', test_auc, prog_bar=False)
+        #     test_auc = self.test_auc.to(preds.device)
+        #     test_auc(logits_segment, targets_segment)
+        #     self.log('test_auc', test_auc, prog_bar=False)
 
-            self.test_per_patient_metric.update(preds_segment, targets_segment, seg_ids)
-        else:
-            # Update the segment metric with current batch
-            self.test_metric.update(preds, targets, seg_ids)
+        #     self.test_per_patient_metric.update(preds_segment, targets_segment, seg_ids)
+        # else:
+        #     # Update the segment metric with current batch
+        #     self.test_metric.update(preds, targets, seg_ids)
  
         return loss
     
     def on_validation_epoch_end(self):
         # Compute and log metrics
-        if not self.is_recurrent:
-            metrics = self.val_metric.compute()
-            self.log_dict({
-                'val_auc': metrics['auc_macro'],
-                'val_f1': metrics['f1_macro'],
-                'val_acc': metrics['accuracy_micro'],
-                'val_patient_acc': metrics['patient_acc'],
-                'val_patient_f1': metrics['patient_f1']
-            })
-        else:
-            metrics = self.val_per_patient_metric.compute()
-            self.log_dict({
-                'val_patient_acc': metrics['patient_acc'],
-                'val_patient_f1': metrics['patient_f1']
-            })
+        # if not self.is_recurrent:
+        #     metrics = self.val_metric.compute()
+        #     self.log_dict({
+        #         'val_auc': metrics['auc_macro'],
+        #         'val_f1': metrics['f1_macro'],
+        #         'val_acc': metrics['accuracy_micro'],
+        #         'val_patient_acc': metrics['patient_acc'],
+        #         'val_patient_f1': metrics['patient_f1']
+        #     })
+        # else:
+        #     metrics = self.val_per_patient_metric.compute()
+        #     self.log_dict({
+        #         'val_patient_acc': metrics['patient_acc'],
+        #         'val_patient_f1': metrics['patient_f1']
+        #     })
         super().on_validation_epoch_end()
         
     def on_test_epoch_end(self):
         # Compute and log final test metrics
-        if not self.is_recurrent:
-            metrics = self.test_metric.compute()
-            self.log_dict({
-                'test_auc': metrics['auc_macro'],
-                'test_f1': metrics['f1_macro'],
-                'test_acc': metrics['accuracy_micro'],
-                'test_patient_acc': metrics['patient_acc'],
-                'test_patient_f1': metrics['patient_f1']
-            })
-        else:
-            metrics = self.test_per_patient_metric.compute()
-            self.log_dict({
-                'test_patient_acc': metrics['patient_acc'],
-                'test_patient_f1': metrics['patient_f1']
-            })
+        # if not self.is_recurrent:
+        #     metrics = self.test_metric.compute()
+        #     self.log_dict({
+        #         'test_auc': metrics['auc_macro'],
+        #         'test_f1': metrics['f1_macro'],
+        #         'test_acc': metrics['accuracy_micro'],
+        #         'test_patient_acc': metrics['patient_acc'],
+        #         'test_patient_f1': metrics['patient_f1']
+        #     })
+        # else:
+        #     metrics = self.test_per_patient_metric.compute()
+        #     self.log_dict({
+        #         'test_patient_acc': metrics['patient_acc'],
+        #         'test_patient_f1': metrics['patient_f1']
+        #     })
         super().on_test_epoch_end()
             
-    
     def predict_batch(self, batch):
         x = batch["signals"]
         targets = batch['labels']
 
-        segment_ids = batch['segment_ids']  # patient ids are not used in the training, but we keep them for consistency
+        # segment_ids = batch['segment_ids']  # patient ids are not used in the training, but we keep them for consistency
 
         # get one hot encoding
 
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
+        mask = (targets != -1)
         logits = self.model(x).squeeze(-1) 
         preds = (torch.sigmoid(logits) > 0.5).float()
 
-        if not self.is_recurrent:
-            targets = targets.squeeze(-1)
-            loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
-        else:
-            targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
-            min_length = min(logits.shape[-1], targets.shape[-1])
-            logits = logits[:, :min_length] 
-            targets = targets[:, :min_length] 
-            preds = preds[:, :min_length] 
+        # print(f'targets shape: {targets.shape}, logits shape: {logits.shape}, preds shape: {preds.shape}, mask shape: {mask.shape}')
 
-            mask = (targets != -1)
-            loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
+        #if not self.is_recurrent:
+        targets = targets.squeeze(-1)
+        loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
+        # else:
+        #     targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
+        #     min_length = min(logits.shape[-1], targets.shape[-1])
+        #     logits = logits[:, :min_length] 
+        #     targets = targets[:, :min_length] 
+        #     preds = preds[:, :min_length] 
 
-        return loss_cls, logits, preds, targets.long(), segment_ids
+        #     loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
+
+        return loss_cls, logits, preds, targets.long()
 
 
-def format_to_segment(preds, target, patch_size, segment_size=6000):
-    # preds will be [bs, seq_len, num_classes]
-    # target will be [bs, seq_len, num_classes]
+# def format_to_segment(preds, target, patch_size, segment_size=6000):
+#     # preds will be [bs, seq_len, num_classes]
 
-    patches_in_segment = segment_size // patch_size
+#     # target will be [bs, seq_len, num_classes]
 
-    num_patches = preds.shape[0] if preds.ndim == 1 else preds.shape[1]
+#     patches_in_segment = segment_size // patch_size
 
-    num_segments = num_patches // patches_in_segment
-    num_segments = max(num_segments, 1)
+#     num_patches = preds.shape[0] if preds.ndim == 1 else preds.shape[1]
 
-    if num_patches % patches_in_segment != 0:
-        # we can skip the very last part
-        preds = preds[:, :-(num_patches % patches_in_segment)]
-        target = target[:, :-(num_patches % patches_in_segment)]
+#     num_segments = num_patches // patches_in_segment
+#     num_segments = max(num_segments, 1)
 
-    # take the prediction and group for patches_in_segment
-    preds = preds.view(-1, num_segments, patches_in_segment)
-    target = target.view(-1, num_segments, patches_in_segment)
+#     if num_patches % patches_in_segment != 0:
+#         # we can skip the very last part
+#         preds = preds[:, :-(num_patches % patches_in_segment)]
+#         target = target[:, :-(num_patches % patches_in_segment)]
 
-    # reducing to segment shape
-    preds_mean = (torch.mean(preds, dim=2) > 0.5).float()
-    logits_mean = torch.sigmoid(torch.mean(preds, dim=2))
-    target_mean = torch.max(target, dim=2)[0]
+#     # take the prediction and group for patches_in_segment
+#     preds = preds.view(-1, num_segments, patches_in_segment)
+#     target = target.view(-1, num_segments, patches_in_segment)
 
-    if preds.shape != target.shape:
-        raise ValueError("preds and target must have the same shape")
+#     # reducing to segment shape
+#     preds_mean = (torch.mean(preds, dim=2) > 0.5).float()
+#     logits_mean = torch.sigmoid(torch.mean(preds, dim=2))
+#     target_mean = torch.max(target, dim=2)[0]
 
-    return preds_mean, target_mean, logits_mean
+#     if preds.shape != target.shape:
+#         raise ValueError("preds and target must have the same shape")
+
+#     return preds_mean, target_mean, logits_mean
 
 
 
@@ -362,7 +383,7 @@ class PerPatientMetric(Metric):
         }
     
 
-class ECG10secSegmentMetric(Metric):
+class ECGSegmentMetric(Metric):
     """
     Custom metric for ECG segment classification that:
     1. Accumulates predictions for 10s segments belonging to 1min annotated segments
