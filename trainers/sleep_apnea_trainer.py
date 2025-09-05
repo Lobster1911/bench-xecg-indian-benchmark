@@ -142,9 +142,9 @@ class TrainingSleepApnea(CommonTrainerDownstream):
         test_f1(preds, targets)
         self.log('test_f1', test_f1, prog_bar=False)
 
-        test_feature_f1 = self.test_feature_f1.to(preds.device)
-        test_feature_f1(preds, targets)
-        self.log('test_feature_f1', test_feature_f1, prog_bar=False)
+        # test_feature_f1 = self.test_feature_f1.to(preds.device)
+        # test_feature_f1(preds, targets)
+        # self.log('test_feature_f1', test_feature_f1, prog_bar=False)
 
         test_auc = self.test_auc.to(preds.device)
         test_auc(logits, targets)
@@ -225,13 +225,13 @@ class TrainingSleepApnea(CommonTrainerDownstream):
             self.model.set_eval_linear_probing()
 
         mask = (targets != -1)
-        logits = self.model(x).squeeze(-1) 
+        logits = self.model(x)
         preds = (torch.sigmoid(logits) > 0.5).float()
 
         # print(f'targets shape: {targets.shape}, logits shape: {logits.shape}, preds shape: {preds.shape}, mask shape: {mask.shape}')
 
         #if not self.is_recurrent:
-        targets = targets.squeeze(-1)
+        # targets = targets.squeeze(-1)
         loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
         # else:
         #     targets = targets.repeat_interleave(logits.shape[-1] // targets.shape[-1], dim=-1)  # repeat targets for binary classification
