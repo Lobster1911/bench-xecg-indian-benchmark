@@ -203,6 +203,7 @@ class MaskTransformer(nn.Module):
             self.pos_embed = nn.Parameter(torch.zeros(c*p, embed_dim), requires_grad=False)
             pos_embed = get_2d_sincos_pos_embed(embed_dim,c,p)
             self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float())
+            print
 
         self.mask_type = mask_type
         # initialize the learnable token
@@ -338,9 +339,9 @@ class MaskTransformer(nn.Module):
             # add padding
             padding = 2500 - x.shape[2]
             x = torch.nn.functional.pad(x, (0, padding), mode='constant', value=0)
-        elif x.shape[2] > 2500:
+        # elif x.shape[2] > 2500:
             # cut the signal
-            x = x[:,:,:2500]
+        #     x = x[:,:,:2500]
 
         # assert x.shape[2] == 2500, f'Input should be of shape (bs, c, 2500), x.shape[2]={x.shape[2]}'
 
@@ -498,6 +499,7 @@ class ecg_jepa(nn.Module):
         self.c=c
         self.p=p
         self.t=t
+        print(f'Creating JEPA with c={c}, p={p}, t={t}')
         self.encoder = MaskTransformer(embed_dim=encoder_embed_dim, 
                                        depth=encoder_depth, 
                                        num_heads=encoder_num_heads, 
@@ -599,13 +601,15 @@ class ECGJepaClassifier(BaseModel):
 
 
 class ECGJepaFeatureClassifier(BaseModel):
-    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, r_peaks_detection=False):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, r_peaks_detection=False, minute_aggregation=False):
         super().__init__()
         self.encoder = encoder
         self.num_classes = num_classes
         self.linear_probing = linear_probing
         self.r_peaks_detection = r_peaks_detection
+        self.minute_aggregation = minute_aggregation
         self.patch_size = patch_size
+        self.sampling_freq = 250
 
         self.head = nn.Sequential(
             nn.Linear(self.encoder.embed_dim, num_classes)
@@ -626,8 +630,27 @@ class ECGJepaFeatureClassifier(BaseModel):
         else:
             out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
 
+        if self.minute_aggregation:
+            out = self.aggregate_per_minute(out)
+
         cls = self.head(out)
         return cls
+    
+    def aggregate_per_minute(self, features):
+        patches_per_segment = (60 * self.sampling_freq) // self.patch_size
+        # print(f'Aggregating features per minute with {patches_per_segment} patches per minute')
+        # print(f'Input features shape: {features.shape}')
+        n_minutes = int(features.size(1)) // patches_per_segment  
+
+        features = features.reshape(
+            features.shape[0],
+            n_minutes,
+            patches_per_segment,
+            features.shape[-1]
+        )
+        features = features.mean(dim=2)
+        return features
+
 
     def get_layers(self):
         return self.encoder.encoder_blocks.blocks

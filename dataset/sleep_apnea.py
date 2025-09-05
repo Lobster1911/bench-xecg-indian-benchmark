@@ -99,48 +99,13 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                 if len(annotations) > 0:
                     num_minutes = sample.shape[0] // self.segment_size
                     if len(annotations) < num_minutes:
-                        print(f"Warning: Less annotations ({len(annotations)}) than expected ({num_minutes}) for record {record}, segment {i}, cropping")
+                        # print(f"Warning: Less annotations ({len(annotations)}) than expected ({num_minutes}) for record {record}, segment {i}, cropping")
                         sample = sample[:len(annotations) * self.segment_size]
 
                     self.samples.append(sample)
                     self.annotations.append(torch.tensor(annotations))
-                else:
-                    print(f"Warning: No annotations found for segment {i} in record {record}, skipping... (This should not happen)")
-
-        # patches_in_segment = min(self.segment_size, self.window_size) // ((100 / self.sampling_freq) * self.patch_size)
-        # # print(f'Patches in segment: {patches_in_segment}')
-
-        # annotations_tmp = []
-        # # convert the annotations to torch tensors
-        # for i, ann_list in enumerate(self.annotations):
-        #     ann = []
-        #     for label in ann_list:
-        #         if label == 'A':
-        #             ann.append(torch.ones(1, dtype=torch.float32))
-        #         elif label == 'N':
-        #             ann.append(torch.zeros(1, dtype=torch.float32))
-        #         else:   
-        #             raise ValueError(f"Unknown label {label}")
-        #     ann = torch.cat(ann, dim=0)
-
-        #     if len(ann) * patches_in_segment > len(self.samples[i]) // self.patch_size:
-        #         print(f'ann shape: {ann.shape} should match {(len(self.samples[i]) / self.patch_size) // patches_in_segment}, more annotations than expected, should never see this')
-        #         ann = ann[:len(self.samples[i]) // self.patch_size]
-        #     elif len(ann) * patches_in_segment < len(self.samples[i]) // self.patch_size:
-        #         print(f'ann shape: {ann.shape} should match {(len(self.samples[i]) / self.patch_size) // patches_in_segment}, probably annotation for last minute is missing.. Removing signal at the end')
-        #         self.samples[i] = self.samples[i][:len(ann) * self.patch_size]
-                
-        #     annotations_tmp.append(ann)
-        # self.annotations = annotations_tmp
-
-        # count annotation distribution
-        # annotation_count = {}
-        # for ann_list in self.annotations:
-        #     for label in ann_list:
-        #         if label.item() not in annotation_count.keys():
-        #             annotation_count[label.item()] = 0
-        #         annotation_count[label.item()] += 1
-        # print(annotation_count)
+                # else:
+                    # print(f"Warning: No annotations found for segment {i} in record {record}, skipping... (This should not happen)")
             
 
     def __len__(self):
@@ -150,12 +115,14 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         sample = self.samples[idx]
         ann = self.annotations[idx]
 
+        sample = self.resample_if_needed(sample, {'fs': 100})  # original sampling freq is 100 Hz
+
         # map to the correct lead
         tensor = torch.zeros(sample.shape[0], len(self.leads), dtype=torch.float32)
         if len(self.leads) == 1:
-            tensor[:, 0] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
+            tensor[:, 0] = sample[:, 0]  # ECG
         else:
-            tensor[:, 1] = torch.tensor(sample[:, 0], dtype=torch.float32)  # ECG
+            tensor[:, 1] = sample[:, 0]  # ECG
 
 
         if self.augmentations is not None:
@@ -166,6 +133,13 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             'annotation': ann,
             'segment_id': self.segment_id[idx],
         }
+    
+    def resample_if_needed(self, signal, info):
+        if self.sampling_freq != info['fs']:
+            signal = nk.signal_resample(signal, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')   
+            signal = torch.tensor(signal, dtype=torch.float32)
+            
+        return signal
     
 
 def make_collate_fn(config, split='train'):

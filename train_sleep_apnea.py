@@ -24,7 +24,6 @@ parser.add_argument('--config_file', type=str, default='configs/train_sleep_apne
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-
     check_window_size(config)
 
     train_dataset =  sleep_apnea.ECGSleepApneaDataset(config, split='train', augmentations=get_transforms(config))
@@ -46,7 +45,7 @@ def train(config, run=None, wandb=False):
 
     # feature classification only if the signal is 1 minute long
     feature_classification = config.window_size % 60 == 0
-    print(f"Feature classification: {feature_classification}")
+    config.max_length_signal = config.window_size * config.sampling_freq
     base_model = utils.get_base_model(config, feature_classification=feature_classification, minute_aggregation=True)
     base_model = utils.change_positional_embedding(base_model, config)
             

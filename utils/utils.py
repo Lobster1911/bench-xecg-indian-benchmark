@@ -33,11 +33,9 @@ def parse_config(config_file, default_config_file):
     if merged_config.use_ecg_jepa:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 50
-        merged_config.max_length_signal = 2500
+        # merged_config.max_length_signal = 2500
         merged_config.win_len = 1250
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
@@ -91,7 +89,7 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
         print(msg)
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, config=config, feature_classification=feature_classification) # dim is the dimension of the latent space
+        base_model = load_encoder(ckpt_dir=ckpt_dir, config=config, feature_classification=feature_classification, minute_aggregation=minute_aggregation) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
             path = './checkpoint/1_lead_ECGFounder.pth'
@@ -130,6 +128,10 @@ def change_positional_embedding(model, config):
     print(f"Changing positional embedding to new sequence length {new_seq_len}")
     if config.use_st_mem:
         pass # TODO
+    elif config.use_ecg_founder:
+        pass
+    elif config.use_ecg_jepa:
+        pass
     elif config.encoder_type == 'transformer':
         if new_seq_len + 2 <= model.core.pos_embedding.shape[1]:
             print(f'No need to change positional embedding, current max sequence length is {model.core.pos_embedding.shape[1]-1}')
