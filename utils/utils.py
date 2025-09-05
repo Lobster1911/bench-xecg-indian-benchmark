@@ -16,6 +16,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, Learning
 from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
 import os
+import torch.nn as nn
 
 def parse_config(config_file, default_config_file):
     with open(default_config_file, 'r') as file:
@@ -58,11 +59,6 @@ def parse_config(config_file, default_config_file):
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
         merged_config.z_score_norm = True
-    elif merged_config.encoder_type == 'transformer':
-        merged_config.win_len = 500 
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
-        merged_config.max_length_signal = 1000
 
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.
@@ -127,6 +123,28 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
     if not minute_aggregation:
         base_model.compile()
     return base_model
+
+
+def change_positional_embedding(model, config):
+    new_seq_len = (config.window_size * config.sampling_freq // config.patch_size)
+    print(f"Changing positional embedding to new sequence length {new_seq_len}")
+    if config.use_st_mem:
+        pass # TODO
+    elif config.encoder_type == 'transformer':
+        if new_seq_len + 2 <= model.core.pos_embedding.shape[1]:
+            print(f'No need to change positional embedding, current max sequence length is {model.core.pos_embedding.shape[1]-1}')
+            return model
+        # get all the positional embeddings except the last one (for cls token)
+        initial_pe = model.core.pos_embedding[:, :-1, :]
+        print(f'initial pe shape: {initial_pe.shape}')
+        # take the last -1 positional embedding and repeat it (the last is for cls tokens)
+        repeated_pe = initial_pe[:, -2, :].repeat(1, new_seq_len - initial_pe.shape[1], 1)
+        # last pe
+        last_pe = model.core.pos_embedding[:, -1:, :]
+
+        model.core.pos_embedding = nn.Parameter(torch.cat([initial_pe, repeated_pe, last_pe], dim=1))
+
+    return model
 
 
 def split_dataset_preserve_labels(dataset, split_ratio=0.1, key='class_label'):

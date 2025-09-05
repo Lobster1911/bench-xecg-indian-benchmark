@@ -10,7 +10,12 @@ from trainers.sleep_apnea_trainer import TrainingSleepApnea
 
 import dataset.sleep_apnea as sleep_apnea
 
-
+def check_window_size(config):
+    assert config.window_size > 0, "Window size must be greater than 0"
+    if config.window_size < 60:
+        assert 60 % config.window_size == 0, "For window sizes less than 60, ensure that 60 is divisible by the window size."
+    else:
+        assert config.window_size % 60 == 0, "For window sizes greater than or equal to 60, ensure that the window size is divisible by 60."
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -19,7 +24,9 @@ parser.add_argument('--config_file', type=str, default='configs/train_sleep_apne
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
-    
+
+    check_window_size(config)
+
     train_dataset =  sleep_apnea.ECGSleepApneaDataset(config, split='train', augmentations=get_transforms(config))
     print(f"Train dataset size: {len(train_dataset)}")
     val_dataset = sleep_apnea.ECGSleepApneaDataset(config, split='val', augmentations=get_transforms(config, split='val'))
@@ -31,15 +38,17 @@ def train(config, run=None, wandb=False):
     else:
         weights = None
 
-
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=sleep_apnea.make_collate_fn(config, split='train'), drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='val'))
 
     test_dataset = sleep_apnea.ECGSleepApneaDataset(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='test'))
 
-    
-    base_model = utils.get_base_model(config, feature_classification=config.is_recurrent, minute_aggregation=True)
+    # feature classification only if the signal is 1 minute long
+    feature_classification = config.window_size % 60 == 0
+    print(f"Feature classification: {feature_classification}")
+    base_model = utils.get_base_model(config, feature_classification=feature_classification, minute_aggregation=True)
+    base_model = utils.change_positional_embedding(base_model, config)
             
     model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
