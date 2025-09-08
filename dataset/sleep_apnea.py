@@ -137,8 +137,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
     def resample_if_needed(self, signal, info):
         if self.sampling_freq != info['fs']:
             signal = nk.signal_resample(signal, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')   
-            signal = torch.tensor(signal, dtype=torch.float32)
-            
+        signal = torch.tensor(signal, dtype=torch.float32)
         return signal
     
 
