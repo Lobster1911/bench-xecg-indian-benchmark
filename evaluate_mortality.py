@@ -23,7 +23,7 @@ def evaluate(config, run_id):
 
     test_dataset = music.MUSICDataset(config, global_augmentations=get_transforms(config, split='test'))
     # consider only a 1%
-    test_dataset = torch.utils.data.Subset(test_dataset, list(range(0, len(test_dataset), 100)))
+    
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=music.make_collate_fn(config), pin_memory=True)
 
     # set deterministic training

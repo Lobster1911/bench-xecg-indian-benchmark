@@ -197,7 +197,7 @@ class ConcordanceIndexMetric(Metric):
 
         if self.multiple_preds_for_same_ecg:
             assert subjs is not None, "subjs must be provided if multiple_preds_for_same_ecg is True"
-            self.subjs.append(subjs)
+            self.subjs.extend(subjs)
 
 
     def compute(self):
@@ -213,17 +213,17 @@ class ConcordanceIndexMetric(Metric):
             events = torch.cat(self.events).numpy()
 
             # subjs contain as keys the subject ids and as values the indexes where the subject id was appearing
-            subjs = {}
+            subjects = {}
             for i, subj in enumerate(self.subjs):
-                if subj not in subjs.keys():
-                    subjs[subj] = []
-                subjs[subj].append(i)
+                if subj not in subjects.keys():
+                    subjects[subj] = []
+                subjects[subj].append(i)
 
             # preds is average over the indexes for each subject
             preds_agg = []
             durations_agg = []
             events_agg = []
-            for subj, indexes in subjs.items():
+            for subj, indexes in subjects.items():
                 preds_agg.append(np.mean(preds[indexes]))
                 durations_agg.append(durations[indexes[0]])
                 events_agg.append(events[indexes[0]])
