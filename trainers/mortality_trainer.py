@@ -16,7 +16,7 @@ from torchmetrics import Metric
 
 
 class TrainerMortality(CommonTrainerDownstream):
-    def __init__(self, model, config,  len_train_dataset, weights=None):
+    def __init__(self, model, config,  len_train_dataset, weights=None, evaluate_music=False):
         super().__init__(model, config,  len_train_dataset, weights)
 
         self.loss_fn = CoxProportionalHazardsLoss()
@@ -24,6 +24,12 @@ class TrainerMortality(CommonTrainerDownstream):
         self.train_ci = ConcordanceIndexMetric()
         self.val_ci = ConcordanceIndexMetric()
         self.test_ci = ConcordanceIndexMetric()
+
+        self.evaluate_music = evaluate_music
+        if self.evaluate_music:
+            self.test_ci_cardiac = ConcordanceIndexMetric(multiple_preds_for_same_ecg=True)
+            self.test_ci = ConcordanceIndexMetric(multiple_preds_for_same_ecg=True)
+
 
     def training_step(self, batch, _):
         loss, logits, batch = self.predict_batch(batch)
@@ -53,12 +59,23 @@ class TrainerMortality(CommonTrainerDownstream):
         loss, logits, batch = self.predict_batch(batch)
         self.log("test_loss", loss)
 
-        self.test_ci.update(logits, batch["timey"], batch["death"])
+        if self.evaluate_music:
+            self.test_ci_cardiac.update(logits, batch["timey"], batch["cardiac_death"], batch['subj'])
+            self.test_ci.update(logits, batch["timey"], batch["death"], batch['subj'])
+        else:
+            self.test_ci.update(logits, batch["timey"], batch["death"])
         return loss
     
     def on_test_epoch_end(self):
-        self.log("test_ci", self.test_ci.compute(), prog_bar=True)
-        self.test_ci.reset()
+        if self.evaluate_music:
+            self.log("test_ci_music_cardiac", self.test_ci_cardiac.compute(), prog_bar=True)
+            self.log("test_ci", self.test_ci.compute(), prog_bar=True)
+            self.test_ci_cardiac.reset()
+            self.test_ci.reset()
+        else: 
+            self.log("test_ci", self.test_ci.compute(), prog_bar=True)
+            self.test_ci.reset()
+
         return super().on_test_epoch_end()
 
     def sort_batch(self, batch, return_ind=False):
@@ -66,7 +83,21 @@ class TrainerMortality(CommonTrainerDownstream):
         fu_time = batch["timey"]
         ind = np.argsort(fu_time.cpu())
         ind = torch.flip(ind, dims=[0])
-        out = {k: v[ind] for k, v in batch.items()}
+
+        out = {}
+        for k, v in batch.items():
+            if torch.is_tensor(v):
+                # already a tensor → can index directly
+                out[k] = v[ind]
+            elif isinstance(v, np.ndarray):
+                # numpy → convert index to numpy
+                out[k] = v[ind.numpy()]
+            elif isinstance(v, list):
+                # python list → gather manually
+                out[k] = [v[i] for i in ind.tolist()]
+            else:
+                raise TypeError(f"Unsupported type for key {k}: {type(v)}")
+        # out = {k: v[ind.tolist()] for k, v in batch.items()}
         if return_ind:
             return out, ind
         else:
@@ -77,34 +108,15 @@ class TrainerMortality(CommonTrainerDownstream):
         batch = self.sort_batch(batch)
 
         x = batch["signals"]
-        # if i have nan print
-        if torch.isnan(x).any():
-            print("NaN found in input signals")
-            nan_count = torch.sum(torch.isnan(x)).item()
-            print(f"Number of NaNs in input signals: {nan_count}")
-
         death = batch["death"]
-        if torch.isnan(death).any():
-            print("NaN found in death labels")
-
-        if torch.isnan(batch['timey']).any():
-            print("NaN found in timey labels")
-
-        # timey = batch["timey"]
-        # get one hot encoding
 
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
         logits = self.model(x)
-
-        if torch.isnan(logits).any():
-            print("NaN found in logits")
-
         loss = self.loss_fn(death, logits)
 
         return loss, logits, batch
-
 
 
 class CoxProportionalHazardsLoss(nn.Module):
@@ -158,7 +170,7 @@ class ConcordanceIndexMetric(Metric):
     full_state_update = True # ensures we aggregate across batches
 
 
-    def __init__(self, dist_sync_on_step=False):
+    def __init__(self, dist_sync_on_step=False, multiple_preds_for_same_ecg=False):
         super().__init__(dist_sync_on_step=dist_sync_on_step)
 
 
@@ -167,8 +179,12 @@ class ConcordanceIndexMetric(Metric):
         self.add_state("durations", default=[], dist_reduce_fx=None)
         self.add_state("events", default=[], dist_reduce_fx=None)
 
+        self.multiple_preds_for_same_ecg = multiple_preds_for_same_ecg
+        if multiple_preds_for_same_ecg:
+            self.add_state("subjs", default=[], dist_reduce_fx=None)
 
-    def update(self, preds: torch.Tensor, durations: torch.Tensor, events: torch.Tensor):
+
+    def update(self, preds: torch.Tensor, durations: torch.Tensor, events: torch.Tensor, subjs = None):
         """
         Args:
         preds: risk scores or predicted survival times (higher means higher risk).
@@ -179,10 +195,39 @@ class ConcordanceIndexMetric(Metric):
         self.durations.append(durations.detach().cpu())
         self.events.append(events.detach().cpu())
 
+        if self.multiple_preds_for_same_ecg:
+            assert subjs is not None, "subjs must be provided if multiple_preds_for_same_ecg is True"
+            self.subjs.append(subjs)
+
 
     def compute(self):
-        preds = torch.cat(self.preds).numpy()
-        durations = torch.cat(self.durations).numpy()
-        events = torch.cat(self.events).numpy()
-        c_index = concordance_index(durations, -preds, events)
+        if not self.multiple_preds_for_same_ecg:
+            preds = torch.cat(self.preds).numpy()
+            durations = torch.cat(self.durations).numpy()
+            events = torch.cat(self.events).numpy()
+            c_index = concordance_index(durations, -preds, events)
+        else:
+            # i need to aggregate and take the mean for every subject
+            preds = torch.cat(self.preds).numpy()
+            durations = torch.cat(self.durations).numpy()
+            events = torch.cat(self.events).numpy()
+
+            # subjs contain as keys the subject ids and as values the indexes where the subject id was appearing
+            subjs = {}
+            for i, subj in enumerate(self.subjs):
+                if subj not in subjs.keys():
+                    subjs[subj] = []
+                subjs[subj].append(i)
+
+            # preds is average over the indexes for each subject
+            preds_agg = []
+            durations_agg = []
+            events_agg = []
+            for subj, indexes in subjs.items():
+                preds_agg.append(np.mean(preds[indexes]))
+                durations_agg.append(durations[indexes[0]])
+                events_agg.append(events[indexes[0]])
+
+            c_index = concordance_index(durations_agg, -np.array(preds_agg), events_agg)
+
         return torch.tensor(c_index, dtype=torch.float32)

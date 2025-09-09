@@ -25,6 +25,11 @@ def parse_config(config_file, default_config_file):
     with open(config_file, 'r') as file:
         config = yaml.safe_load(file)
 
+    # loop all the properties and if they are dict with a value key use that value
+    for k, v in config.items():
+        if isinstance(v, dict) and 'value' in v:
+            config[k] = v['value']
+
     merged_config = ConfigDict(default_config)
     merged_config.update(config)
     # print(merged_config)
@@ -75,7 +80,7 @@ def parse_config(config_file, default_config_file):
 
 
 
-def get_base_model(config, feature_classification=False, minute_aggregation=False):
+def get_base_model(config, feature_classification=False, minute_aggregation=False, compile_model=True):
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob, feature_classification=feature_classification, r_peaks_detection=config.r_peaks_detection)
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
@@ -118,7 +123,7 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
             print(message) 
 
     # this gives problem due to reshaping
-    if not minute_aggregation:
+    if not minute_aggregation and compile_model:
         base_model.compile()
     return base_model
 

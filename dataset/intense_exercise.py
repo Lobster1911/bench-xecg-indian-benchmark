@@ -15,7 +15,6 @@ class ECGHighIntensity(PretrainDataset):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=None)
         self.data_folder = Path(config.data_folder_high_intensity) # /media/Volume/data/ECG_high_intensity_exercise
         self.info_dict = {"fs": 250, "sig_name": ["II"]}
-        self.max_length_signal = config.max_length_signal
 
         self.load_records(split)
         self.load_tabular_data()

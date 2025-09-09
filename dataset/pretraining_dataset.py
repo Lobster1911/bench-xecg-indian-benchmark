@@ -27,7 +27,9 @@ class PretrainDataset(torch.utils.data.Dataset):
         self.n_global_view = config.n_global_view
         self.n_local_view = config.n_local_view
         self.sampling_freq = config.sampling_freq
-        self.nk_clean = config.nk_clean
+        self.nk_clean = config.nk_clean        
+        self.max_length_signal = config.max_length_signal
+
 
     def __len__(self):
         return len(self.records)
