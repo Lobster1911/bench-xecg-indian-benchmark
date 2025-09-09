@@ -73,7 +73,6 @@ class MUSICDataset(PretrainDataset):
 
             _, info = wfdb.rdsamp(os.path.join(self.data_folder, subj))  # check if the record can be read
             sig_len_on_model = ((info['sig_len'] - initial_pad) / info['fs']) * self.sampling_freq
-
             subj = subj.split('/')[1]
 
             records = []
@@ -180,10 +179,15 @@ def xyz_to_12lead(data, sig_name, method="kors"):
 
     # find indices for X, Y, Z
     ix = sig_name.index("X")
+    X = data[:, ix]
     iy = sig_name.index("Y")
-    iz = sig_name.index("Z")
+    Y = data[:, iy]
 
-    X, Y, Z = data[:, ix], data[:, iy], data[:, iz]
+    if "Z" not in sig_name:
+        Z = np.zeros_like(X)
+    else:
+        iz = sig_name.index("Z")
+        Z = data[:, iz]
 
     if method.lower() == "kors":
         M = np.array([
