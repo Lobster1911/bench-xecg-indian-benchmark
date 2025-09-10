@@ -19,7 +19,7 @@ parser.add_argument('--max_length_signal', type=int, default=3600, help='Max len
 parser.add_argument('--data_folder_music', type=str, default='/media/Volume/data/MUSIC', help='Path to MUSIC data folder')
 parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for data loading')
 
-def evaluate(config, run_id, test_dataloader):
+def evaluate(config, run_id):
 
     test_dataset = music.MUSICDataset(config, global_augmentations=get_transforms(config, split='test'))
     # consider only a 1%
