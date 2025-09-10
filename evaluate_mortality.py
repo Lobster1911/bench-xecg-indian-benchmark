@@ -38,7 +38,7 @@ def evaluate(config, run_id):
     run = wandb.init(
         project="train-mortality",
         id=run_id,
-        resume="allow"   # or "must" if you want to force resume
+        resume="must"   # or "must" if you want to force resume
     )
 
     base_model = utils.get_base_model(config, compile_model=False)
@@ -49,7 +49,7 @@ def evaluate(config, run_id):
 
     # stop wandb run
     run.finish()
-
+    wandb.finish()
     
 # if main
 if __name__ == '__main__':

@@ -69,7 +69,7 @@ class TrainerMortality(CommonTrainerDownstream):
     def on_test_epoch_end(self):
         if self.evaluate_music:
             self.log("test_ci_music_cardiac", self.test_ci_cardiac.compute(), prog_bar=True)
-            self.log("test_ci", self.test_ci.compute(), prog_bar=True)
+            self.log("test_ci_music", self.test_ci.compute(), prog_bar=True)
             self.test_ci_cardiac.reset()
             self.test_ci.reset()
         else: 
