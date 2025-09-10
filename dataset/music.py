@@ -8,7 +8,7 @@ from dataset.pretraining_dataset import PretrainDataset
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from dataset.generic_utils import pad
-
+from functools import lru_cache
 
 class MUSICDataset(PretrainDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
@@ -44,6 +44,14 @@ class MUSICDataset(PretrainDataset):
         })
 
         self.load_records()
+
+        # using cache to speed up and avoid continuous long loading times
+        self._cached_read = lru_cache(maxsize=config.num_workers * 2)(self._read_signal)
+
+    def _read_signal(self, subj):
+        path = os.path.join(self.data_folder, 'Holter_ECG', subj)
+        signal, info = wfdb.rdsamp(path)
+        return signal, info
 
     def load_records(self):
         cached_path = os.path.join(self.data_folder, f'music_records_{self.max_length_signal}.csv')
@@ -97,7 +105,8 @@ class MUSICDataset(PretrainDataset):
 
     def __getitem__(self, idx):
         start, end, subj = self.records[idx]
-        signal, info = wfdb.rdsamp(os.path.join(self.data_folder, 'Holter_ECG', subj))  # check if the record can be read
+        signal, info = self._cached_read(subj)
+        # signal, info = wfdb.rdsamp(os.path.join(self.data_folder, 'Holter_ECG', subj))  # check if the record can be read
 
         # print(f'loaded {subj} with shape {signal.shape} from {start} to {end}')
 
