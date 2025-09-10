@@ -43,8 +43,11 @@ def evaluate(config, run_id):
     base_model = utils.get_base_model(config, compile_model=False)
     model = TrainerMortality(model=base_model, config=config, len_train_dataset=0, evaluate_music=True)
     trainer = utils.get_trainer(config, model, f'train-mortality', wandb=wandb, run=run)
-
-    trainer.test(model=model, dataloaders=test_dataloader)
+    
+    try: 
+        trainer.test(model=model, dataloaders=test_dataloader)
+    except Exception as e:
+        print(f"Error occurred while testing: {e}")
 
     # stop wandb run
     run.finish()
