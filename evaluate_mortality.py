@@ -13,7 +13,7 @@ from trainers.mortality_trainer import TrainerMortality
 
 parser = argparse.ArgumentParser(description='Train a model')
 # add argument checkpoints array
-parser.add_argument('--run_ids', type=str, nargs='+', help='List of run IDs to evaluate')
+parser.add_argument('--run_ids', type=str, help='List of run IDs to evaluate')
 parser.add_argument('--batch_size', type=int, default=1, help='Batch size for evaluation')
 parser.add_argument('--max_length_signal', type=int, default=3600, help='Max length of signal in seconds')
 parser.add_argument('--data_folder_music', type=str, default='/media/Volume/data/MUSIC', help='Path to MUSIC data folder')
@@ -56,6 +56,9 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
     args = parser.parse_args()
 
+    args.run_ids = args.run_ids.split(',')
+    print(f"Evaluating run IDs: {args.run_ids}")
+
     for run_id in args.run_ids:
         # find the file config in the wandb folder i.e. wandb/run-20250821_143635-hq0hw9ne/files/config.yaml via regex, i know only the last part of the path
         # get list of files in the wandb folder
@@ -68,7 +71,7 @@ if __name__ == '__main__':
             continue
 
         run_folder = run_folder[0]
-        print(f"Found run folder: {run_folder}")
+        # print(f"Found run folder: {run_folder}")
         run_path = os.path.join(wandb_folder, run_folder, 'files')
         # find the config file in the run folder
         config_file = [f for f in os.listdir(run_path) if f.endswith('.yaml') or f.endswith('.yml')]
@@ -77,12 +80,12 @@ if __name__ == '__main__':
             continue
 
         config_file = os.path.join(run_path, config_file[0])
-        print(f"Found config file: {config_file}")
+        # print(f"Found config file: {config_file}")
 
         config = utils.parse_config(config_file, 'config_defaults/train_mortality_config_defaults.yaml')
 
 
-        # find the checokpoint file in the run folder
+        # find the checkpoint file in the run folder
         dir = os.path.join('train-mortality', run_id, 'checkpoints')
         # get the file ending with .ckpt
         checkpoint_files = [f for f in os.listdir(dir) if f.endswith('.ckpt')]
