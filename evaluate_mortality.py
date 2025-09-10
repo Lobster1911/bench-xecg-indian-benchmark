@@ -17,6 +17,7 @@ parser.add_argument('--run_ids', type=str, nargs='+', help='List of run IDs to e
 parser.add_argument('--batch_size', type=int, default=1, help='Batch size for evaluation')
 parser.add_argument('--max_length_signal', type=int, default=3600, help='Max length of signal in seconds')
 parser.add_argument('--data_folder_music', type=str, default='/media/Volume/data/MUSIC', help='Path to MUSIC data folder')
+parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for data loading')
 
 def evaluate(config, run_id):
     print(config)
@@ -38,6 +39,9 @@ def evaluate(config, run_id):
     trainer = utils.get_trainer(config, model, f'train-mortality', wandb=wandb, run=run)
 
     trainer.test(model=model, dataloaders=test_dataloader)
+
+    # stop wandb run
+    run.finish()
 
     
 # if main
@@ -82,6 +86,7 @@ if __name__ == '__main__':
         config.checkpoint = os.path.join(dir, checkpoint_files[0])
         config.max_length_signal = args.max_length_signal * config.sampling_freq  # convert to samples
         config.batch_size = args.batch_size
+        config.num_workers = args.num_workers
         config.labels_file_music = args.data_folder_music + '/subject-info.csv'
         config.data_folder_music = args.data_folder_music
 
