@@ -46,7 +46,7 @@ class MUSICDataset(PretrainDataset):
         self.load_records()
 
         # using cache to speed up and avoid continuous long loading times
-        self._cached_read = lru_cache(maxsize=config.num_workers * 2)(self._read_signal)
+        self._cached_read = lru_cache(maxsize=config.num_workers + 1)(self._read_signal)
 
     def _read_signal(self, subj):
         path = os.path.join(self.data_folder, 'Holter_ECG', subj)

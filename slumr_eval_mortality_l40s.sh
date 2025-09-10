@@ -21,4 +21,4 @@ ulimit -n 16384
 ulimit -n
 
 # run script from above
-srun ~/.conda/envs/xlstm_pretrained/bin/python -u $1 --run_ids $2 --batch_size $3 --max_length_signal $4 --data_folder_music $5 --num_workers 64
+srun ~/.conda/envs/xlstm_pretrained/bin/python -u $1 --run_ids $2 --batch_size $3 --max_length_signal $4 --data_folder_music $5 --num_workers 32
