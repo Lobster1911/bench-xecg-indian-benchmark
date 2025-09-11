@@ -52,13 +52,13 @@ def parse_config(config_file, default_config_file):
         merged_config.window_size_train = 1000
         merged_config.window_size_val = 1000
     elif merged_config.use_ecg_founder:
-        merged_config.win_len = 2500
+        # merged_config.win_len = 2500
         merged_config.sampling_freq = 500
         merged_config.low_pass_filter = 50
         merged_config.high_pass_filter = 0.5
-        merged_config.max_length_signal = 5000
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
+        # merged_config.max_length_signal = 5000
+        # merged_config.window_size_train = 1000
+        # merged_config.window_size_val = 1000
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
         merged_config.z_score_norm = True

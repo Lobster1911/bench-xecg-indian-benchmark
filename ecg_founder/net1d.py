@@ -362,6 +362,7 @@ class Net1D(BaseModel):
         
     def forward(self, x):
         x = x.transpose(1, 2)
+        # print(f'Input feature shape: {x.shape}')
         out = x
         
         # first conv
@@ -375,7 +376,6 @@ class Net1D(BaseModel):
             net = self.stage_list[i_stage]
             out = net(out)
 
-        # final prediction
         deep_features = out.mean(-1)
         out = self.head(deep_features)
 

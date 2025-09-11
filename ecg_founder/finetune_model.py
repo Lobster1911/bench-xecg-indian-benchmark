@@ -31,6 +31,8 @@ def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False):
 
     model.load_state_dict(state_dict, strict=False)
 
+    # print(f'Model head in features: {model.head.in_features}')
+
     model.head = nn.Sequential(
           nn.Linear(model.head.in_features, n_classes).to(device)
     )
