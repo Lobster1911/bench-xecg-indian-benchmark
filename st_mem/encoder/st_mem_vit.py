@@ -70,6 +70,7 @@ class ST_MEM_ViT(BaseModel):
         self.patch_size = patch_size
         self.feature_classification = feature_classification
         self.r_peaks_detection = r_peaks_detection
+        self.minute_aggregation = minute_aggregation
 
         # embedding layers
         num_patches = seq_len // patch_size
