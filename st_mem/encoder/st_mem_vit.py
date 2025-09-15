@@ -39,7 +39,8 @@ class ST_MEM_ViT(BaseModel):
                  drop_path_rate: float = 0.,
                  linear_probing: bool = False,
                  feature_classification: bool = False,
-                 r_peaks_detection: bool = False
+                 r_peaks_detection: bool = False,
+                 minute_aggregation: bool = False
                  ):
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
@@ -59,8 +60,10 @@ class ST_MEM_ViT(BaseModel):
             'drop_path_rate': drop_path_rate,
             'linear_probing': linear_probing,
             'feature_classification': feature_classification,
-            'r_peaks_detection': r_peaks_detection
+            'r_peaks_detection': r_peaks_detection,
+            'minute_aggregation': minute_aggregation
         }
+
         self.width = width
         self.depth = depth
         self.linear_probing = linear_probing
@@ -165,11 +168,29 @@ class ST_MEM_ViT(BaseModel):
             else:
                 x = x.mean(dim=1) 
 
+            if self.minute_aggregation:
+                x = self.aggregate_per_minute(x)
+
             out = self.head(x)
             # print(f"Output shape: {out.shape}")  # Debugging output
 
             return out
         return self.head(x)
+    
+    def aggregate_per_minute(self, features):
+        patches_per_segment = (60 * self.sampling_freq) // self.patch_size
+        # print(f'Aggregating features per minute with {patches_per_segment} patches per minute')
+        # print(f'Input features shape: {features.shape}')
+        n_minutes = int(features.size(1)) // patches_per_segment  
+
+        features = features.reshape(
+            features.shape[0],
+            n_minutes,
+            patches_per_segment,
+            features.shape[-1]
+        )
+        features = features.mean(dim=2)
+        return features
 
     def __repr__(self):
         print_str = f"{self.__class__.__name__}(\n"

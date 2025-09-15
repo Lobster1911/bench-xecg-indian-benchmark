@@ -308,7 +308,7 @@ class Net1D(BaseModel):
 
     """
 
-    def __init__(self, in_channels, base_filters, ratio, filter_list, m_blocks_list, kernel_size, stride, groups_width, n_classes, use_bn=True, use_do=True, return_features=False, verbose=False):
+    def __init__(self, in_channels, base_filters, ratio, filter_list, m_blocks_list, kernel_size, stride, groups_width, n_classes, use_bn=True, use_do=True, return_features=False, verbose=False, feature_classification=False):
         super(Net1D, self).__init__()
         
         self.in_channels = in_channels
@@ -325,6 +325,7 @@ class Net1D(BaseModel):
         self.use_do = use_do
         self.return_features = return_features
         self.verbose = verbose
+        self.feature_classification = feature_classification
 
         # first conv
         self.first_conv = MyConv1dPadSame(
@@ -375,6 +376,9 @@ class Net1D(BaseModel):
         for i_stage in range(self.n_stages):
             net = self.stage_list[i_stage]
             out = net(out)
+
+        if self.feature_classification:
+            return self.head(out)
 
         deep_features = out.mean(-1)
         out = self.head(deep_features)

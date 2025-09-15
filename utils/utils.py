@@ -44,13 +44,13 @@ def parse_config(config_file, default_config_file):
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
-        merged_config.max_length_signal = 2325
-        merged_config.win_len = 1125
+        # merged_config.max_length_signal = 2325
+        # merged_config.win_len = 1125
         merged_config.low_pass_filter = 40
         merged_config.high_pass_filter = 0.67
         merged_config.standardize = True
-        merged_config.window_size_train = 1000
-        merged_config.window_size_val = 1000
+        # merged_config.window_size_train = 1000
+        # merged_config.window_size_val = 1000
     elif merged_config.use_ecg_founder:
         # merged_config.win_len = 2500
         merged_config.sampling_freq = 500
@@ -72,7 +72,7 @@ def parse_config(config_file, default_config_file):
     # ensure that for r_peaks detection, num_classes is equal to patch_size
     if merged_config.r_peaks_detection:
         if merged_config.use_ecg_founder:
-            merged_config.num_classes = merged_config.max_length_signal
+            merged_config.num_classes = 5000 // 20
         else:
             merged_config.num_classes = merged_config.patch_size
     
@@ -82,7 +82,17 @@ def parse_config(config_file, default_config_file):
 
 def get_base_model(config, feature_classification=False, minute_aggregation=False, compile_model=True):
     if config.use_st_mem:
-        base_model = encoder.__dict__['st_mem_vit_base'](seq_len=2250, patch_size=75, num_leads=12, num_classes=config.num_classes, linear_probing=config.linear_probing, drop_path_rate=config.drop_path_prob, feature_classification=feature_classification, r_peaks_detection=config.r_peaks_detection)
+        base_model = encoder.__dict__['st_mem_vit_base'](
+            seq_len=2250, 
+            patch_size=75, 
+            num_leads=12, 
+            num_classes=config.num_classes, 
+            linear_probing=config.linear_probing, 
+            drop_path_rate=config.drop_path_prob, 
+            feature_classification=feature_classification, 
+            r_peaks_detection=config.r_peaks_detection,
+            minute_aggregation=minute_aggregation
+        )
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
         checkpoint_model = checkpoint['model']
         state_dict = base_model.state_dict()
@@ -94,7 +104,12 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
         print(msg)
     elif config.use_ecg_jepa:
         ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
-        base_model = load_encoder(ckpt_dir=ckpt_dir, config=config, feature_classification=feature_classification, minute_aggregation=minute_aggregation) # dim is the dimension of the latent space
+        base_model = load_encoder(
+            ckpt_dir=ckpt_dir, 
+            config=config, 
+            feature_classification=feature_classification, 
+            minute_aggregation=minute_aggregation
+        ) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
             path = './checkpoint/1_lead_ECGFounder.pth'
@@ -132,7 +147,19 @@ def change_positional_embedding(model, config):
     new_seq_len = (config.window_size * config.sampling_freq // config.patch_size)
     print(f"Changing positional embedding to new sequence length {new_seq_len}")
     if config.use_st_mem:
-        pass # TODO
+        if new_seq_len + 2 <= model.pos_embedding.shape[1]:
+            print(f'No need to change positional embedding, current max sequence length is {model.core.pos_embedding.shape[1]-1}')
+            return model
+        
+        # get all the positional embeddings except the last one (for cls token)
+        initial_pe = model.pos_embedding[:, :-1, :]
+        print(f'initial pe shape: {initial_pe.shape}')
+        # take the last -1 positional embedding and repeat it (the last is for cls tokens)
+        repeated_pe = initial_pe[:, -2, :].repeat(1, new_seq_len - initial_pe.shape[1], 1)
+        # last pe
+        last_pe = model.pos_embedding[:, -1:, :]
+        model.pos_embedding = nn.Parameter(torch.cat([initial_pe, repeated_pe, last_pe], dim=1))
+
     elif config.use_ecg_founder:
         pass
     elif config.use_ecg_jepa:

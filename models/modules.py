@@ -19,6 +19,19 @@ class SparseConvPatchEmbedding(nn.Module):
         x = self.conv2(x)
         x = self.linear_patch(x, permute=False)
         return x
+    
+
+class AttentionClassEmbedding(nn.Module):
+    def __init__(self, num_hiddens=256, num_heads=8, dropout=0.0, activation='gelu'):
+        super().__init__()
+        self.num_hiddens = num_hiddens
+        self.num_heads = num_heads
+        self.attn = nn.TransformerEncoderLayer(d_model=num_hiddens, nhead=num_heads, dim_feedforward=num_hiddens*2, dropout=dropout, activation=activation, batch_first=True)
+        self.channel_embedding = nn.Parameter(torch.randn(12, num_hiddens))  # assuming 12 channels
+
+    def forward(self, x):
+        bs, channels, len = x.shape
+        # 
 
 
 class LinearPatchEmbedding(nn.Module):

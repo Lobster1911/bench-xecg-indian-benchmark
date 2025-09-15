@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch
 
 
-def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False):
+def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False, feature_classification=False):
     model = Net1D(
         in_channels=12, 
         base_filters=64, #32 64
@@ -22,7 +22,9 @@ def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False):
         verbose=False, 
         use_bn=False,
         use_do=False,
-        n_classes=n_classes)
+        n_classes=n_classes,
+        feature_classification=feature_classification
+    )
 
     checkpoint = torch.load(pth, map_location=device, weights_only=False)
     state_dict = checkpoint['state_dict']
@@ -32,10 +34,8 @@ def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False):
     model.load_state_dict(state_dict, strict=False)
 
     # print(f'Model head in features: {model.head.in_features}')
-
-    model.head = nn.Sequential(
-          nn.Linear(model.head.in_features, n_classes).to(device)
-    )
+    model.head = nn.Linear(model.head.in_features, n_classes).to(device)
+        
     # freezing model
     if linear_prob == True: 
       for name, param in model.named_parameters():
