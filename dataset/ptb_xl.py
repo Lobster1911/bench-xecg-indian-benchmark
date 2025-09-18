@@ -10,7 +10,7 @@ class ECGPTBXLDataset(PretrainDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_ptbxl
-        self.labels_file = config.labels_file_ptbxl
+        self.labels_file = os.path.join(config.data_folder_ptbxl, '..', 'ptbxl_database.csv')
         self.task = config.task
         self.load_tabular_data()
         self.load_records(split, task=config.task)

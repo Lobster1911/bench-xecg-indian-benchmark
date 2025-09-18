@@ -5,7 +5,6 @@ import wfdb
 import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
-from dataset.generic_utils import pad, pad_multi_view_batch
 
 
 class ECGCODE15Dataset(PretrainDataset):
@@ -29,6 +28,10 @@ class ECGCODE15Dataset(PretrainDataset):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)
         # set exam_id as index
+
+        self.tab_data['valid'] = self.tab_data.parallel_apply(lambda row: os.path.exists(os.path.join(self.data_folder, f"{row['exam_id']}.hea")), axis=1)
+        self.tab_data = self.tab_data[self.tab_data['valid']]
+
         self.tab_data.set_index('exam_id', inplace=True)
 
         print("tabular data fields for CODE 15: ", self.tab_data.head())

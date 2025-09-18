@@ -49,7 +49,7 @@ def parse_config(config_file, default_config_file):
         merged_config.sampling_freq = 250
         merged_config.patch_size = 50
         # merged_config.max_length_signal = 2500
-        merged_config.win_len = 1250
+        # merged_config.win_len = 1250
         # jepa uses 8 leads
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
     elif merged_config.use_st_mem:

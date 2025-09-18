@@ -30,15 +30,6 @@ class CommonTrainerDownstream(pl.LightningModule):
         self.task = config.task
         self.use_st_mem = config.use_st_mem
         self.use_ecg_jepa = config.use_ecg_jepa
-
-    def get_layers(self):
-        if self.use_ecg_jepa:
-            # get all the params
-            return self.model.encoder.encoder_blocks.blocks
-        elif self.use_st_mem:
-            return [self.model.__getattr__(f'block{i}') for i in range(self.model.depth)]
-        else:
-            return self.model.core.model.blocks
         
     def get_params(self):
         if self.linear_probing:

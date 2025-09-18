@@ -7,7 +7,6 @@ import torch
 import argparse
 import utils.utils as utils
 from torch.utils.data import DataLoader
-from torchvision import transforms
 from dataset.generic_utils import get_transforms, make_collate_fn_task
 from trainers.mimic_lab_trainer import TrainingMIMIC_LAB
 
@@ -20,7 +19,7 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
 
-    # force the number of classes to be 3 times the number of labels
+    # force the number of classes to be 3 times the number of labels (below, inside, and over the normal range)
     config.num_classes = len(config.label_list) * 3
     
     train_dataset =  mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='lab')
@@ -35,7 +34,7 @@ def train(config, run=None, wandb=False):
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, 'labels'), pin_memory=True)
 
-    base_model = utils.get_base_model(config)
+    base_model = utils.get_base_model(config, compile_model=False)
 
     log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
     print(f"Logging every {log_every_n_steps} steps")
