@@ -10,7 +10,6 @@ import dataset.mit_bih as mit_bih
 from trainers.mit_bih_trainer import TrainingMIT_BIH
 from trainers.r_peaks_trainer import TrainingRPeak
 
-# os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -20,15 +19,21 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
 
+    # recurrent models can handle longer sequences, so we use full signal for evaluation and testing
+    config.is_recurrent = not (config.use_ecg_jepa or config.use_st_mem or config.use_ecg_founder or config.encoder_type == 'transformer')
+
+
     dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.use_ecg_founder and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
 
     if config.split_val_by_patient:
+        # splits the validation set by patient
         train_dataset =  dataset_class(config, split='train', augmentations=get_transforms(config))
         print(f"Train dataset size (split by patient): {len(train_dataset)}")
         val_dataset = dataset_class(config, split='val', augmentations=get_transforms(config, split='val'))
         print(f"Val dataset size (split by patient): {len(val_dataset)}")
     else:
+        # split the validation set from the training set, here patients are mixed
         dataset = dataset_class(config, split='train', augmentations=get_transforms(config))
         dataset_len = len(dataset)
         train_len = int(dataset_len * 0.9)
@@ -40,9 +45,6 @@ def train(config, run=None, wandb=False):
         if config.r_peaks_detection:
             print('Using class weights for r-peaks detection')
             weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
-        # weights = get_training_class_weights(train_dataset).to('cuda')
-        # real_weights = [2.2248e-01, 1.0810e+01, 2.6938e+00, 2.4588e+01, 1.2755e+03]
-        # without the last class = [0.2781, 13.5098,  3.3668, 30.7307]
         if config.num_classes == 5:
             print('Using class weights for 5 classes')
             weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')

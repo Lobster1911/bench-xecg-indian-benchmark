@@ -1,12 +1,12 @@
 import os
 from torch import utils
 import lightning as pl
-from trainers.r_peaks_trainer import TrainingRPeak
 import torch
 import argparse
 import os
-import dataset.intense_exercise as intense_exercise
 
+from trainers.r_peaks_trainer import TrainingRPeak
+import dataset.intense_exercise as intense_exercise
 import utils.utils as utils
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
@@ -19,6 +19,13 @@ parser.add_argument('--config_file', type=str, default='configs/train_high_inten
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
+
+    if config.use_ecg_founder:
+        # ensure that num_classes is equal to patch_size
+        config.num_classes = 5000 // 20
+    else:
+        # ensure that num_classes is equal to patch_size
+        config.num_classes = config.patch_size
 
     if config.use_class_weights:
         print('Using weights for training')

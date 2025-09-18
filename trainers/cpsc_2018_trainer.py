@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-from utils.train_utils import focal_loss
+from utils.loss_utils import focal_loss
 
 
 class TrainingCPSC_2018(CommonTrainerDownstream):

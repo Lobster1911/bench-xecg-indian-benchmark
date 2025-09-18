@@ -221,39 +221,6 @@ class pretrainedxLSTM(BaseModel):
 
         return mask & ~padding_mask
     
-    def generate(self, x, length=10):
-
-         
-        # i do not need to drop the leads here
-        x = self.patch_embedding(x, augment=False)
-
-        if self.bidirectional:
-            reconstructed = []
-            for i in range(length - 1):
-                out = self.core(x, need_expansion=False)
-                new_patch = out[:, -1, :].unsqueeze(1)
-                r, _ = self.reconstruction(new_patch)
-                reconstructed.append(r)
-                # toadd = self.patch_embedding(r, augment=False)
-                x = torch.cat([x, new_patch], dim=1)
-    
-            return torch.cat(reconstructed, dim=1)
-        else:
-            state = None
-            for i in range(x.shape[1]):
-                new_x, state = self.core.step(x[:, i].unsqueeze(1), state=state)
-
-            r, _ = self.reconstruction(new_x)
-
-            reconstructed = [r]
-
-            for i in range(length - 1):
-                new_x, state = self.core.step(new_x, state=state)
-                r, _ = self.reconstruction(new_x)
-                reconstructed.append(r)
-            
-            return torch.cat(reconstructed, dim=1)
-
     def trainable_parameters(self):
         if self.use_teacher_student:
             return [param for name, param in self.named_parameters() if "teacher" not in name and 'reconstruction' not in name]

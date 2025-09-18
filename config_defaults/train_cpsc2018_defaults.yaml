@@ -17,6 +17,7 @@ batch_size: 64
 num_workers: 32
 epochs: 30
 linear_probing: false
+precision: 16-mixed  
 
 # regularizers
 dropout: 0.
@@ -67,6 +68,5 @@ monitor_mode: max
 num_classes: 9
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 data_folder_cpsc2018: /media/Volume/data/CPSC2018/
-labels_file_cpsc2018: /media/Volume/data/CPSC2018/exams_filtered.csv
 n_global_view: 1
 n_local_view: 0

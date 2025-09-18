@@ -1,13 +1,11 @@
 import lightning as L
-from utils.train_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, embedding_cross_entropy_loss, masked_cosine_loss
+from utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, masked_cosine_loss, SimDINOv2Loss
 from torch.nn import functional as F
 from utils.plot_utils import plot_reconstruction, plot_generation
 import numpy as np
 import torch
 import lightning
 import trainers.common as common
-import torch.distributed
-from loss import KoLeoLoss, MCRLoss
 from threadpoolctl import threadpool_limits
 from sklearn.metrics import f1_score
 
@@ -58,7 +56,7 @@ class PretrainedNetwork(L.LightningModule):
         self.teacher_temp = config.teacher_temp
         self.stud_temp = config.stud_temp
 
-        self.mcr_loss = MCRLoss(eps=0.05)
+        self.sim_dino_loss = SimDINOv2Loss(eps=0.05)
 
         if self.model.use_teacher_student:
             self.model.init_teacher()
@@ -245,7 +243,7 @@ class PretrainedNetwork(L.LightningModule):
         cls_tok_stud_g = torch.stack([g['cls'] for g in global_out] + [l['cls'] for l in local_out], dim=0)
         cls_tok_teacher_g = torch.stack([g['cls'] for g in global_out_teacher], dim=0)
     
-        compression_term, expansion_term = self.mcr_loss(cls_tok_stud_g, cls_tok_teacher_g)
+        compression_term, expansion_term = self.sim_dino_loss(cls_tok_stud_g, cls_tok_teacher_g)
         self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, sync_dist=self.devices == 2)
         self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, sync_dist=self.devices == 2)
 
@@ -374,6 +372,9 @@ class PretrainedNetwork(L.LightningModule):
     
     @torch.no_grad()
     def knn_evaluation(self):
+        """
+        Evaluating KNN performance on the validation set of PTB-XL as a metric
+        """
         self.model.eval()
         all_features = []
         # all_features_teacher = []

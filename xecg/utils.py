@@ -51,25 +51,6 @@ def get_reconstruction_head(patch_size, embedding_size, num_channels):
         use_pre_head=True
     )
 
-def get_activation_fn(activation_fn):
-    if activation_fn == 'relu':
-        return nn.ReLU()
-    elif activation_fn == 'leakyrelu' or activation_fn == 'leaky_relu':
-        return nn.LeakyReLU()
-    elif activation_fn == 'gelu':
-        return nn.GELU()
-    else:
-        raise ValueError(f"Activation function {activation_fn} not supported")
-    
-    
-def get_pooling(pooling, kernel_size=2):
-    if pooling == 'max':
-        return nn.MaxPool1d(kernel_size=kernel_size)
-    elif pooling == 'avg':
-        return nn.AvgPool1d(kernel_size=kernel_size)
-    else:
-        raise ValueError(f"Pooling {pooling} not supported")
-
 
 def get_xlstm(config):
     cfg = xLSTMBlockStackConfig(

@@ -1,16 +1,10 @@
 from torch import optim, nn
 import lightning as pl
 import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
 import numpy as np
 import torch
 from schedulers import get_cosine_schedule_with_warmup
-import trainers.common as common
-from optimizers.lamb import Lamb
-from utils.train_utils import focal_loss
+from utils.loss_utils import focal_loss
 
 
 class CommonTrainerDownstream(pl.LightningModule):
@@ -72,8 +66,6 @@ class CommonTrainerDownstream(pl.LightningModule):
             optimizer = optim.AdamW(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
         elif self.optimizer == 'adafactor':
             optimizer = optim.Adafactor(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
-        elif self.optimizer == 'lamb':
-            optimizer = Lamb(params=self.get_params(), lr=self.get_lr(), weight_decay=self.wd)
         elif self.optimizer == 'momentum':
             optimizer = optim.SGD(self.get_params(), lr=self.get_lr(), momentum=0.9, weight_decay=self.wd)
         elif self.optimizer == 'sgd':

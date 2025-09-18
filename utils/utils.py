@@ -19,6 +19,16 @@ import os
 import torch.nn as nn
 
 def parse_config(config_file, default_config_file):
+    """
+    This function parses a YAML configuration file and merges it with default configuration values.
+    Where values of default_config_file are overwritten by those in config_file.
+
+    Args:
+        config_file (str): Path to the YAML configuration file.
+        default_config_file (str): Path to the default configuration YAML file.
+    Returns:
+        ConfigDict: A dictionary-like object containing the merged configuration.
+    """
     with open(default_config_file, 'r') as file:
         default_config = yaml.safe_load(file)
 
@@ -32,14 +42,15 @@ def parse_config(config_file, default_config_file):
 
     merged_config = ConfigDict(default_config)
     merged_config.update(config)
-    # print(merged_config)
 
-    # perform some checks
+    # Is more convenient to hardcode the frequency, patch size or orther important parameter for your model here,
+    # so for each model we do not have to set in the config file, making it cleaner
     if merged_config.use_ecg_jepa:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 50
         # merged_config.max_length_signal = 2500
         merged_config.win_len = 1250
+        # jepa uses 8 leads
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
@@ -66,21 +77,23 @@ def parse_config(config_file, default_config_file):
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.
         merged_config.drop_path_prob = False
-
-    merged_config.is_recurrent = not (merged_config.use_ecg_jepa or merged_config.use_st_mem or merged_config.use_ecg_founder or merged_config.encoder_type == 'transformer')
-    
-    # ensure that for r_peaks detection, num_classes is equal to patch_size
-    if merged_config.r_peaks_detection:
-        if merged_config.use_ecg_founder:
-            merged_config.num_classes = 5000 // 20
-        else:
-            merged_config.num_classes = merged_config.patch_size
     
     return merged_config
 
 
 
 def get_base_model(config, feature_classification=False, minute_aggregation=False, compile_model=True):
+    """
+    Returns the base model according to the configuration.
+    
+    Args:
+        config (ConfigDict): Global configuration.
+        feature_classification (bool): Whether to use feature classification of signal level classification
+        minute_aggregation (bool): Whether the head should aggregate 1 minute of signal (this is used for the sleep apnea task)
+        compile_model (bool): Whether to compile the model using torch.compile
+    Returns:
+        nn.Module: The base model.
+    """
     if config.use_st_mem:
         base_model = encoder.__dict__['st_mem_vit_base'](
             seq_len=2250, 
@@ -143,7 +156,17 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
     return base_model
 
 
-def change_positional_embedding(model, config):
+def change_positional_embedding_if_needed(model, config):
+    """
+    Change the positional embedding of the model to match the new sequence length.
+    This is done by repeating the last positional embedding.
+
+    Args:
+        model (nn.Module): The model with the positional embedding to change.
+        config (ConfigDict): Global configuration.
+    Returns:
+        nn.Module: The model with the changed positional embedding.
+    """
     new_seq_len = (config.window_size * config.sampling_freq // config.patch_size)
     print(f"Changing positional embedding to new sequence length {new_seq_len}")
     if config.use_st_mem:
@@ -182,6 +205,16 @@ def change_positional_embedding(model, config):
 
 
 def split_dataset_preserve_labels(dataset, split_ratio=0.1, key='class_label'):
+    """
+    Splits the dataset into a training set while preserving the label distribution using multilabel stratified shuffle split.
+
+    Args:
+        dataset (Dataset): The dataset to split.
+        split_ratio (float): The ratio of the dataset to use for training.
+        key (str): The key in the dataset samples that contains the multilabels.
+    Returns:
+        Subset: A subset of the original dataset containing the training samples.
+    """
     print(f"Splitting dataset with {split_ratio} training data")
     multilabels = np.array([dataset[i][key] for i in range(len(dataset))])  # get multilabels
     splitter = MultilabelStratifiedShuffleSplit(n_splits=1, test_size=1 - split_ratio)
@@ -191,6 +224,9 @@ def split_dataset_preserve_labels(dataset, split_ratio=0.1, key='class_label'):
     return balanced_train_dataset
 
 def format_keys(key):
+    """ 
+    Because of some model re-naming after saving weights this function is needed to load weights correctly.
+    """
     if key.startswith('model.'):
         key = key[6:]
 
@@ -199,6 +235,9 @@ def format_keys(key):
     return key
 
 class ConfigDict(dict):
+    """ 
+    A dictionary that allows access to its keys as attributes where unset elements return None instead of raising errors.
+    """
     def __getitem__(self, key):
         return self.get(key, None)
 
@@ -218,6 +257,9 @@ class ConfigDict(dict):
 
 
 def get_trainer(config, model, prj_string, wandb=False, run=None):
+    """
+    Define all the callbacks and loggers for the trainer.
+    """
     callbacks = []
     early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
     callbacks.append(early_stopping)
@@ -234,61 +276,12 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         callbacks.append(lr_monitor)
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
         #  wand_logger.watch(model, log=None)
-        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=get_precision())
+        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
         # need to save the config file to a new file in the wandb directory
     else:
         print(f"Using default logger for project {prj_string} and run {run}")
-        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=get_precision())
+        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
     return trainer
-
-def get_precision():
-    #device = torch.device('cuda')
-    #props = torch.cuda.get_device_properties(device)
-    #if props.major > 8:  # Ampere or newer architecture
-    #    print("Using transformer-engine fp8 precision")
-    #    return 'transformer-engine-float16'
-
-    print("Using f16-mixed precision")
-    return '16-mixed'
-
-def save_config(config, trainer):
-    # get the checkpoint callback form the trainer
-    checkpoint_callback = next((cb for cb in trainer.callbacks if isinstance(cb, ModelCheckpoint)), None)
-    if checkpoint_callback is None:
-        print("No ModelCheckpoint callback found in the trainer.")
-        return
-
-    config_path = os.path.join(checkpoint_callback.dirpath, 'config.yaml')
-    with open(config_path, 'w') as f:
-        yaml.dump(config, f)
-    print(f"Config saved to {config_path}")
-
-def parse_sweep_config(config, default_config_file):
-    with open(default_config_file, 'r') as file:
-        default_config = yaml.safe_load(file)
-
-    merged_config = ConfigDict(default_config)
-    merged_config.update(config)
-    # print(merged_config)
-    
-    return merged_config
-
-def print_metrics_table(sensitivity, ppv, specificity, class_names = [ "N", "S", "V", "F", "Q"] ):
-  """Prints a formatted table of per-class metrics."""
-
-  table = PrettyTable()
-  table.field_names = ["Class", "Sensitivity", "PPV", "Specificity"]
-
-  for i, class_name in enumerate(class_names):
-      table.add_row([class_name, f"{sensitivity[i]:.4f}", f"{ppv[i]:.4f}", f"{specificity[i]:.4f}"])
-
-  print(table)
-
-def seed_worker(worker_id):
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
-
 
 def get_training_class_weights(train_dataset, do_not_consider_classes = [], label_key='label'):
   """

@@ -5,35 +5,6 @@ from torch.nn import functional as F
 from xlstm.xlstm_large.model import mLSTMStateType
 
 
-class SparseConvPatchEmbedding(nn.Module):
-    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, out_channels=128):
-        super().__init__()
-        self.num_channels = num_channels
-        self.conv1 = nn.Conv1d(num_channels, out_channels // 2, kernel_size=5, bias=True, padding=2)
-        self.conv2 = nn.Conv1d(out_channels // 2, out_channels, kernel_size=3, bias=True, padding=1)
-        self.linear_patch = LinearPatchEmbedding(patch_size, num_hiddens, num_channels=out_channels)
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1) # put the channels in the middle
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.linear_patch(x, permute=False)
-        return x
-    
-
-class AttentionClassEmbedding(nn.Module):
-    def __init__(self, num_hiddens=256, num_heads=8, dropout=0.0, activation='gelu'):
-        super().__init__()
-        self.num_hiddens = num_hiddens
-        self.num_heads = num_heads
-        self.attn = nn.TransformerEncoderLayer(d_model=num_hiddens, nhead=num_heads, dim_feedforward=num_hiddens*2, dropout=dropout, activation=activation, batch_first=True)
-        self.channel_embedding = nn.Parameter(torch.randn(12, num_hiddens))  # assuming 12 channels
-
-    def forward(self, x):
-        bs, channels, len = x.shape
-        # 
-
-
 class LinearPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
         super().__init__()
@@ -43,7 +14,6 @@ class LinearPatchEmbedding(nn.Module):
         if permute: x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.conv(x).flatten(2).transpose(1, 2)
         return x
-    
 
 class NonLinearPatchEmbedding(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
@@ -61,26 +31,6 @@ class NonLinearPatchEmbedding(nn.Module):
         return x
     
     
-class EnrichedLinearPatchEmbedding(nn.Module):
-    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, enrich_dim=64, kernel_size=16):
-        super().__init__()
-        self.kernel_size = kernel_size
-        self.erich_conv1 = nn.Conv1d(num_channels, enrich_dim, kernel_size=kernel_size, padding=0)
-        self.erich_conv2 = nn.Conv1d(enrich_dim, enrich_dim, kernel_size=kernel_size, padding=0)
-        self.conv = nn.Conv1d(num_channels + enrich_dim * 2, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
-
-    def forward(self, x):
-        # x [bs, num_channels, num_samples]
-        # apply padding of kernel_size - 1 on the left side
-        x = x.permute(0, 2, 1) # put the channels in the middle
-        x_padded = F.pad(x, (self.kernel_size - 1, 0))
-        enriched_x1 = self.erich_conv1(x_padded) # [bs, enrich_dim, num_samples]
-        enriched_x1_padded = F.pad(enriched_x1, (self.kernel_size - 1, 0))
-        enriched_x2 = self.erich_conv2(enriched_x1_padded)
-
-        x = torch.cat([x, enriched_x1, enriched_x2], dim=1) # [bs, num_channels + enrich_dim, num_samples]
-        x = self.conv(x).flatten(2).transpose(1, 2)
-        return x
       
 class EmbedPatching(nn.Module):
     def __init__(self, patch_size=64, num_hiddens=256, num_channels=12, use_pre_head=False):
@@ -143,6 +93,7 @@ class ConvPatchEmbedding(nn.Module):
 
         # print('x shape after unfold', x.shape)
         return x
+    
     
 class HeadModule(nn.Module):
     

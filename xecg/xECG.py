@@ -1,8 +1,6 @@
 import torch
 from torch import nn
 
-from models.utils import get_xlstm
-from models.base_model import BaseModel
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 import numpy as np
 from huggingface_hub import PyTorchModelHubMixin
@@ -12,33 +10,37 @@ class xECG(
     nn.Module,
     PyTorchModelHubMixin,
     repo_url="https://github.com/dlaskalab/bench-xecg/",
-    pipeline_tag="xECG-test",
+    pipeline_tag="other",
     license="mit"
 ):
+    """
+    This is a simplified version of the xECG model, where most of the hyperparameters are hardcoded. 
+    This class should be used for the pretrained model on huggingface.
+    """
 
     def __init__(
             self, 
+            cls_type,
             config,
         ):
         super(xECG, self).__init__()
-        self.dropout = nn.Dropout(config.dropout)
-        self.patch_size = config.patch_size
-        self.embedding_size = config.embedding_size
-        self.cls_type = config.cls_type
-        self.sampling_freq = config.sampling_freq
+
+        self.dropout = nn.Dropout(config['dropout'])
+        self.sampling_freq = config['sampling_freq']
+        self.patch_size = config['patch_size']
+        self.embedding_size = config['embedding_size']
+        self.cls_type = cls_type
+        assert self.cls_type in ['max', 'avg', 'mean', None], f"cls_type {self.cls_type} not supported"
 
         self.patch_embedding = LinearPatchEmbedding(
-            patch_size=config.patch_size, 
-            num_hiddens=config.embedding_size, 
+            patch_size=config['patch_size'], 
+            num_hiddens=config['embedding_size'], 
             num_channels=12
         )
 
         self.core = get_xlstm(config)
-        self.mask_token = nn.Parameter(torch.zeros(config.embedding_size))
+        self.mask_token = nn.Parameter(torch.zeros(config['embedding_size']))
 
-        assert config.cls_type in ['max', 'avg', 'mean'], f"cls_type {config.cls_type} not supported"
-        
-    
     def pooling(self, out, padding_mask=None):
         cls= None
         if self.cls_type == 'max':
@@ -192,35 +194,35 @@ def get_xlstm(config):
     cfg = xLSTMBlockStackConfig(
         mlstm_block=mLSTMBlockConfig(
             mlstm=mLSTMLayerConfig(
-                conv1d_kernel_size=4, 
-                qkv_proj_blocksize=config.num_heads, 
-                num_heads=config.num_heads,
-                proj_factor=config.proj_factor
+                conv1d_kernel_size=4,
+                qkv_proj_blocksize=config['num_heads'],
+                num_heads=config['num_heads'],
+                proj_factor=config['proj_factor']
             )
         ),
         slstm_block=sLSTMBlockConfig(
             slstm=sLSTMLayerConfig(
-                num_heads=config.num_heads,
-                backend=config.backend if config.backend else "cuda",
+                num_heads=config['num_heads'],
+                backend=config['backend'] if 'backend' in config.keys() and config['backend'] else "cuda",
                 conv1d_kernel_size=4,
                 bias_init="powerlaw_blockdependent",
-                batch_size=config.batch_size,
+                batch_size=config['batch_size'],
             ),
-            feedforward=FeedForwardConfig(proj_factor=1.3, act_fn=config.activation_fn),
+            feedforward=FeedForwardConfig(proj_factor=1.3, act_fn=config['activation_fn']),
         ),
         context_length=8000,
-        num_blocks=len(config.xlstm_config),
-        embedding_dim=config.embedding_size,
-        slstm_at=[idx for idx, b in enumerate(config.xlstm_config) if b == 's'],
-        dropout=config.dropout,
+        num_blocks=len(config['xlstm_config']),
+        embedding_dim=config['embedding_size'],
+        slstm_at=[idx for idx, b in enumerate(config['xlstm_config']) if b == 's'],
+        dropout=config['dropout'],
 
-        add_post_blocks_norm=config.use_final_layer_norm
+        add_post_blocks_norm=config['use_final_layer_norm'] if 'use_final_layer_norm' in config.keys() else False
     )
-    print('creating xlstm with slstm at: ', [idx for idx, b in enumerate(config.xlstm_config) if b == 's'])
-    
+    print('creating xlstm with slstm at: ', [idx for idx, b in enumerate(config['xlstm_config']) if b == 's'])
+
     return vanillaxLSTMWrapper(
-        xLSTMBlockStack(cfg), 
-        dropout=config.dropout,
-        bidirectional=True, 
-        drop_path=config.drop_path_prob
+        xLSTMBlockStack(cfg),
+        dropout=config['dropout'],
+        bidirectional=True,
+        drop_path=config['drop_path_prob']
     )

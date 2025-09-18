@@ -1,4 +1,4 @@
-from xecg.xLSTM import xECG
+from xecg.xECG import xECG
 import torch
 import torch.nn as nn
 
@@ -7,14 +7,15 @@ class xECGClassification(xECG):
             self, 
             config,
             num_classes,
+            linear_probing=False,
+            cls_type='avg',
         ): 
-        self.linear_probing = config.linear_probing
-        super(xECGClassification, self).__init__(config)
+        self.linear_probing = linear_probing
+        super(xECGClassification, self).__init__(cls_type=cls_type, config=config)
 
-        emb_size = config.embedding_size * 2 if config.cls_type == 'mix' else config.embedding_size
         self.head = nn.Sequential(
-            get_normalization_layer(config, emb_size),
-            nn.Linear(emb_size, num_classes)
+            get_normalization_layer(config, config['embedding_size']),
+            nn.Linear(config['embedding_size'], num_classes)
         )
 
     def forward(self, x):
@@ -32,13 +33,14 @@ class xECGFeatureClassification(xECG):
             self, 
             config,
             num_classes,
+            linear_probing=False,
         ): 
-        self.linear_probing = config.linear_probing
-        super(xECGFeatureClassification, self).__init__(config)
+        self.linear_probing = linear_probing
+        super(xECGFeatureClassification, self).__init__(cls_type=None, config=config)
 
         self.head = nn.Sequential(
-            get_normalization_layer(config, config.embedding_size),
-            nn.Linear(config.embedding_size, num_classes)
+            get_normalization_layer(config, config['embedding_size']),
+            nn.Linear(config['embedding_size'], num_classes)
         )
 
     def forward(self, x):
@@ -64,13 +66,15 @@ class xECGMinuteLevelClassification(xECG):
         self, 
         config,
         num_classes,
+        linear_probing=False,
+        cls_type='max'
     ): 
-        self.linear_probing = config.linear_probing
-        super(xECGFeatureClassification, self).__init__(config)
+        self.linear_probing = linear_probing
+        super(xECGFeatureClassification, self).__init__(cls_type=cls_type, config=config)
 
         self.head = nn.Sequential(
-            get_normalization_layer(config, config.embedding_size),
-            nn.Linear(config.embedding_size, num_classes)
+            get_normalization_layer(config, config['embedding_size']),
+            nn.Linear(config['embedding_size'], num_classes)
         )
 
     def forward(self, x):
@@ -101,11 +105,11 @@ class xECGMinuteLevelClassification(xECG):
 
 
 def get_normalization_layer(config, embedding_size=None):
-    if config.cls_normalization == 'layer':
+    if config['cls_normalization'] == 'layer':
         return nn.LayerNorm(embedding_size)
-    elif config.cls_normalization == 'batch':
+    elif config['cls_normalization'] == 'batch':
         return nn.BatchNorm1d(embedding_size)
-    elif config.cls_normalization == 'instance':
+    elif config['cls_normalization'] == 'instance':
         return nn.InstanceNorm1d(embedding_size)
     else:
         return nn.Identity()

@@ -17,6 +17,7 @@ batch_size: 64
 num_workers: 32
 epochs: 30
 linear_probing: false
+precision: 16-mixed  
 
 # regularizers
 dropout: 0.

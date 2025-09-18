@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-from utils.train_utils import focal_loss
+from utils.loss_utils import focal_loss
 from lifelines.utils import concordance_index
 from torchmetrics import Metric
 

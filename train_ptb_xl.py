@@ -1,26 +1,16 @@
-import os
-from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMClassification
-
-import dataset.ptb_xl as ptbxl
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-
-from trainers.ptb_xl_trainer import TrainingPTB_XL
 import torch
 import argparse
-import os
-import numpy as np
-from tqdm import tqdm
-import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from torchvision import transforms
+
+from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
-import st_mem.encoder as encoder
-from ecg_jepa.models import load_encoder
+from torch import utils
+
+
+import dataset.ptb_xl as ptbxl
+from trainers.ptb_xl_trainer import TrainingPTB_XL
+from utils.utils import get_training_class_weights_multilabel
+import utils.utils as utils
 
 
 # os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
@@ -42,14 +32,12 @@ def train(config, run=None, wandb=False):
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
 
     if config.use_class_weights:
-        if config.num_classes == 5:
-            print('Using class weights for 5 classes')
-            # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-            weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
-        else:
-            weights = None # TODO
+        # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
+        # hardcode for faster initialization
+        weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
     else:
         weights = None
+
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='train'), pin_memory=True, drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='val'), pin_memory=True, drop_last=False)

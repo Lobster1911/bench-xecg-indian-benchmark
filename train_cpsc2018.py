@@ -1,30 +1,15 @@
-import os
 from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMClassification
+import torch
 
 import dataset.cpsc2018 as cpsc2018
 
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-
 from trainers.cpsc_2018_trainer import TrainingCPSC_2018
-import torch
-import argparse
-import os
-import numpy as np
-from tqdm import tqdm
 import utils.utils as utils
 from utils.utils import get_training_class_weights_multilabel
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
-from torchvision import transforms
+from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
-import st_mem.encoder as encoder
-from ecg_jepa.models import load_encoder
 
-
-# os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -43,12 +28,9 @@ def train(config, run=None, wandb=False):
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct, key='labels')
 
     if config.use_class_weights:
-        if config.num_classes == 9:
-            # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
-            weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
-            print(f'Class weights: {weights}')
-        else:
-            weights = None # TODO
+        # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
+        weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
+        print(f'Class weights: {weights}')
     else:
         weights = None
 
@@ -58,7 +40,7 @@ def train(config, run=None, wandb=False):
     test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
     
-    base_model = utils.get_base_model(config)
+    base_model = utils.get_base_model(config, compile_model=False)
             
     model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
     

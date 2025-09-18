@@ -1,23 +1,18 @@
 import os
 from torch import utils
 import lightning as L
-from lightning.pytorch.loggers import WandbLogger
-from models.classification import xLSTMClassification
-
-from dataset.deepbeat import DeepBeatDataset
-import dataset.generic_utils as generic_utils
-from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-
-from trainers.deepbeat_trainer import TrainingDeepBeat
 import torch
 import numpy as np
 import argparse
 import os
+
+from dataset.deepbeat import DeepBeatDataset
+from trainers.deepbeat_trainer import TrainingDeepBeat
+
 import utils.utils as utils
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
+from torch.utils.data import DataLoader, Subset
 from dataset.generic_utils import get_transforms
 from torch.utils.data import WeightedRandomSampler
-
 
 
 import argparse
@@ -34,6 +29,7 @@ def train(config, run=None, wandb=False):
     print(f"Val dataset size: {len(val_dataset)}")
 
     if config.data_pct < 1.0:
+        # At every epoch, we will sample a different subset of the data, so we use less data and training is faster.
         N = len(train_dataset)
         num_samples = int(N * config.data_pct)  # 10% of the dataset
         weights = torch.ones(N) / N  # Initialize weights to 1.0

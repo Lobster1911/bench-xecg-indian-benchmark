@@ -47,7 +47,7 @@ def train(config, run=None, wandb=False):
     feature_classification = config.window_size % 60 == 0
     config.max_length_signal = config.window_size * config.sampling_freq
     base_model = utils.get_base_model(config, feature_classification=feature_classification, minute_aggregation=True)
-    base_model = utils.change_positional_embedding(base_model, config)
+    base_model = utils.change_positional_embedding_if_needed(base_model, config)
             
     model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 

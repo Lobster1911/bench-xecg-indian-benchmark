@@ -1,22 +1,16 @@
 from torch import utils
 import lightning as L
-
+import torch
 
 import dataset.code_dataset as code
 import dataset.ptb_xl as ptbxl
 import dataset.mimic_iv as mimic_iv
 import dataset.cpsc2018 as cpsc2018
 
-
-import torch
-import argparse
-
 import utils.utils as utils
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms, make_collate_fn_task
 from trainers.regression_trainer import RegressionTrainer
-
-# os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')

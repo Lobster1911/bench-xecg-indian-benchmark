@@ -1,123 +1,158 @@
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn as nn
+import numpy as np
 
 
-def contrastive_coupled_loss(outputs, labels, patient_ids, class_weights=None, margin=.1):
-    """
-    Computes the contrastive coupled loss for a batch of embeddings.
+def focal_loss(loss):
+    pt = torch.exp(-loss)
+    alpha = 2.
+    gamma = .25
+    loss = (alpha * (1-pt)**gamma * loss)
+    return loss.mean()   
 
-    The loss is calculated by first normalizing the output embeddings and then computing a similarity matrix using the cosine similarity. 
-    A patient matrix is created to differentiate between samples from the same and different patients. 
-    The similarity matrix is adjusted to zero out values between the same patients. 
-    A label matrix is created to differentiate between samples with the same and different labels. 
-    Class weights are applied to the label matrix to account for class imbalance.
+def masked_cosine_loss(input, target, reduction='mean', mask=None):
+    loss = F.cosine_similarity(target, input, dim=-1)
+    if mask is not None:
+        loss = loss[mask]
 
-    The positive loss is calculated by clamping the margin minus the similarity matrix, multiplied by the label matrix and the weight matrix. 
-    This encourages the model to maximize the similarity between samples with the same label. 
-    The negative loss is calculated by clamping the similarity matrix plus the margin, multiplied by the inverse of the label matrix. 
-    This encourages the model to minimize the similarity between samples with different labels.
-
-    The final loss is the sum of the positive and negative losses, averaged over the batch.
-
-    Args:
-        outputs (torch.Tensor): The output embeddings from the model, shape (batch_size, embedding_dim).
-        labels (torch.Tensor): The ground truth labels for the batch, shape (batch_size,).
-        patient_ids (torch.Tensor): The patient IDs corresponding to each sample in the batch, shape (batch_size,).
-        class_weights (torch.Tensor): The weights for each class, shape (num_classes,).
-        margin (float, optional): The margin value for the contrastive loss. Default is 0.1.
-
-    Returns:
-        torch.Tensor: The computed contrastive coupled loss.
-    """
-    similarity_matrix = get_euclidean_distance_matrix(outputs)
-    # create a matrix where the same patient has a 0 and different patients have a 1
-    patient_matrix = (patient_ids.unsqueeze(0) != patient_ids.unsqueeze(1)).float().to(outputs.device) 
-
-    # orig_label_matrix = (orig_labels.unsqueeze(0) == orig_labels.unsqueeze(1)).float().to(outputs.device)
-    # matrix where is 1 only if the orig label is 0
-    # similarity_matrix = similarity_matrix + orig_label_matrix
-
-    # matrix where the patient is 7 --> synthetic data is taken from different patients so we want to make their embeddings similar
-    # synt_pat_matrix = ((patient_ids == 7).unsqueeze(0) * (patient_ids == 7).unsqueeze(1)).float().to(outputs.device) - torch.eye(outputs.size(0)).to(outputs.device)
-    # patient_matrix = patient_matrix + synt_pat_matrix
-    
-    # set to zero values between same patients
-    similarity_matrix = similarity_matrix * patient_matrix
-
-    # get the matrix for same label (1) and different label (0)
-    label_matrix = (labels.unsqueeze(0) == labels.unsqueeze(1)).float().to(outputs.device)
-    # apply class weights in both dimensions
-    if class_weights is not None:
-        weight_matrix = class_weights[labels].unsqueeze(1) * class_weights[labels].unsqueeze(0)
+    if reduction == "mean":
+        return 1 - loss.mean()
+    elif reduction == "sum":
+        return (1-loss).sum()
     else:
-        weight_matrix = torch.ones_like(label_matrix)
+        return 1-loss
 
-    positive_loss = torch.clamp(margin - similarity_matrix, min=0) * label_matrix * weight_matrix # Positive pairs: maximize similarity
-    negative_loss = torch.clamp(similarity_matrix + margin, min=0) * (1 - label_matrix)  # Negative pairs: minimize similarity
+def masked_mse_loss(input, target, reduction='mean', mask=None):
+    out = (input - target)**2
+    if mask is not None:
+        out = out[mask]
+    if reduction == "mean":
+        return out.mean()
+    elif reduction == "sum":
+        return out.sum()
+    else:
+        return out
+    
+def masked_mae_loss(input, target, reduction='mean', mask=None):
+    out = torch.abs(input-target)
+    # do not consider elements set to 0
+    if mask is not None:
+        #expand the mask with 12 channels
+        out = out[mask]
+    if reduction == "mean":
+        return out.mean()
+    elif reduction == "sum":
+        return out.sum()
+    else:
+        return out
+    
+def masked_min_max_loss(input, target, reduction='mean', patch_size=100, mask=None):
+    # input should be tokenized
+    batch_size, sig_len, num_channels = input.shape
+    #print('batch_size', batch_size)
+    #print('sig_len', sig_len)
+    tokens_num = sig_len // patch_size    
+    tokenized_inp = input.view(batch_size, tokens_num, patch_size, num_channels)
+    tokenized_target = target.view(batch_size, tokens_num, patch_size, num_channels)   
+    # find the min and max value of each patch
+    min_inp, _ = tokenized_inp.min(dim=-1)
+    # print('min_inp', min_inp.shape)
+    max_inp, _ = tokenized_inp.max(dim=-1)
+    # print('max_inp', max_inp)
+    min_target, _ = tokenized_target.min(dim=-1)
+    # print('min_target', min_target)
+    max_target, _ = tokenized_target.max(dim=-1)
+    # print('max_target', max_target)
+    # calculate the loss
+    out = (min_inp - min_target)**2 + (max_inp - max_target)**2
 
-    # maximize the similarity between same label and minimize the similarity between different labels
-    loss = (positive_loss + negative_loss).sum(dim=1).mean()
-    return loss
+    # do not consider elements set to 0
+    if mask is not None:
+        out = out[mask]
 
-def get_cosine_similarity_matrix(outputs):
-    """
-    Computes the cosine similarity matrix for the given outputs.
+    if reduction == "mean":
+        return out.mean() / tokens_num
+    elif reduction == "sum":
+        return out.sum() / tokens_num
+    else:
+        return out / tokens_num
+    
+def gradient_loss(input, target, reduction='mean', p=2, mask=None):
+    input_grad = input[:, 1:] - input[:, :-1]
+    target_grad = target[:, 1:] - target[:, :-1]
+    out = torch.pow(input_grad - target_grad, p)
+    # do not consider elements that was at 0 in the input
+    # using [:, :-1] because preserve the order of the elements
+    if mask is not None:
+        #expand the mask with 12 channels
+        out = out[mask[:, :-1]]
+    if reduction == "mean":
+        return out.mean()
+    elif reduction == "sum":
+        return out.sum()
+    else:
+        return out
+    
 
-    Args:
-        outputs (torch.Tensor): The input tensor containing the embeddings.
+class SimDINOv2Loss(nn.Module):
+    def __init__(self, eps=0.5, coeff=1.0):
+        super().__init__()
+        self.eps = eps
+        self.coeff = coeff
 
-    Returns:
-        torch.Tensor: The computed cosine similarity matrix.
-    """
-    outputs = F.normalize(outputs, p=2, dim=1) # Normalize embeddings
-    similarity_matrix = torch.mm(outputs, outputs.t())
-    return similarity_matrix
+    def forward(self, student_feat, teacher_feat):
+        """
+        Expansion Loss and Compression Loss between features of the teacher and student networks.
+        """
+        # student_feat = student_feat.view(2, -1, student_feat.shape[-1])
+        # teacher_feat = teacher_feat.view(2, -1, teacher_feat.shape[-1])
 
-def get_euclidean_distance_matrix(outputs):
-    """
-    Computes the euclidean distance matrix for the given outputs.
+        student_feat = F.normalize(student_feat, p=2, dim=-1)
+        teacher_feat = F.normalize(teacher_feat, p=2, dim=-1)
+        
+        comp_loss = self.calc_compression(student_feat, teacher_feat)
+        expa_loss = self.calc_expansion(student_feat[:len(teacher_feat)])
 
-    Args:
-        outputs (torch.Tensor): The input tensor containing the embeddings.
+        return comp_loss, expa_loss
+    
+    def calc_compression(self, student_feat_list, teacher_feat_list):
+        """
+        Compute compression loss between student and teacher features.
+        """
+        # Convert lists of tensors to a single tensor for vectorized operations
+        
+        sim = F.cosine_similarity(teacher_feat_list.unsqueeze(1), student_feat_list.unsqueeze(0), dim=-1)
+        sim.view(-1, sim.shape[-1])[:: (len(student_feat_list) + 1), :].fill_(0)  # Trick to fill diagonal
+        
+        n_loss_terms = len(teacher_feat_list)* len(student_feat_list) - min(len(teacher_feat_list), len(student_feat_list))
+        # Sum the cosine similarities
+        comp_loss = sim.mean(2).sum()/n_loss_terms
 
-    Returns:
-        torch.Tensor: The computed euclidean distance matrix.
-    """
-    distance_matrix = torch.cdist(outputs, outputs, p=2)
-    return distance_matrix
+        # global_comp_loss = (sim[:, :len(teacher_feat_list)].mean(2).sum()).detach_().div_(len(teacher_feat_list))
+        return 1 - comp_loss
+    
+    def calc_expansion(self, feat_list) -> torch.Tensor:
+        """
+        Compute expansion loss using Coding Rate estimation.
+        """
+        cov_list = []
+        num_views = len(feat_list)
+        _, m, p = feat_list.shape
+        
+        cov_list = torch.einsum('nbc,nbd->ncd', feat_list, feat_list)
 
+        scalar = p / (m * self.eps)
+        loss:torch.Tensor = 0
 
-def sparsity_loss(outputs, k=0.1, p=2):
-    """
-    Computes the sparsity loss for the given outputs by keeping the top k% of the embeddings
-    and setting the rest to zero. The loss is calculated as the mean squared value of the masked outputs.
+        I = torch.eye(p, device=cov_list.device, dtype=cov_list.dtype)
+        for i in range(num_views):
+            mat = (I + scalar * cov_list[i]).to(torch.float32)
+            loss_term = torch.linalg.cholesky_ex(mat)[0].diagonal().log().sum()
+            loss += loss_term.to(dtype=cov_list.dtype)  # back to original dtype
 
-    Args:
-        outputs (torch.Tensor): The input tensor containing the embeddings.
-        k (float, optional): The percentage of top embeddings to keep. Default is 0.1 (10%).
-
-    Returns:
-        torch.Tensor: The computed sparsity loss.
-    """
-    # keep the top k% of the embeddings and set the rest to zero
-    idxs = torch.topk(outputs, int(k * outputs.size(1)), dim=1, largest=True)[1]
-    mask = torch.ones_like(outputs)
-    mask.scatter_(1, idxs, value=0)
-    loss = (outputs * mask).pow(p).mean()
-    return loss
-
-def contrastive_cluster_loss(outputs, patient_ids, margin=0.1):
-    outs = F.normalize(outputs, p=2, dim=1) # Normalize embeddings
-    similarity_matrix = torch.mm(outs, outs.t()) - torch.eye(outputs.size(0)).to(outputs.device)
-
-    # create a matrix where the same patient has a 0 and different patients have a 1
-    patient_matrix = (patient_ids.unsqueeze(0) == patient_ids.unsqueeze(1)).float().to(outputs.device)
-    # set to zero values between same patients
-    similarity_matrix = similarity_matrix * patient_matrix
-
-    losses = 1 - (similarity_matrix - 0.2).abs()
-    loss = losses.sum(dim=1).mean()
-
-    return loss
+        loss /= num_views
+        # loss *= (p+m)/(p*m) # the balancing factor gamma, you can also use the next line. This is ultimately a heuristic, so feel free to experiment.
+        # loss *= ((self.eps * m) ** 0.5 / p)
+        loss *= self.eps * np.sqrt(m/(p*np.min([p, m])))
+        return -loss

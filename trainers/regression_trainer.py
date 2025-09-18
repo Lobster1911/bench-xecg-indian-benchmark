@@ -9,7 +9,7 @@ import torchmetrics.classification.specificity
 import numpy as np
 import torch
 from trainers.common_trainer import CommonTrainerDownstream
-from utils.train_utils import focal_loss
+from utils.loss_utils import focal_loss
 from torchmetrics import Metric
 from torch import Tensor
 from typing import Any

@@ -17,6 +17,7 @@ batch_size: 64
 num_workers: 32
 epochs: 15
 linear_probing: false
+precision: 16-mixed  
 
 monitor_metric: val_f1
 monitor_mode: max

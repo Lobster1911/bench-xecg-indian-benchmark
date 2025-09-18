@@ -1,6 +1,5 @@
 import numpy as np
 from torch import optim
-from optimizers.lamb import Lamb
 from schedulers import get_cosine_schedule_with_warmup
 from lightning.pytorch.callbacks import ModelCheckpoint
 from typing_extensions import override
@@ -12,8 +11,6 @@ def configure_optimizers(trainer):
         optimizer = optim.AdamW(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'adafactor':
         optimizer = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-    elif trainer.optimizer == 'lamb':
-        optimizer = Lamb(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
     elif trainer.optimizer == 'momentum':
         optimizer = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
     elif trainer.optimizer == 'sgd':
@@ -49,9 +46,6 @@ def configure_optimizer_teacher_student(trainer):
     elif trainer.optimizer == 'adafactor':
         optimizer1 = optim.Adafactor(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
         optimizer2 = optim.Adafactor(params=trainer.model.reconstruction.parameters(), lr=trainer.get_reconstruction_lr(), weight_decay=trainer.wd)
-    elif trainer.optimizer == 'lamb':
-        optimizer1 = Lamb(params=trainer.get_params(), lr=trainer.get_lr(), weight_decay=trainer.wd)
-        optimizer2 = Lamb(params=trainer.model.reconstruction.parameters(), lr=trainer.get_reconstruction_lr(), weight_decay=trainer.wd)
     else:
         optimizer1 = optim.SGD(trainer.get_params(), lr=trainer.get_lr(), momentum=0.9, weight_decay=trainer.wd)
         optimizer2 = optim.SGD(trainer.model.reconstruction.parameters(), lr=trainer.get_reconstruction_lr(), momentum=0.9, weight_decay=trainer.wd)
