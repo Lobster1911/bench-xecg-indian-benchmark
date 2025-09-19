@@ -40,6 +40,13 @@ Details of each task are in the following documentations:
 - [Sleep Apnea](docs/sleep_apnea.md)
 - [PPG AF](docs/ppg_af.md)
 - [Exercise (R-peak detection)](docs/exercise.md)
+- [Age](docs/age.md)
+- [Blood test](docs/blood_test.md)
+- [Mortality](docs/mortality.md)
+
+## Call for feedbacks
+
+We really appreciate any issue / suggestion / feedback to improve our repository!
 
 ## Citation
 
