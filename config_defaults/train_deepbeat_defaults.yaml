@@ -1,0 +1,70 @@
+# logging
+wandb_log: false
+wand_group: null
+
+# optimizer
+optimizer: adamw
+num_epochs_warmup: 1
+sched_decay_factor: 0.8
+use_class_weights: false
+use_focal_loss: false
+use_scheduler: true
+patience: 10
+grad_clip: 3.
+lr_head: 0.001
+lr_xlstm: 0.00001
+batch_size: 64
+num_workers: 32
+epochs: 30
+linear_probing: false
+precision: 16-mixed  
+
+# regularizers
+dropout: 0.
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 
+wd: 0.01
+
+# model
+use_ecg_founder: false
+use_st_mem: false
+use_ecg_jepa: false
+use_batch_norm_jepa: true
+
+patch_size: 25
+sampling_freq: 100
+proj_factor: 2
+num_heads: 4
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+activation_fn: "gelu"
+cls_type: avg
+embedding_size: 1024
+use_final_layer_norm: true
+patch_embedding: linear
+encoder_type: vanilla
+bidirectional: true
+num_reg_token: 0
+cls_normalization: null
+
+# augmentations
+random_surrogate_prob: 0.
+random_jitter_prob: 0.
+random_change_amplitude: 0.
+random_drop_leads: 0.
+random_resample: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: false
+nk_clean: false
+normalize: false
+random_crop: 1.
+
+# dataset
+task: multiclass
+monitor_metric: val_auroc
+monitor_mode: max
+max_length_signal: 2500
+leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+data_folder_deepbeat: ../../../data/DeepBeat_PPG/
+num_classes: 2
+n_global_view: 1
+n_local_view: 0

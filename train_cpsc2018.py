@@ -1,0 +1,61 @@
+from torch import utils
+import lightning as L
+import torch
+
+import dataset.cpsc2018 as cpsc2018
+
+from trainers.cpsc_2018_trainer import TrainingCPSC_2018
+import utils.utils as utils
+from utils.utils import get_training_class_weights_multilabel
+from torch.utils.data import DataLoader
+from dataset.generic_utils import get_transforms
+
+
+import argparse
+parser = argparse.ArgumentParser(description='Train a model')
+parser.add_argument('--config_file', type=str, default='configs/train_cpsc2018_run_config.yaml', help='Path to the config file')
+
+def train(config, run=None, wandb=False):
+    # set deterministic training
+    if config.deterministic: L.seed_everything(42)
+    
+    train_dataset =  cpsc2018.ECGCPSC2018Dataset(config, split='train', global_augmentations=get_transforms(config))
+    print(f"Train dataset size: {len(train_dataset)}")
+    val_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='val', global_augmentations=get_transforms(config, split='val'))
+    print(f"Val dataset size: {len(val_dataset)}")
+
+    if config.training_pct < 1.0:
+        train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct, key='labels')
+
+    if config.use_class_weights:
+        # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
+        weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
+        print(f'Class weights: {weights}')
+    else:
+        weights = None
+
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='train'))
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='val'))
+
+    test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
+    
+    base_model = utils.get_base_model(config, compile_model=False)
+            
+    model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
+    
+    prj_string = f'train-cpsc2018-{config.task}'
+    trainer = utils.get_trainer(config, model, prj_string, wandb=wandb, run=run)
+
+    trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
+    trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
+
+
+# if main
+if __name__ == '__main__':
+    torch.set_float32_matmul_precision('medium')
+
+    args = parser.parse_args()
+    config = utils.parse_config(args.config_file, 'config_defaults/train_cpsc2018_defaults.yaml')
+
+    train(config, wandb=config.wandb_log)

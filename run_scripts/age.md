@@ -1,0 +1,57 @@
+# Age
+
+## ecg founder OK
+
+for i in {1..5}; do
+    sbatch --job-name=fm_ft_age slurm_train_l40s.sh train_age.py configs/age/ecgfm_ft.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=fm_lp_age slurm_train_l40s.sh train_age.py configs/age/ecgfm_lp.yaml
+done
+
+## jepa OK
+
+for i in {1..5}; do
+    sbatch --job-name=jepa_lp_age slurm_train_l40s.sh train_age.py configs/age/jepa_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=jepa_ft_age slurm_train_l40s.sh train_age.py configs/age/jepa_ft.yaml
+done
+
+## st-mem OK
+
+for i in {1..5}; do
+    sbatch --job-name=stmem_lp_age slurm_train_l40s.sh train_age.py configs/age/stmem_lp.yaml
+done
+
+for i in {1..5}; do
+    sbatch --job-name=stmem_ft_age slurm_train_l40s.sh train_age.py configs/age/stmem_ft.yaml
+done
+
+## transformer OK
+
+for i in {1..5}; do
+    sbatch --job-name=trans_lp_age slurm_train_l40s.sh train_age.py configs/age/transformer_lp.yaml
+done
+
+for i in {1..5}; do
+    sbatch --job-name=trans_ft_age slurm_train_l40s.sh train_age.py configs/age/transformer_ft.yaml 
+done
+
+## xlstm OK
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_age slurm_train_l40s.sh train_age.py configs/age/xlstm_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_age slurm_train_l40s.sh train_age.py configs/age/xlstm_ft.yaml
+done 
+
+## supervised
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_sup_age slurm_train_l40s.sh train_age.py configs/age/xlstm_supervised.yaml
+done 
