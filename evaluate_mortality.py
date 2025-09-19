@@ -92,7 +92,7 @@ if __name__ == '__main__':
         config_file = os.path.join(run_path, config_file[0])
         # print(f"Found config file: {config_file}")
 
-        config = utils.parse_config(config_file, 'config_defaults/train_mortality_config_defaults.yaml')
+        config = utils.parse_config(config_file, 'config_defaults/train_mortality_defaults.yaml')
 
 
         # find the checkpoint file in the run folder

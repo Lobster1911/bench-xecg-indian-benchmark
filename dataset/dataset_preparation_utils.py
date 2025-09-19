@@ -163,23 +163,35 @@ def check_sample(record_path):
     
     return True
 
-    if checksums is None:
-        x = wfdb.rdrecord(record, physical=False)   
-        signals = np.asarray(x.d_signal)
-        checksums = np.sum(signals, axis=0, dtype=np.int16)
 
-    header_filename = os.path.join(record + '.hea')
-    string = ''
-    with open(header_filename, 'r') as f:
-        for i, l in enumerate(f):
-            if i == 0:
-                arrs = l.split(' ')
-                num_leads = int(arrs[1])
-            if 0 < i <= num_leads and not l.startswith('#'):
-                arrs = l.split(' ')
-                arrs[6] = str(checksums[i-1])
-                l = ' '.join(arrs)
-            string += l
-
-    with open(header_filename, 'w') as f:
-        f.write(string)
+def save_record_hdf5_to_wfdb(record_path, exam_id, output_file_path):
+    """
+    Save a record from hdf5 to wfdb format
+    
+    Args:
+        record_path (str): path to the hdf5 file
+        exam_id (str): exam id to save, from exams.csv
+        output_file_path (str): path to save the wfdb file
+    """
+    with h5py.File(record_path, 'r') as f:
+        # idx of the exam_id
+        signal_idx = np.where(f['exam_id'][:] == exam_id)[0][0]
+        signal = np.array(f['tracings'][signal_idx], dtype=np.float32)
+        
+        if isinstance(signal, str) or isinstance(signal, int):
+            return str(signal)
+        
+        try:
+            wfdb.wrsamp(
+                str(exam_id),
+                fs=400,
+                units=['mV']*12, 
+                sig_name=lead_names, 
+                p_signal=signal, 
+                fmt=['16']*len(lead_names), 
+                adc_gain=[1000]*12, 
+                baseline=[0]*12,
+                write_dir=output_file_path, # output here
+            )
+        except Exception as e:
+            print(f"Error in record {exam_id}: {e}")

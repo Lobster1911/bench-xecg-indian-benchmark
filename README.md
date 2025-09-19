@@ -32,7 +32,14 @@ If you need to use layerwise decay:
 
 ### Task specific documentation
 
-[PTB-XL](docs/ptbxl.md)
+Details of each task are in the following documentations:
+- [PTB-XL](docs/ptbxl.md)
+- [CPSC2018](docs/cpsc2018.md)
+- [MIT-BIH (classification)](docs/mit_bih.md)
+- [MIT-BIH (R-peak detection)](docs/r_peak.md)
+- [Sleep Apnea](docs/sleep_apnea.md)
+- [PPG AF](docs/ppg_af.md)
+- [Exercise (R-peak detection)](docs/exercise.md)
 
 ## Citation
 

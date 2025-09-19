@@ -19,11 +19,7 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
 
-    # recurrent models can handle longer sequences, so we use full signal for evaluation and testing
-    config.is_recurrent = not (config.use_ecg_jepa or config.use_st_mem or config.use_ecg_founder or config.encoder_type == 'transformer')
-
-
-    dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.use_ecg_founder and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
+    dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.single_hb and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
 
     if config.split_val_by_patient:
@@ -81,6 +77,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_mit_bih_config_defaults.yaml')
+    config = utils.parse_config(args.config_file, 'config_defaults/train_mit_bih_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

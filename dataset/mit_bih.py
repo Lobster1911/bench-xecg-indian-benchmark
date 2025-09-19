@@ -51,13 +51,10 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_mit
         self.split = split
         self.samples = []
-        self.nkclean = config.nk_clean
         self.patch_size = config.patch_size
-        self.normalize = config.normalize
         self.num_classes = config.num_classes 
         self.win_len = config.win_len # defined in timepoints of model's frequency
         self.skip_majority_class_samples = config.skip_majority_class_samples
-        self.bidirectional = config.bidirectional
         self.split_val_by_patient = config.split_val_by_patient
         self.augmentations = augmentations
         self.sampling_freq = config.sampling_freq
@@ -86,10 +83,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         def process_patient(patient):
             signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
-
-            if self.nkclean:
-                for i in range(signal.shape[1]):
-                    signal[:, i] = nk.ecg_clean(signal[:, i], sampling_rate=360, method='neurokit')
 
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
             annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
