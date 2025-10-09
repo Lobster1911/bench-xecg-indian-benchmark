@@ -48,6 +48,11 @@ Details of each task are in the following documentations:
 
 We really appreciate any issue / suggestion / feedback to improve our repository!
 
+## Disclaimer
+
+The code and data of this repository are provided to promote reproducible research. They are not intended for clinical care or commercial use. The software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement. 
+In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in the software.
+
 ## Citation
 
 If you use our BenchECG code, xECG model or just find our code helpful, please cite:
