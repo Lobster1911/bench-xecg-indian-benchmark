@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
+
 import copy
 import math
 import torch
@@ -556,9 +558,24 @@ class ecg_jepa(nn.Module):
         loss = self.loss_func(z_pred, masked_h)
         return loss
     
-    
+class ECGJepaBase(BaseModel):
 
-class ECGJepaClassifier(BaseModel):
+    def get_layers(self):
+        return self.encoder.encoder_blocks.blocks
+    
+    def finetuning_params(self):
+        return self.encoder.parameters()
+    
+    def additional_params(self, lr, last_layer_lr, wd):
+        params = []
+        # linear projection, need the smallest layer_lr
+        params.append({"params": self.encoder.W_P.parameters(), "lr": last_layer_lr, "name": "W_P", "weight_decay": wd})
+        # final layer norm, normal lr
+        params.append({"params": self.encoder.norm.parameters(), "lr": lr, "name": "ln", "weight_decay": wd})
+        return params
+
+
+class ECGJepaClassifier(ECGJepaBase):
     def __init__(self, encoder, num_classes, patch_size, linear_probing=True, use_batch_norm_jepa=True):
         super().__init__()
         self.encoder = encoder
@@ -585,29 +602,56 @@ class ECGJepaClassifier(BaseModel):
 
         return self.head(repr)
     
-    def get_layers(self):
-        return self.encoder.encoder_blocks.blocks
-    
-    def finetuning_params(self):
-        return self.encoder.parameters()
-    
-    def additional_params(self, lr, last_layer_lr, wd):
-        params = []
-        # linear projection, need the smallest layer_lr
-        params.append({"params": self.encoder.W_P.parameters(), "lr": last_layer_lr, "name": "W_P", "weight_decay": wd})
-        # final layer norm, normal lr
-        params.append({"params": self.encoder.norm.parameters(), "lr": lr, "name": "ln", "weight_decay": wd})
-        return params
+
+class ECGJepaSleepApnea(ECGJepaBase):
+
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, context_size=0, window_size=60):
+        super().__init__()
+        self.encoder = encoder
+        self.num_classes = num_classes
+        self.linear_probing = linear_probing
+        self.patch_size = patch_size
+        self.sampling_freq = 250
+        self.context_size = context_size
+        self.window_size = window_size  # seconds
+
+        self.head = nn.Sequential(
+            nn.Linear(self.encoder.embed_dim, num_classes)
+        )
+
+    def forward(self, x):
+        x = x.transpose(1, 2)
+        if self.linear_probing:
+            with torch.no_grad():
+                out = self.encoder.representation(x, return_features=True)
+        else:
+            out = self.encoder.representation(x, return_features=True)
+
+        # i need to group by 8 because i have one patch for each lead
+        bs, patches, emb = out.shape
+        features = out.reshape(bs, 8, patches // 8, emb)[:, 1, :, :]  # (bs, patches // 8, emb)
+
+        if self.context_size > 0:
+            # remove the context patches from the features   
+            context_patches = (self.context_size * self.sampling_freq) // self.patch_size
+            window_patches = (self.window_size * self.sampling_freq) // self.patch_size
+            start = context_patches
+            end = context_patches + window_patches
+            features = features[:, start:end, :]
+
+        out = torch.mean(features, dim=1)
+
+        cls = self.head(out)
+        return cls
 
 
-class ECGJepaFeatureClassifier(BaseModel):
-    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, r_peaks_detection=False, minute_aggregation=False):
+class ECGJepaFeatureClassifier(ECGJepaBase):
+    def __init__(self, encoder, num_classes, patch_size, linear_probing=True, r_peaks_detection=False):
         super().__init__()
         self.encoder = encoder
         self.num_classes = num_classes
         self.linear_probing = linear_probing
         self.r_peaks_detection = r_peaks_detection
-        self.minute_aggregation = minute_aggregation
         self.patch_size = patch_size
         self.sampling_freq = 250
 
@@ -630,38 +674,6 @@ class ECGJepaFeatureClassifier(BaseModel):
         else:
             out = out.reshape(bs, 8, patches // 8, emb).mean(dim=1)  # (bs, patches // 8, emb)
 
-        if self.minute_aggregation:
-            out = self.aggregate_per_minute(out)
-
         cls = self.head(out)
         return cls
-    
-    def aggregate_per_minute(self, features):
-        patches_per_segment = (60 * self.sampling_freq) // self.patch_size
-        # print(f'Aggregating features per minute with {patches_per_segment} patches per minute')
-        # print(f'Input features shape: {features.shape}')
-        n_minutes = int(features.size(1)) // patches_per_segment  
 
-        features = features.reshape(
-            features.shape[0],
-            n_minutes,
-            patches_per_segment,
-            features.shape[-1]
-        )
-        features = features.mean(dim=2)
-        return features
-
-
-    def get_layers(self):
-        return self.encoder.encoder_blocks.blocks
-    
-    def finetuning_params(self):
-        return self.encoder.parameters()
-    
-    def additional_params(self, lr, last_layer_lr, wd):
-        params = []
-        # linear projection, need the smallest layer_lr
-        params.append({"params": self.encoder.W_P.parameters(), "lr": last_layer_lr, "name": "W_P", "weight_decay": wd})
-        # final layer norm, normal lr
-        params.append({"params": self.encoder.norm.parameters(), "lr": lr, "name": "ln", "weight_decay": wd})
-        return params

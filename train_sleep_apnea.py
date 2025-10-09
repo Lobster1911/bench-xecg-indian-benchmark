@@ -14,8 +14,12 @@ def check_window_size(config):
     assert config.window_size > 0, "Window size must be greater than 0"
     if config.window_size < 60:
         assert 60 % config.window_size == 0, "For window sizes less than 60, ensure that 60 is divisible by the window size."
-    else:
-        assert config.window_size % 60 == 0, "For window sizes greater than or equal to 60, ensure that the window size is divisible by 60."
+    if config.window_size > 60:
+        raise NotImplementedError("Window sizes greater than 60 seconds are not supported.")
+    #else: assert config.window_size % 60 == 0, "For window sizes greater than or equal to 60, ensure that the window size is divisible by 60."
+    
+    if config.context_size > 0:
+        assert config.context_size % 120 == 0, "Context size must be a multiple of 60."
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -37,6 +41,7 @@ def train(config, run=None, wandb=False):
     else:
         weights = None
 
+    config.max_length_signal = (config.window_size + config.context_size) * config.sampling_freq
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=sleep_apnea.make_collate_fn(config, split='train'), drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, num_workers=config.num_workers, shuffle=False, collate_fn=sleep_apnea.make_collate_fn(config, split='val'))
 
@@ -45,16 +50,14 @@ def train(config, run=None, wandb=False):
 
     # feature classification only if the signal is 1 minute long
     feature_classification = config.window_size % 60 == 0
-    config.max_length_signal = config.window_size * config.sampling_freq
-    base_model = utils.get_base_model(config, feature_classification=feature_classification, minute_aggregation=True)
+    base_model = utils.get_base_model(config, feature_classification=feature_classification, sleep_apnea=True, compile_model=False)
     base_model = utils.change_positional_embedding_if_needed(base_model, config)
             
     model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    trainer = utils.get_trainer(config, model, 'train-sleep-apnea', wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, model, 'train-sleep-apnea_bis', wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
-
 
 # if main
 if __name__ == '__main__':

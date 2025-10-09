@@ -14,6 +14,3 @@ checkpoints
 checkpoint
 configs/*
 figs
-local_signal_comparison_across_leads.png
-mean_rank_methods.png
-radar_chart_methods.pdf

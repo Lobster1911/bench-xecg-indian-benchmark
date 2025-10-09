@@ -8,15 +8,28 @@ import yaml
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from torch.utils.data import Subset
 import numpy as np
-from models.classification import xLSTMClassification, xLSTMFeatureClassification
-from ecg_jepa.models import load_encoder
-import st_mem.encoder as encoder
-from ecg_founder.finetune_model import ft_12lead_ECGFounder, ft_1lead_ECGFounder
+from models.classification import xLSTMClassification, xLSTMFeatureClassification, xLSTMSleepApnea
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
 import os
 import torch.nn as nn
+
+try:
+    from ecg_jepa.models import load_encoder
+except ImportError:
+    pass
+
+try:
+    import st_mem.encoder as encoder
+except ImportError:
+    pass
+
+try:
+    from ecg_founder.finetune_model import ft_1lead_ECGFounder, ft_12lead_ECGFounder
+except ImportError:
+    pass
+
 
 def parse_config(config_file, default_config_file):
     """
@@ -82,7 +95,7 @@ def parse_config(config_file, default_config_file):
 
 
 
-def get_base_model(config, feature_classification=False, minute_aggregation=False, compile_model=True):
+def get_base_model(config, feature_classification=False, sleep_apnea=False, compile_model=True):
     """
     Returns the base model according to the configuration.
     
@@ -104,7 +117,9 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
             drop_path_rate=config.drop_path_prob, 
             feature_classification=feature_classification, 
             r_peaks_detection=config.r_peaks_detection,
-            minute_aggregation=minute_aggregation
+            sleep_apnea=sleep_apnea,
+            window_size=config.window_size,
+            context_size=config.context_size
         )
         checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
         checkpoint_model = checkpoint['model']
@@ -121,7 +136,7 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
             ckpt_dir=ckpt_dir, 
             config=config, 
             feature_classification=feature_classification, 
-            minute_aggregation=minute_aggregation
+            sleep_apnea=sleep_apnea
         ) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
@@ -131,8 +146,10 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
             path = './checkpoint/12_lead_ECGFounder.pth'
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     else:
-        if feature_classification:
-            base_model = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads), minute_aggregation=minute_aggregation)
+        if sleep_apnea:
+            base_model = xLSTMSleepApnea(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
+        elif feature_classification:
+            base_model = xLSTMFeatureClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         else:
             base_model = xLSTMClassification(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
         
@@ -151,8 +168,9 @@ def get_base_model(config, feature_classification=False, minute_aggregation=Fals
             print(message) 
 
     # this gives problem due to reshaping
-    if not minute_aggregation and compile_model:
+    if compile_model:
         base_model.compile()
+
     return base_model
 
 
@@ -167,39 +185,69 @@ def change_positional_embedding_if_needed(model, config):
     Returns:
         nn.Module: The model with the changed positional embedding.
     """
-    new_seq_len = (config.window_size * config.sampling_freq // config.patch_size)
+
+    
+    win_seq_len = (config.window_size * config.sampling_freq // config.patch_size)
+    new_seq_len = (config.context_size * config.sampling_freq // config.patch_size) // 2
+
     print(f"Changing positional embedding to new sequence length {new_seq_len}")
     if config.use_st_mem:
-        if new_seq_len + 2 <= model.pos_embedding.shape[1]:
+        original_seq_len = model.pos_embedding.shape[1] - 2  # exclude cls token
+        print(f'Original positional embedding shape: {model.pos_embedding.shape}')
+
+        if new_seq_len * 2 + win_seq_len + 2 <= model.pos_embedding.shape[1]:
             print(f'No need to change positional embedding, current max sequence length is {model.core.pos_embedding.shape[1]-1}')
             return model
         
         # get all the positional embeddings except the last one (for cls token)
-        initial_pe = model.pos_embedding[:, :-1, :]
-        print(f'initial pe shape: {initial_pe.shape}')
+        left_pe = model.pos_embedding[:, :1, :] # position 0
+        right_pe = model.pos_embedding[:, -1:, :] # last position
+
         # take the last -1 positional embedding and repeat it (the last is for cls tokens)
-        repeated_pe = initial_pe[:, -2, :].repeat(1, new_seq_len - initial_pe.shape[1], 1)
-        # last pe
-        last_pe = model.pos_embedding[:, -1:, :]
-        model.pos_embedding = nn.Parameter(torch.cat([initial_pe, repeated_pe, last_pe], dim=1))
+        repeated_pe_left = model.pos_embedding[:, :1, :].repeat(1, new_seq_len + (win_seq_len - original_seq_len) // 2, 1)
+        print(f'repeated left pe shape: {repeated_pe_left.shape}')
+        repeated_pe_right = model.pos_embedding[:, -1:, :].repeat(1, new_seq_len + (win_seq_len - original_seq_len) // 2, 1)
+        print(f'repeated right pe shape: {repeated_pe_right.shape}')
+
+        model.pos_embedding = nn.Parameter(torch.cat([
+            left_pe, 
+            repeated_pe_left, 
+            model.pos_embedding[:, 1:-1, :], 
+            repeated_pe_right, 
+            right_pe
+        ], dim=1))
+
+        print(f'New positional embedding shape: {model.pos_embedding.shape}')
 
     elif config.use_ecg_founder:
         pass
     elif config.use_ecg_jepa:
         pass
     elif config.encoder_type == 'transformer':
-        if new_seq_len + 2 <= model.core.pos_embedding.shape[1]:
+        original_seq_len = model.core.pos_embedding.shape[1] - 2  # exclude cls token
+        print(f'Original positional embedding shape: {model.core.pos_embedding.shape}')
+
+        if new_seq_len * 2 + win_seq_len + 2 <= model.core.pos_embedding.shape[1]:
             print(f'No need to change positional embedding, current max sequence length is {model.core.pos_embedding.shape[1]-1}')
             return model
+        
         # get all the positional embeddings except the last one (for cls token)
-        initial_pe = model.core.pos_embedding[:, :-1, :]
-        print(f'initial pe shape: {initial_pe.shape}')
-        # take the last -1 positional embedding and repeat it (the last is for cls tokens)
-        repeated_pe = initial_pe[:, -2, :].repeat(1, new_seq_len - initial_pe.shape[1], 1)
-        # last pe
-        last_pe = model.core.pos_embedding[:, -1:, :]
+        left_pe = model.core.pos_embedding[:, :1, :] # position 0
+        right_pe = model.core.pos_embedding[:, -1:, :] # last position
 
-        model.core.pos_embedding = nn.Parameter(torch.cat([initial_pe, repeated_pe, last_pe], dim=1))
+        # take the last -1 positional embedding and repeat it (the last is for cls tokens)
+        repeated_pe_left = model.core.pos_embedding[:, :1, :].repeat(1, new_seq_len + (win_seq_len - original_seq_len) // 2, 1)
+        print(f'repeated left pe shape: {repeated_pe_left.shape}')
+        repeated_pe_right = model.core.pos_embedding[:, -1:, :].repeat(1, new_seq_len + (win_seq_len - original_seq_len) // 2, 1)
+        print(f'repeated right pe shape: {repeated_pe_right.shape}')
+
+        model.core.pos_embedding = nn.Parameter(torch.cat([
+            left_pe, 
+            repeated_pe_left, 
+            model.core.pos_embedding[:, 1:-1, :], 
+            repeated_pe_right, 
+            right_pe
+        ], dim=1))
 
     return model
 
@@ -274,7 +322,11 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         callbacks.append(checkpoint_callback)
         lr_monitor = LearningRateMonitor(logging_interval='step')
         callbacks.append(lr_monitor)
-        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group)
+
+        gpu_tag = [f'CUDA_VISIBLE_DEVICES_{os.environ["CUDA_VISIBLE_DEVICES"]}'] if 'CUDA_VISIBLE_DEVICES' in os.environ else [f'CUDA_VISIBLE_DEVICES_{torch.cuda.current_device()}']
+        print(f"Using GPU tag: {gpu_tag}")
+
+        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group, tags=gpu_tag)
         #  wand_logger.watch(model, log=None)
         trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
         # need to save the config file to a new file in the wandb directory

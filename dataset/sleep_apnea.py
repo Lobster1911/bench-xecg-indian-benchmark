@@ -16,14 +16,18 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
         self.data_folder = config.data_folder_sleep_apnea
         self.split = split
         self.leads = config.leads
-        self.patch_size = config.patch_size
-        self.window_size = config.window_size * 100
+        self.window_size = config.window_size * 100 # seconds of data to classify
+        self.context_size_half = config.context_size * 100 // 2 # seconds of context for each ecg
+        self.skip_ignored_indexes = config.skip_ignored_indexes
 
         self.augmentations = augmentations
         self.segment_size = 6000  # 60 seconds in samples
 
         if self.sampling_freq % self.patch_size != 0:
             print(f"Warning: Sampling freq {self.sampling_freq} should be divisible by patch size {self.patch_size}")
+        
+        if self.window_size > self.segment_size:
+            print(f"Warning: Window size {self.window_size} is larger than segment size {self.segment_size}, this may lead to unexpected behavior.")
 
         self.load_records()
         self.load_samples()
@@ -54,7 +58,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             records = [record for i, record in enumerate(records) if i in test_idxs]
             print(f"Test records: {records}")
 
-        self.records = [os.path.join(self.data_folder, record) for record in records]
+        self.records = [os.path.join(self.data_folder, record) for record in records]    
 
     def load_samples(self):
         # for each record, divide it into 5 min segments
@@ -77,8 +81,31 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             if self.window_size < self.segment_size: count_2 = 0
 
             for i in range(0, length, self.window_size):
+                if signal.shape[0] - i < self.window_size:
+                    break # do not use the last segment if it is smaller than window_size
+                
                 # append the segment  of window_size to the samples list
-                sample = signal[i:min(length, i + self.window_size)]
+                if self.context_size_half > 0:
+                    # add context before and after the segment
+                    start = max(0, i - self.context_size_half)
+                    end = min(length, i + self.window_size + self.context_size_half)
+                    sample = signal[start:end]
+                    # print(f"Original sample shape: {signal.shape}, start: {start}, end: {end}, segment shape: {sample.shape}")
+
+                    # if the context size is larger than the segment size, pad the sample using numpy
+                    if start == 0:
+                        pad_len = self.context_size_half - i
+                        if pad_len > 0:
+                            pad_array = np.zeros((pad_len, signal.shape[1]))
+                            sample = np.concatenate((pad_array, sample), axis=0)
+                    if end == length:
+                        pad_len = self.context_size_half - (length - (i + self.window_size))
+                        if pad_len > 0:
+                            pad_array = np.zeros((pad_len, signal.shape[1]))
+                            sample = np.concatenate((sample, pad_array), axis=0)
+                else:
+                    sample = signal[i:min(length, i + self.window_size)]
+
 
                 # get the annotations for the segment
                 annotations = []
@@ -94,17 +121,15 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
                     else:
                         count += 1
 
+                        
                 if len(annotations) > 0:
-                    num_minutes = sample.shape[0] // self.segment_size
-                    if len(annotations) < num_minutes:
-                        # print(f"Warning: Less annotations ({len(annotations)}) than expected ({num_minutes}) for record {record}, segment {i}, cropping")
-                        sample = sample[:len(annotations) * self.segment_size]
-
                     self.samples.append(sample)
                     self.annotations.append(torch.tensor(annotations))
+
+            # print(f"Loaded {len(self.samples)} segments from record {record}")
+        print(f"Total samples: {len(self.samples)}, total annotations: {len(self.annotations)}, total segment ids: {len(self.segment_id)}")
                 # else:
                     # print(f"Warning: No annotations found for segment {i} in record {record}, skipping... (This should not happen)")
-            
 
     def __len__(self):
         return len(self.samples)
@@ -121,7 +146,6 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
             tensor[:, 0] = sample[:, 0]  # ECG
         else:
             tensor[:, 1] = sample[:, 0]  # ECG
-
 
         if self.augmentations is not None:
             tensor = self.augmentations(tensor)
@@ -155,7 +179,9 @@ def make_collate_fn(config, split='train'):
         else:
             signals = torch.nn.utils.rnn.pad_sequence(signals, batch_first=True)
 
-        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
+        labels = torch.tensor(np.array([label.numpy() for label in labels]), dtype=torch.float32)
+
+        # labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
             
         return {
             'signals': signals,

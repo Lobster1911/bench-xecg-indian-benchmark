@@ -15,9 +15,9 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__(model, config,  len_train_dataset, weights)
 
-        self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-        self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
-        self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1)
+        self.train_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1, average='macro')
+        self.valid_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1, average='macro')
+        self.test_f1 = torchmetrics.F1Score(task='binary', ignore_index=-1, average='macro')
 
         self.train_acc = torchmetrics.Accuracy(task='binary', ignore_index=-1)
         self.valid_acc = torchmetrics.Accuracy(task='binary', ignore_index=-1)
@@ -124,29 +124,19 @@ class TrainingSleepApnea(CommonTrainerDownstream):
     def predict_batch(self, batch):
         x = batch["signals"]
         targets = batch['labels']
-
-        # print(f'Batch signals shape: {x.shape}, Batch labels shape: {targets.shape}')
-
-        if targets.ndim == 1:
-            targets = targets.unsqueeze(-1)
-
         segment_ids = batch['segment_ids']  # patient ids are not used in the training, but we keep them for consistency
-
-        # get one hot encoding
 
         if self.linear_probing: 
             self.model.set_eval_linear_probing()
 
-        mask = (targets != -1)
+        # mask = (targets != -1)
         logits = self.model(x)
         if logits.ndim > 2:
             logits = logits.squeeze(-1)
 
         preds = (torch.sigmoid(logits) > 0.5).float()
 
-        # print(f'targets shape: {targets.shape}, logits shape: {logits.shape}, preds shape: {preds.shape}, mask shape: {mask.shape}')
-
-        loss_cls = nn.functional.binary_cross_entropy_with_logits(logits[mask], targets[mask], reduction='mean')
+        loss_cls = nn.functional.binary_cross_entropy_with_logits(logits, targets, reduction='mean')
         return loss_cls, logits, preds, targets.long(), segment_ids
 
 

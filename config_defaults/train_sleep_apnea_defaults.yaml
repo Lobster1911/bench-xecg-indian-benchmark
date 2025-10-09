@@ -71,5 +71,6 @@ monitor_metric: val_auc
 monitor_mode: max
 
 
-window_size: 1800 # 30 minutes in samples
-max_length_signal: 180000
+window_size: 60 # 60 seconds
+context_size: 0 
+max_length_signal: 1800000

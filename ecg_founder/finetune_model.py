@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/PKUDigitalHealth/ECGFounder>
+
 import numpy as np
 import pandas as pd
 import torch.nn as nn
@@ -47,7 +49,7 @@ def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False, feature_clas
     return model
 
 
-def ft_1lead_ECGFounder(device, pth, n_classes,linear_prob=False, feature_classification=False, r_peaks_detection=False):
+def ft_1lead_ECGFounder(device, pth, n_classes,linear_prob=False):
   model = Net1D(
       in_channels=1, 
       base_filters=64, #32 64

@@ -1,7 +1,9 @@
-import torch
-from ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier
+# Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
 
-def load_encoder(ckpt_dir, config, feature_classification=False, minute_aggregation=False):
+import torch
+from ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier, ECGJepaSleepApnea
+
+def load_encoder(ckpt_dir, config, feature_classification=False, sleep_apnea=False):
 
     if config.leads is None:
         config.leads = [0,1,2,3,4,5,6,7]
@@ -30,14 +32,22 @@ def load_encoder(ckpt_dir, config, feature_classification=False, minute_aggregat
     print(msg)
     # check if all params require grad
 
-    if feature_classification:
+    if sleep_apnea:
+        model = ECGJepaSleepApnea(
+            encoder,
+            num_classes=config.num_classes,
+            patch_size=config.patch_size, 
+            linear_probing=config.linear_probing, 
+            context_size=config.context_size, 
+            window_size=config.window_size
+        )
+    elif feature_classification:
         model = ECGJepaFeatureClassifier(
             encoder, 
             config.num_classes, 
             patch_size=config.patch_size, 
             linear_probing=config.linear_probing, 
-            r_peaks_detection=config.r_peaks_detection,
-            minute_aggregation=minute_aggregation,
+            r_peaks_detection=config.r_peaks_detection
         )
     else:
         model = ECGJepaClassifier(

@@ -1,3 +1,6 @@
+# Code obtained from <https://github.com/PKUDigitalHealth/ECGFounder>
+
+
 """
 a modularized deep neural network for 1-d signal data, pytorch version
  
@@ -379,6 +382,8 @@ class Net1D(BaseModel):
 
         if self.feature_classification:
             return self.head(out)
+        
+        print(out.shape)
 
         deep_features = out.mean(-1)
         out = self.head(deep_features)

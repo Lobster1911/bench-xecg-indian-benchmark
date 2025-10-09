@@ -1,12 +1,6 @@
 # Copyright 2024 ST-MEM paper authors. <https://github.com/bakqui/ST-MEM>
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-# --------------------------------------------------------
-# References:
-# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
-# vit_pytorch: https://github.com/lucidrains/vit-pytorch
-# --------------------------------------------------------
+# Modified work for BenchECG analysis. Copyright (c) 2025 Dlaska Lab - Digital Cardiology. <https://github.com/dlaskalab/bench-xecg>
 
 from typing import Optional
 
@@ -23,25 +17,29 @@ __all__ = ['ST_MEM_ViT', 'st_mem_vit_small', 'st_mem_vit_base']
 
 
 class ST_MEM_ViT(BaseModel):
-    def __init__(self,
-                 seq_len: int,
-                 patch_size: int,
-                 num_leads: int,
-                 num_classes: Optional[int] = None,
-                 width: int = 768,
-                 depth: int = 12,
-                 mlp_dim: int = 3072,
-                 heads: int = 12,
-                 dim_head: int = 64,
-                 qkv_bias: bool = True,
-                 drop_out_rate: float = 0.,
-                 attn_drop_out_rate: float = 0.,
-                 drop_path_rate: float = 0.,
-                 linear_probing: bool = False,
-                 feature_classification: bool = False,
-                 r_peaks_detection: bool = False,
-                 minute_aggregation: bool = False
-                 ):
+    def __init__(
+            self,
+            seq_len: int,
+            patch_size: int,
+            num_leads: int,
+            num_classes: Optional[int] = None,
+            width: int = 768,
+            depth: int = 12,
+            mlp_dim: int = 3072,
+            heads: int = 12,
+            dim_head: int = 64,
+            qkv_bias: bool = True,
+            drop_out_rate: float = 0.,
+            attn_drop_out_rate: float = 0.,
+            drop_path_rate: float = 0.,
+            linear_probing: bool = False,
+            feature_classification: bool = False,
+            r_peaks_detection: bool = False,
+            sleep_apnea: bool = False,
+            window_size: int = 60,
+            context_size: int = 0,
+            ):
+        
         super().__init__()
         assert seq_len % patch_size == 0, 'The sequence length must be divisible by the patch size.'
         self._repr_dict = {
@@ -61,7 +59,9 @@ class ST_MEM_ViT(BaseModel):
             'linear_probing': linear_probing,
             'feature_classification': feature_classification,
             'r_peaks_detection': r_peaks_detection,
-            'minute_aggregation': minute_aggregation
+            'sleep_apnea': sleep_apnea,
+            'window_size': window_size,
+            'context_size': context_size
         }
 
         self.width = width
@@ -70,7 +70,11 @@ class ST_MEM_ViT(BaseModel):
         self.patch_size = patch_size
         self.feature_classification = feature_classification
         self.r_peaks_detection = r_peaks_detection
-        self.minute_aggregation = minute_aggregation
+        self.sleep_apnea = sleep_apnea
+        self.sampling_freq = 250
+        self.context_size = context_size
+        self.window_size = window_size
+
 
         # embedding layers
         num_patches = seq_len // patch_size
@@ -121,6 +125,7 @@ class ST_MEM_ViT(BaseModel):
 
         x = self.to_patch_embedding(series)
         b, _, n, _ = x.shape
+        # print(f'Features shape after patch embedding: {x.shape}')
         
         # cut the signal if needed
         if n >= self.pos_embedding.shape[1]:
@@ -160,8 +165,10 @@ class ST_MEM_ViT(BaseModel):
         else:
             x = self.forward_encoding(series)
 
+        # print(f'Features shape before head: {x.shape}')
+
         if self.feature_classification:
-            if self.r_peaks_detection:
+            if self.r_peaks_detection or self.sleep_apnea:
                 # print('before getting the channel: ', x.shape)
                 # get only the second lead for r-peaks detection
                 x = x[:, 1, :, :]
@@ -169,16 +176,22 @@ class ST_MEM_ViT(BaseModel):
             else:
                 x = x.mean(dim=1) 
 
-            if self.minute_aggregation:
-                x = self.aggregate_per_minute(x)
+            if self.sleep_apnea and self.context_size > 0:
+                # remove the context patches from the features   
+                context_patches = (self.context_size * self.sampling_freq) // self.patch_size
+                window_patches = (self.window_size * self.sampling_freq) // self.patch_size
+                start = context_patches
+                end = context_patches + window_patches
+                x = x[:, start:end, :]
 
-            out = self.head(x)
+            out = self.head(x.mean(dim=1))
             # print(f"Output shape: {out.shape}")  # Debugging output
 
             return out
         return self.head(x)
     
     def aggregate_per_minute(self, features):
+        # print(f'Input features shape: {features.shape}')
         patches_per_segment = (60 * self.sampling_freq) // self.patch_size
         # print(f'Aggregating features per minute with {patches_per_segment} patches per minute')
         # print(f'Input features shape: {features.shape}')

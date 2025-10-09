@@ -8,11 +8,9 @@ from trainers.ssl_pretrainer import PretrainedNetwork
 import utils.utils as utils
 import torch
 import dataset.ptb_xl as ptb_xl
-from torch.utils.data import DataLoader, Dataset, ConcatDataset, Subset
+from torch.utils.data import DataLoader, Subset
 from dataset.dataset_preparation_utils import load_datasets
 from trainers.common import DelayedCheckpoint
-import st_mem.encoder as encoder
-import torch.distributed as dist
 import time
 
 # argparse
