@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/PKUDigitalHealth/ECGFounder>
+
 import numpy as np
 import pandas as pd
 import torch.nn as nn

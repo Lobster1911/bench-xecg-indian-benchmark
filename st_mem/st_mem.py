@@ -1,14 +1,7 @@
 # Original work Copyright (c) Meta Platforms, Inc. and affiliates. <https://github.com/facebookresearch/mae>
 # Modified work Copyright 2024 ST-MEM paper authors. <https://github.com/bakqui/ST-MEM>
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-# --------------------------------------------------------
-# References:
-# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
-# DeiT: https://github.com/facebookresearch/deit
-# MAE: https://github.com/facebookresearch/mae
-# --------------------------------------------------------
+# Further modified work for BenchECG analysis. Copyright (c) 2025 Dlaska Lab - Digital Cardiology. <https://github.com/dlaskalab/bench-xecg>
 
 from functools import partial
 

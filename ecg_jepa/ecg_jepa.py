@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
+
 import copy
 import math
 import torch

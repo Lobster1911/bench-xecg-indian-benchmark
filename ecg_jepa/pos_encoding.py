@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
+
 import numpy as np
 import torch.nn as nn
 

@@ -1,3 +1,6 @@
+# Code obtained from <https://github.com/PKUDigitalHealth/ECGFounder>
+
+
 """
 a modularized deep neural network for 1-d signal data, pytorch version
  

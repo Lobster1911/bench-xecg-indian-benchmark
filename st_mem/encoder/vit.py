@@ -1,12 +1,6 @@
 # Copyright 2024 ST-MEM paper authors. <https://github.com/bakqui/ST-MEM>
 
-# This source code is licensed under the license found in the
-# LICENSE file in the root directory of this source tree.
-# --------------------------------------------------------
-# References:
-# timm: https://github.com/rwightman/pytorch-image-models/tree/master/timm
-# vit_pytorch: https://github.com/lucidrains/vit-pytorch
-# --------------------------------------------------------
+# Modified work for BenchECG analysis. Copyright (c) 2025 Dlaska Lab - Digital Cardiology. <https://github.com/dlaskalab/bench-xecg>
 
 from typing import Optional
 

@@ -1,3 +1,5 @@
+# Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
+
 import torch
 from ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier, ECGJepaSleepApnea
 
