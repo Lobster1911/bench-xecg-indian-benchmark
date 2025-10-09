@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import trainers.common as common
 from trainers.common_trainer import CommonTrainerDownstream
-from ecg_jepa.models import load_encoder
 import os
 import matplotlib.pyplot as plt
 import lightning.pytorch as pl

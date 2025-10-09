@@ -13,8 +13,6 @@ from utils.utils import get_training_class_weights_multilabel
 import utils.utils as utils
 
 
-# os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
-
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run_config.yaml', help='Path to the config file')

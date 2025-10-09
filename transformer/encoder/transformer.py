@@ -88,7 +88,7 @@ class Transformer(nn.Module):
         # cut the signal if needed
         if n >= self.pos_embedding.shape[1]:
             x = x[:, :self.pos_embedding.shape[1] -1, :]
-            # print(f'Input sequence length {n} is longer than the maximum sequence length {self.pos_embedding.shape[1]-1}. Cutting the input to match the maximum sequence length.')
+            print(f'Input sequence length {n} is longer than the maximum sequence length {self.pos_embedding.shape[1]-1}. Cutting the input to match the maximum sequence length.')
 
         x = x + self.pos_embedding[:, 1:n + 1, :]
 
