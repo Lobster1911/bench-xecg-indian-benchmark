@@ -81,7 +81,7 @@ def pretrain(config, run=None, wandb=False):
             devices=num_gpus,
             strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto', 
             sync_batchnorm=True if num_gpus > 1 else False,
-            precision=utils.get_precision()
+            precision=config.precision
         )
     else:
         trainer = L.Trainer(
@@ -94,7 +94,7 @@ def pretrain(config, run=None, wandb=False):
             devices=num_gpus,
             strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto',
             sync_batchnorm=True if num_gpus > 1 else False,
-            precision=utils.get_precision()
+            precision=config.precision
         )
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)

@@ -12,6 +12,7 @@ import dataset.mimic_iv as mimic
 import dataset.ptb_xl as ptb_xl
 import dataset.chapman as chapman
 import dataset.incart as incart
+import dataset.heedb as heedb
 from torch.utils.data import Subset, ConcatDataset
 from dataset.generic_utils import get_transforms
 import torch
@@ -22,7 +23,18 @@ def load_datasets(config):
     val_datasets = []
 
     for dataset in config.pretrain_datasets:
-        if dataset == 'mimic':
+        if dataset == 'heedb':
+            _heedb = heedb.ECGHEEDBDataset(
+                config, 
+                global_augmentations=get_transforms(config, split='train', type='global'), 
+                local_augmentations=get_transforms(config, split='train', type='local')
+            )
+            # split the dataset into train and val
+            train_size = int(0.9 * len(_heedb))
+            train_code, val_code = Subset(_heedb, range(0, train_size)), Subset(_heedb, range(train_size, len(_heedb)))
+            datasets_pretrain.append(train_code)
+            val_datasets.append(val_code)
+        elif dataset == 'mimic':
             datasets_pretrain.append(mimic.ECGMIMICDataset(
                 config, 
                 split='train', 
