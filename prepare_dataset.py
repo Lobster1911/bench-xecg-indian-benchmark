@@ -1,27 +1,35 @@
-import neurokit2 as nk
-from tqdm import tqdm
 import os
-import wfdb
 import argparse
-import numpy as np
-import shutil
 import pandas as pd
-from collections import Counter
 from dataset.dataset_preparation_utils import *
-from joblib import Parallel, delayed
 import json
-import wfdb.processing as wp
 from pandarallel import pandarallel
 
-pandarallel.initialize(progress_bar=False, verbose=0)
 
 parser = argparse.ArgumentParser(description='Create dataset for MIT-BIH')
 parser.add_argument('--data_folder', type=str, default='/media/Volume/data/MIMIC_IV/', help='Path to raw data folder')
 parser.add_argument('--label_file', type=str, default='/media/Volume/data/MIMIC_IV/records_w_diag_icd10.csv', help='Path to the label file')
 parser.add_argument('--dataset', type=str, required=True, help='the name of the dataset: mimic, code 15 or ptbxl')
+parser.add_argument('--num_workers', type=int, default=16, help='number of parallel jobs')
 args = parser.parse_args()
 
+pandarallel.initialize(progress_bar=False, verbose=0, nb_workers=args.num_workers)
+
+
+def find_records(folder, file_extension='.hea'):
+    records = set()
+    for root, directories, files in os.walk(folder):
+        for file in files:
+            extension = os.path.splitext(file)[1]
+            if extension == file_extension:
+                record = os.path.relpath(os.path.join(root, file), folder)[:-len(file_extension)]
+                records.add(record)
+    records = sorted(records)
+    return records
+
 if __name__ == '__main__':
+
+    print(args)
 
     if args.dataset == 'chapman':
         # open the file RECORDS and read the lines
@@ -42,6 +50,11 @@ if __name__ == '__main__':
         
         exams = pd.DataFrame()
         exams['file_name'] = paths
+    elif args.dataset == 'heedb':
+        exams = pd.DataFrame()
+        all_records = find_records(args.data_folder, file_extension='.hea')
+        print('found records: ', len(all_records), all_records[:10])
+        exams['file_name'] = all_records
     else:
         exams = pd.read_csv(args.label_file)
 
@@ -49,12 +62,15 @@ if __name__ == '__main__':
     print(exams.columns)
     print('initial count rows: ', len(exams))
 
+
     if args.dataset == 'mimic':
         exams['file_name'] = exams.parallel_apply(lambda row:  str(row['file_name']).replace('mimic-iv-ecg-diagnostic-electrocardiogram-matched-subset-1.0/', ''), axis=1)
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
     elif args.dataset == 'ptbxl':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['filename_hr']))), axis=1)
     elif args.dataset in ['chapman', 'code']:
+        exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
+    elif args.dataset == 'heedb':
         exams['valid'] = exams.parallel_apply(lambda row: check_sample(os.path.join(args.data_folder, str(row['file_name']))), axis=1)
 
     to_remove = exams[exams['valid'] == False]
