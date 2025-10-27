@@ -144,8 +144,8 @@ class PretrainedNetwork(L.LightningModule):
         """
         if self.logger is None:
             return super().on_validation_epoch_end()
-        
-        self.log_sample_plots(self.trainer.train_dataloader, 0, -42)
+
+        self.log_sample_plots(self.trainer.train_dataloader, 0, -42, stage_name='train')
 
         return super().on_train_epoch_end()
 
@@ -160,11 +160,11 @@ class PretrainedNetwork(L.LightningModule):
         if self.logger is None:
             return super().on_validation_epoch_end()
         
-        self.log_sample_plots(self.trainer.val_dataloaders, 115, -25)
+        self.log_sample_plots(self.trainer.val_dataloaders, 115, -25, stage_name='val')
 
         return super().on_validation_epoch_end()
     
-    def log_sample_plots(self, dataloader, fixed_idx1, fixed_idx2):
+    def log_sample_plots(self, dataloader, fixed_idx1, fixed_idx2, stage_name=''):
         # save the plots of the reconstruction for some samples
         sample_1 = dataloader.dataset[fixed_idx1]
         sample_2 = dataloader.dataset[fixed_idx2]
@@ -184,8 +184,8 @@ class PretrainedNetwork(L.LightningModule):
         img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key="reconstructions", images=[img_1, img_2, img_3, img_4])
-            self.logger.log_image(key="local_views", images=[local_views])
+            self.logger.log_image(key=f"reconstructions_{stage_name}", images=[img_1, img_2, img_3, img_4])
+            self.logger.log_image(key=f"local_views_{stage_name}", images=[local_views])
 
     
     def reconstruct_batch(self, batch, step):

@@ -42,7 +42,7 @@ def pretrain(config, run=None, wandb=False):
     # if config.debug: val_dataset = Subset(val_dataset, range(0, len(val_dataset) // 10))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), pin_memory=True)
     base_model = pretrainedxLSTM(config=config, num_channels=len(config.leads))
-    base_model.compile()
+    # base_model.compile()
 
     if config.checkpoint != None:
         model = PretrainedNetwork.load_from_checkpoint(
@@ -72,7 +72,7 @@ def pretrain(config, run=None, wandb=False):
         wand_logger = WandbLogger(project="pretrain-xLSTM", experiment=run, config=config)
         wand_logger.watch(model, log='gradients')
         trainer = L.Trainer(
-            num_sanity_val_steps=0,
+            # num_sanity_val_steps=0,
             max_epochs=config.epochs, 
             logger=wand_logger, 
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
@@ -85,7 +85,7 @@ def pretrain(config, run=None, wandb=False):
         )
     else:
         trainer = L.Trainer(
-            num_sanity_val_steps=0,
+            # num_sanity_val_steps=0,
             logger=False,
             max_epochs=config.epochs, 
             callbacks=[checkpoint_callback, early_stopping], 
