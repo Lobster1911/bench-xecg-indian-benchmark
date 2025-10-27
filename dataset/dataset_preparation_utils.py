@@ -31,9 +31,9 @@ def load_datasets(config):
             )
             # split the dataset into train and val
             train_size = int(0.9 * len(_heedb))
-            train_code, val_code = Subset(_heedb, range(0, train_size)), Subset(_heedb, range(train_size, len(_heedb)))
-            datasets_pretrain.append(train_code)
-            val_datasets.append(val_code)
+            train_heedb, val_heedb = Subset(_heedb, range(0, train_size)), Subset(_heedb, range(train_size, len(_heedb)))
+            datasets_pretrain.append(train_heedb)
+            val_datasets.append(val_heedb)
         elif dataset == 'mimic':
             datasets_pretrain.append(mimic.ECGMIMICDataset(
                 config, 
@@ -48,14 +48,16 @@ def load_datasets(config):
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'incart':
-            # only training because small sample size
-            incart_dataset = incart.ECGIncartDataset(
+            _incart = incart.ECGIncartDataset(
                 config, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             )
-            datasets_pretrain.append(incart_dataset)
+            train_size = int(0.9 * len(_incart))
+            train_incart, val_incart = Subset(_incart, range(0, train_size)), Subset(_incart, range(train_size, len(_incart)))
+            datasets_pretrain.append(train_incart)
+            val_datasets.append(val_incart)
             
         elif dataset == 'code15':
             code15 = code.ECGCODE15Dataset(
@@ -103,7 +105,6 @@ def load_datasets(config):
             train_chapman, val_chapman = Subset(chapman_dataset, range(0, train_size)), Subset(chapman_dataset, range(train_size, len(chapman_dataset)))
             datasets_pretrain.append(train_chapman)
             val_datasets.append(val_chapman)
-
         else:
             raise ValueError(f"Dataset {dataset} not found")
 

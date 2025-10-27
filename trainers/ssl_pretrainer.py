@@ -144,33 +144,7 @@ class PretrainedNetwork(L.LightningModule):
         if self.logger is None:
             return super().on_validation_epoch_end()
         
-        sample_1 = self.trainer.train_dataloader.dataset[0]
-        sample_2 = self.trainer.train_dataloader.dataset[-42]
-
-        # get two random samples from the training dataset
-        idx_3 = np.random.randint(0, len(self.trainer.train_dataloader.dataset))
-        idx_4 = np.random.randint(0, len(self.trainer.train_dataloader.dataset))
-
-        sample_3 = self.trainer.train_dataloader.dataset[idx_3]
-        sample_4 = self.trainer.train_dataloader.dataset[idx_4]
-
-        log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
-
-
-        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key="reconstructions_train", images=[img_1, img_2, img_3, img_4])
-
-        if self.pretraining_strategy == 'next_token_prediction':
-            img_1 = plot_generation(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_1')
-            img_2 = plot_generation(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_2')
-            img_3 = plot_generation(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_3_random')
-            img_4 = plot_generation(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_4_random')
-            if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-                self.logger.log_image(key="generations_train", images=[img_1, img_2, img_3, img_4])
+        self.log_sample_plots(self.trainer.train_dateloaders, 0, -42)
 
         return super().on_train_epoch_end()
 
@@ -183,29 +157,31 @@ class PretrainedNetwork(L.LightningModule):
         if self.logger is None:
             return super().on_validation_epoch_end()
         
+        self.log_sample_plots(self.trainer.val_dataloaders, 115, -25)
+
+        return super().on_validation_epoch_end()
+    
+    def log_sample_plots(self, dataloader, fixed_idx1, fixed_idx2):
         # save the plots of the reconstruction for some samples
-        sample_s = self.trainer.val_dataloaders.dataset[115]
-        sample_v = self.trainer.val_dataloaders.dataset[91]
-        sample_t = self.trainer.val_dataloaders.dataset[23]
-        sample_n = self.trainer.val_dataloaders.dataset[0]
+        sample_1 = dataloader.dataset[fixed_idx1]
+        sample_2 = dataloader.dataset[fixed_idx1]
+
+        # get two random samples from the training dataset
+        idx_3 = np.random.randint(0, len(dataloader.dataset))
+        idx_4 = np.random.randint(0, len(dataloader.dataset))
+
+        sample_3 = dataloader.dataset[idx_3]
+        sample_4 = dataloader.dataset[idx_4]
 
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
 
-        img_s = plot_reconstruction(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_v = plot_reconstruction(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_t = plot_reconstruction(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_n = plot_reconstruction(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key="reconstructions", images=[img_s, img_v, img_t, img_n])
+            self.logger.log_image(key="reconstructions", images=[img_1, img_2, img_3, img_4])
 
-        if self.pretraining_strategy == 'next_token_prediction':
-            img_s = plot_generation(sample_s, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s')
-            img_v = plot_generation(sample_v, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v')
-            img_t = plot_generation(sample_t, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t')
-            img_n = plot_generation(sample_n, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n')
-            if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-                self.logger.log_image(key="generations", images=[img_s, img_v, img_t, img_n])
-        return super().on_validation_epoch_end()
     
     def reconstruct_batch(self, batch, step):
         global_signals = batch["global_signals"]

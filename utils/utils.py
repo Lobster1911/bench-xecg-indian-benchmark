@@ -14,6 +14,7 @@ from lightning.pytorch.loggers import WandbLogger
 import lightning as pl
 import os
 import torch.nn as nn
+from joblib import Parallel, delayed
 
 try:
     from ecg_jepa.models import load_encoder
@@ -309,23 +310,26 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
     Define all the callbacks and loggers for the trainer.
     """
     callbacks = []
-    early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
-    callbacks.append(early_stopping)
+    if config.monitor_metric is not None:
+        early_stopping = EarlyStopping(monitor=config.monitor_metric, check_finite=True, patience=config.patience, mode=config.monitor_mode)
+        callbacks.append(early_stopping)
 
-    if config.monitor_metric != 'val_loss':
-        nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
-        callbacks.append(nan_stop)
+        if config.monitor_metric != 'val_loss':
+            nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
+            callbacks.append(nan_stop)
 
     if wandb:
         print(f"Using WandbLogger for project {prj_string} and run {run}")
-        checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
-        callbacks.append(checkpoint_callback)
+        if config.monitor_metric is not None:
+            checkpoint_callback = ModelCheckpoint(monitor=config.monitor_metric, mode=config.monitor_mode)
+            callbacks.append(checkpoint_callback)
         lr_monitor = LearningRateMonitor(logging_interval='step')
         callbacks.append(lr_monitor)
 
         gpu_tag = [f'CUDA_VISIBLE_DEVICES_{os.environ["CUDA_VISIBLE_DEVICES"]}'] if 'CUDA_VISIBLE_DEVICES' in os.environ else [f'CUDA_VISIBLE_DEVICES_{torch.cuda.current_device()}']
         print(f"Using GPU tag: {gpu_tag}")
-
+        
+        # Adding the tag to the logger
         wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group, tags=gpu_tag)
         #  wand_logger.watch(model, log=None)
         trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
@@ -335,28 +339,46 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
     return trainer
 
-def get_training_class_weights(train_dataset, do_not_consider_classes = [], label_key='label'):
-  """
-  Returns the class weights for the training dataset.
-  """
-  labels = [sample[label_key] for sample in train_dataset]
-
-  if len(labels[0]) > 1:
-    # If labels are multilabel, flatten them
-    labels = [label for sublist in labels for label in sublist]
-
-  labels = [label.item() for label in labels if label not in do_not_consider_classes]
-  
-  # labels = train_dataset.get_labels()
-  class_counts = Counter(labels)
-  total_samples = len(labels)
-  num_classes = len(class_counts)
-
-  class_weights = {cls: total_samples / (num_classes * count) for cls, count in class_counts.items()}
-  
-  weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
-  print(f"Class Weights: {weights}")
-  return weights
+def get_training_class_weights(train_dataset, do_not_consider_classes=[], label_key='label', n_jobs=-1):
+    """
+    Returns the class weights for the training dataset.
+    Parallelized using joblib for faster processing.
+    
+    Args:
+        train_dataset: Dataset to extract labels from
+        do_not_consider_classes: Classes to exclude from weight calculation
+        label_key: Key to access labels in dataset
+        n_jobs: Number of parallel jobs (-1 uses all cores)
+    """
+    
+    def extract_label(i):
+        """Extract and process a single label."""
+        return train_dataset[i][label_key]
+    
+    # Parallel label extraction
+    labels = Parallel(n_jobs=n_jobs, backend='threading')(
+        delayed(extract_label)(i) for i in range(len(train_dataset))
+    )
+    
+    # Flatten multilabel if needed
+    if len(labels[0]) > 1:
+        from itertools import chain
+        labels = list(chain.from_iterable(labels))
+    
+    # Filter and convert to items
+    labels = [label.item() for label in labels if label not in do_not_consider_classes]
+    
+    # Calculate class weights
+    class_counts = Counter(labels)
+    print('Class count:', class_counts)
+    total_samples = len(labels)
+    num_classes = len(class_counts)
+    
+    class_weights = {cls: total_samples / (num_classes * count) for cls, count in class_counts.items()}
+    
+    weights = torch.tensor([class_weights[cls] for cls in range(num_classes)], dtype=torch.float32)
+    print(f"Class Weights: {weights}")
+    return weights
 
 def get_training_class_weights_multilabel(train_dataset, label_key='label'):
     labels = [sample[label_key] for sample in train_dataset]

@@ -46,6 +46,7 @@ use_final_layer_norm: true
 cls_normalization: null
 max_length_signal: 1200
 proj_factor: 2
+incart_win_len: 12
 
 use_transformer: false
 

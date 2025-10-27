@@ -9,7 +9,7 @@ from tqdm import tqdm
 import neurokit2 as nk
 from dataset.generic_utils import RandomSwitchtBaselineWanderBatched
 from typing_extensions import override
-
+import random
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {
@@ -60,9 +60,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
         self.is_recurrent = config.is_recurrent 
+        self.context_len = config.context_len
         self.original_freq = 360
         self.freq_factor = self.sampling_freq / self.original_freq
         self.r_peaks_detection = config.r_peaks_detection
+        self.random_shift = config.random_shift
         print(f"freq_factor: {self.freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}")
 
         self.load_patient_data(split)
@@ -79,7 +81,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.annotations = {}
         self.signals = {}
         self.r_peaks = {}
-        self.labels = {}
 
         def process_patient(patient):
             signal, _ = wfdb.rdsamp(os.path.join(self.data_folder, 'raw', f'{patient}'))
@@ -88,28 +89,27 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
 
             r_peaks = [(r_peak, convert_label(annotations.symbol[i])) for i, r_peak in enumerate(annotations.sample) if annotations.symbol[i] in valid_annotations]
-            labels_orig = [label for label in annotations.symbol if label in valid_annotations]
-            labels = [convert_label(l) for l in labels_orig]
 
             # filter classes
             if self.num_classes == 3:
                 r_peaks = [(r_peak, label) for r_peak, label in r_peaks if label in ['N', 'S', 'V']]
-                labels = [l for l in labels if l in ['N', 'S', 'V']]
 
-            return patient, signal, header, annotations, r_peaks, labels
+            return patient, signal, header, annotations, r_peaks
 
         results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
         # results = [process_patient(patient) for patient in self.patients]
 
-        for patient, signal, header, annotations, r_peaks, labels in results:
+        ## RESAMPLING SIGNALS
+        for patient, signal, header, annotations, r_peaks in results:
             if self.sampling_freq != header.fs:
                 signal = nk.signal_resample(signal, sampling_rate=header.fs, desired_sampling_rate=self.sampling_freq, method='FFT')
 
             self.signals[patient] = signal
             self.headers[patient] = header
             self.annotations[patient] = annotations
-            self.r_peaks[patient] = r_peaks
-            self.labels[patient] = labels
+
+            # RESAMPLE R peaks
+            self.r_peaks[patient] = [(int(np.round(r_peak * self.freq_factor)), label) for r_peak, label in r_peaks]
             # map labels with r_peaks in a tuple
 
     def load_samples(self, subset):
@@ -117,9 +117,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             samples = []
             last_class = None
             skipped = 0
-            win_orig = np.round(self.win_len / self.freq_factor)
             len_signal = len(self.signals[patient])
-            # print((f"win_orig: {win_orig}, freq_factor: {freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}"))
 
             if self.r_peaks_detection:
                 # len signal and win_len are in the same frequency domain, r_peaks are not
@@ -132,39 +130,41 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                         'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len * 2) // self.freq_factor],
                     })
             elif subset == 'train':
-                for i, r_peak in enumerate(r_peaks):
-                    sample_class = r_peaks[i][1]
+                if self.skip_majority_class_samples:
+                    for i, r_peak in enumerate(r_peaks):
+                        skip_class = r_peaks[i][1]
 
-                    if (sample_class != last_class or skipped > 10 or sample_class != 'N') or not self.skip_majority_class_samples:
+                        if (skip_class != last_class or skipped > 10 or skip_class != 'N'):
+                            samples.append({
+                                'patient': patient,
+                                'r_peak': r_peak[0],
+                                'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - self.win_len + 1 <= r < r_peak[0] + self.win_len - 1],
+                            })
+                            skipped = 0
+                        else:
+                            skipped += 1
+                        last_class = skip_class
+
+                else:
+                    for i, r_peak in enumerate(r_peaks):
                         samples.append({
                             'patient': patient,
-                            'r_peak': r_peak[0],
-                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - win_orig <= r < r_peak[0] + win_orig - 1],
+                            'start': max(0, r_peak[0] - self.win_len - self.context_len),
+                            'end': min(r_peak[0] + self.win_len + self.context_len, len_signal),
+                            'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - self.win_len + 1 <= r < r_peak[0] + self.win_len - 1],
                         })
-                        skipped = 0
-                    else:
-                        skipped += 1
-
-                    last_class = sample_class
-            elif not self.is_recurrent:
-                sample_len = self.signals[patient].shape[0]
+            else:
                 #print(f"sample_len: {sample_len}, win_len: {self.win_len}, freq_factor: {self.freq_factor}")
-                for i in range(0, sample_len, self.win_len * 2):
+                for i in range(0, len_signal, self.win_len * 2):
                     # for every window
-                    around_r_peaks = [(r, l) for r, l in r_peaks if np.round(i / self.freq_factor) <= r < np.round((i + self.win_len * 2) / self.freq_factor)]
+                    around_r_peaks = [(r, l) for r, l in r_peaks if i <= r < i + self.win_len * 2 - 1]
                     # print(f"i: {i}, win_len: {self.win_len}, sample_len: {sample_len}, around_r_peaks: {around_r_peaks}")
                     samples.append({
                         'patient': patient,
-                        'start': i,
-                        'end': min(i + self.win_len * 2, sample_len),
+                        'start': max(0, i - self.context_len),
+                        'end': min(i + self.win_len * 2 + self.context_len, len_signal),
                         'around_r_peaks': around_r_peaks,
                     })
-            else:
-                samples.append({
-                    'patient': patient,
-                    'r_peak': -1,
-                    'around_r_peaks': r_peaks,
-                })
 
             return samples
 
@@ -227,36 +227,27 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         signal = torch.tensor(self.signals[patient], dtype=torch.float32)
         header = self.headers[patient]
 
-        around_r_peaks = [(int(np.round(r * (self.sampling_freq / header.fs))), l) for r, l in sample['around_r_peaks']]
         len_signal = signal.shape[0]
 
-        if self.split == 'train':
-            r_peak = int(np.round(sample['r_peak'] * (self.sampling_freq / header.fs)))
-            window_start = max(0, r_peak - self.win_len)
-            window_end = min(r_peak + self.win_len, len_signal)
-        elif not self.is_recurrent:
-        # for non-recurrent, we take the whole signal
-            window_start = sample.get('start', 0)
-            window_end = sample.get('end', len_signal)
-        else:
-            window_start = 0
-            window_end = len_signal
+        window_start = sample.get('start', 0)
+        window_end = sample.get('end', len_signal)
+
+        # random shift is a percentage of context_len (let's say max 25% of it)
+        if self.context_len > 0 and self.random_shift:
+            random_shift = random.randint(0, self.context_len // 4) - int(self.context_len // 8)
+            if window_start + random_shift >= 0 and window_end - random_shift <= len_signal:
+                window_start = window_start + random_shift
+                window_end = window_end - random_shift
 
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
 
         if self.augmentations is not None:
-            signal = self.augmentations(signal)
+            window_signal = self.augmentations(window_signal)
         
-        r_peaks_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32)
-
-        # Use a list comprehension to filter and set the mask
-        valid_r_peaks = [r - window_start for r, l in around_r_peaks if window_start <= r < window_end]
-        r_peaks_mask[valid_r_peaks] = 1
-
         labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) - 1
 
-        for r, l in around_r_peaks:
+        for r, l in sample['around_r_peaks']:
             # print(r, l)
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
@@ -273,7 +264,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         return {
             'signal': window_signal,
             'patient_id': patient,
-            'r_peak': r_peaks_mask,
             'label': labels_mask,
             # 'r_peak_orig': original_r_peaks,
         }

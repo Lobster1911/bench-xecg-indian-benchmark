@@ -9,6 +9,7 @@ from dataset.generic_utils import get_transforms
 import dataset.mit_bih as mit_bih
 from trainers.mit_bih_trainer import TrainingMIT_BIH
 from trainers.r_peaks_trainer import TrainingRPeak
+from utils.utils import get_training_class_weights
 
 
 import argparse
@@ -18,13 +19,13 @@ parser.add_argument('--config_file', type=str, default='configs/train_mit_bih_ru
 def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
-
+    
     dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.single_hb and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
 
     if config.split_val_by_patient:
         # splits the validation set by patient
-        train_dataset =  dataset_class(config, split='train', augmentations=get_transforms(config))
+        train_dataset = dataset_class(config, split='train', augmentations=get_transforms(config))
         print(f"Train dataset size (split by patient): {len(train_dataset)}")
         val_dataset = dataset_class(config, split='val', augmentations=get_transforms(config, split='val'))
         print(f"Val dataset size (split by patient): {len(val_dataset)}")
@@ -43,7 +44,14 @@ def train(config, run=None, wandb=False):
             weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
         if config.num_classes == 5:
             print('Using class weights for 5 classes')
-            weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
+            if config.win_len == 1600:
+                weights = torch.tensor([2.2425e-01, 8.3814e+00, 2.7265e+00, 1.8476e+01, 2.4445e+03]).to('cuda')
+            elif config.win_len == 500:
+                weights = torch.tensor([2.2468e-01, 7.8135e+00, 2.7218e+00, 1.8698e+01, 2.5163e+03]).to('cuda')
+            else:
+                weights = get_training_class_weights(train_dataset, label_key='label', do_not_consider_classes=[-1]).to('cuda')
+            
+            # weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
         elif config.num_classes == 3: 
             print('Using class weights for 3 classes')
             weights = torch.tensor([0.367, 17.866, 4.452]).to('cuda')
@@ -58,8 +66,10 @@ def train(config, run=None, wandb=False):
 
     test_dataset = dataset_class(config, split='test', augmentations=get_transforms(config, split='test'))
     test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
+    print(f"Test dataset size: {len(test_dataset)}")
 
-    base_model = utils.get_base_model(config, feature_classification=True)
+
+    base_model = utils.get_base_model(config, feature_classification=True, compile_model=False)
 
     if config.r_peaks_detection:
        model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
@@ -72,7 +82,7 @@ def train(config, run=None, wandb=False):
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
-# if main
+
 if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 

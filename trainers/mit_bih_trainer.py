@@ -44,10 +44,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
 
         self.train_acc = self.train_acc.to(preds.device)
-        self.train_acc(preds, targets)
+        self.train_acc(preds.flatten(), targets.flatten())
 
         self.train_f1 = self.train_f1.to(preds.device)
-        self.train_f1(preds, targets)
+        self.train_f1(preds.flatten(), targets.flatten())
 
         self.log('train_loss', loss_cls.detach().item(), prog_bar=True)
 
@@ -66,10 +66,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
 
         self.valid_acc = self.valid_acc.to(preds.device)
-        self.valid_acc(preds, targets)
+        self.valid_acc(preds.flatten(), targets.flatten())
 
         self.valid_f1 = self.valid_f1.to(preds.device)
-        self.valid_f1(preds, targets)
+        self.valid_f1(preds.flatten(), targets.flatten())
 
         self.log('val_loss', loss_cls.detach().item(), prog_bar=True)
 
@@ -117,13 +117,13 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
 
         self.test_acc = self.test_acc.to(preds.device)
-        self.test_acc(preds, targets)
+        self.test_acc(preds.flatten(), targets.flatten())
 
         self.test_acc_no_avg = self.test_acc_no_avg.to(preds.device)
-        self.test_acc_no_avg(preds, targets)
+        self.test_acc_no_avg(preds.flatten(), targets.flatten())
 
         self.test_f1 = self.test_f1.to(preds.device)
-        self.test_f1(preds, targets)
+        self.test_f1(preds.flatten(), targets.flatten())
 
         self.log("test_loss", loss_cls.detach().item())
 
@@ -195,13 +195,13 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
         return loss_cls 
     
-    def on_test_epoch_end(self):
+    def on_validation_epoch_end(self):
         super().on_test_epoch_end()
 
         if self.plot_test_predictions:
             try:
-                sample_1 = self.trainer.test_dataloaders.dataset[2]
-                sample_2 = self.trainer.test_dataloaders.dataset[3]
+                sample_1 = self.trainer.val_dataloaders.dataset[2]
+                sample_2 = self.trainer.val_dataloaders.dataset[3]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
                 img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1')
                 img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2')
@@ -223,25 +223,18 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         if self.linear_probing:
             self.model.set_eval_linear_probing()
 
-        if not self.single_hb:
-            targets = batch['label'].unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
-            # get one hot encoding
-
-            cls = self.model(x)
-            # print(f"cls shape: {cls.shape}, targets shape: {targets.shape}")
-            if cls.shape[1] > targets.shape[1]:
-                cls = cls[:, :targets.shape[1], :]
-
-            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
-        else:
+        if self.single_hb:
             targets = batch['label'].long()
             cls = self.model(x).unsqueeze(1)  # [bs, 1, num_classes]
-            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights,  ignore_index=-1)
-
+            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets + 1, weight=self.weights, ignore_index=-1)
+        else:
+            targets = batch['label'].unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
+            cls = self.model(x)
+            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
 
         # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
         preds = torch.argmax(cls, dim=-1)
-        
+
         if self.use_focal_loss:
             pt = torch.exp(-loss_cls)
             alpha = 2.
@@ -250,7 +243,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         
         return loss_cls, preds, targets, cls.permute(0, 2, 1)
 
-def plot_mit_bih_pred(sample, model, device, logdir, epoch, name, max_length=3000):
+def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
         signal = sample['signal'].to(device).unsqueeze(0)
         target = sample['label'].to(device).unsqueeze(0)
@@ -258,9 +251,9 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name, max_length=300
         predicted = model(signal)
 
         # consider max 2000 time samples for plotting
-        if signal.shape[1] > max_length:
-            signal = signal[:, :max_length, :]
-            target = target[:, :max_length]
+        # if signal.shape[1] > max_length:
+        #     signal = signal[:, :max_length, :]
+        #    target = target[:, :max_length]
 
         targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
         fig, ax = plt.subplots(figsize=(25, 5))
@@ -274,7 +267,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name, max_length=300
             ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
 
         # inside each patch plot the prediction above and the target below
-        print("shape of targets", targets.shape)
+
         for i in range(targets.shape[1]):
             patch_start = i * model.patch_size
             patch_end = patch_start + model.patch_size
