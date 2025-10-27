@@ -145,7 +145,7 @@ class PretrainedNetwork(L.LightningModule):
         if self.logger is None:
             return super().on_validation_epoch_end()
         
-        self.log_sample_plots(self.trainer.train_dataloaders, 0, -42)
+        self.log_sample_plots(self.trainer.train_dataloader, 0, -42)
 
         return super().on_train_epoch_end()
 
