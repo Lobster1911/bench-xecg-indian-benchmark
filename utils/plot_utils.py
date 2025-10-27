@@ -10,7 +10,7 @@ color_2 = (207/ 255, 86/ 255, 86/ 255)
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
-def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, training_strategy, mask_ratio=0.5):
+def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, name, training_strategy, mask_ratio=0.5):
     with torch.no_grad():
 
         x = sample['global_signals'][0].to(device).unsqueeze(0)
@@ -79,8 +79,8 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
                     ax.legend(['Original', 'Reconstructed'], loc='upper left')
 
             if i == 5 or i == 11:
-                ax.set_xticks(np.arange(0, len(x[0]), 360))
-                ax.set_xticklabels(np.arange(0, len(x[0]), 360) // 360)
+                ax.set_xticks(np.arange(0, len(x[0]), freq))
+                ax.set_xticklabels(np.arange(0, len(x[0]), freq) // freq)
                 ax.set_xlabel('Time (s)')
             else:
                 ax.set_xticks([])
@@ -92,6 +92,55 @@ def plot_reconstruction(sample, model, patch_size, device, logdir, epoch, name, 
         plt.savefig(path)
         plt.close()
         return path
+    
+def plot_local_views(sample, patch_size, freq, device, logdir, epoch, name):
+    with torch.no_grad():
+        num_signals = len(sample['local_signals'])
+        leads = [f"Lead {i+1}" for i in range(sample['local_signals'][0].shape[-1])]
+        color_1 = "tab:blue"
+
+        fig = plt.figure(figsize=(20, 15))
+
+        # garantisce almeno 1 riga
+        n_rows = max(1, num_signals // 2)
+        n_cols = 2 if num_signals > 1 else 1
+
+        outer_gs = gridspec.GridSpec(n_rows, n_cols)
+        outer_gs.update(wspace=0.2, hspace=0.3)
+
+        for idx, signal in enumerate(sample['local_signals']):
+            x = signal.to(device).unsqueeze(0)
+
+            # Calcolo corretto posizione nella griglia principale
+            row = idx // n_cols
+            col = idx % n_cols
+
+            inner_gs = gridspec.GridSpecFromSubplotSpec(
+                6, 2, subplot_spec=outer_gs[row, col], wspace=0.2, hspace=0.4
+            )
+
+            for i in range(x.shape[-1]):
+                ax = plt.subplot(inner_gs[i // 2, i % 2])
+                ax.plot(x[..., i].cpu().squeeze().numpy(), color=color_1)
+                ax.set_title(leads[i])
+
+                for j in range(0, x.shape[1], patch_size):
+                    ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
+
+                if i == 10 or i == 11:
+                    ax.set_xticks(np.arange(0, len(x[0]), freq))
+                    ax.set_xticklabels(np.arange(0, len(x[0]), freq) // freq)
+                    ax.set_xlabel('Time (s)')
+                else:
+                    ax.set_xticks([])
+
+        os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
+        path = f'{logdir}/epoch_{epoch}/reconstruction_{name}.png'
+        plt.savefig(path, bbox_inches='tight')
+        plt.close()
+        return path
+
+
 
     
 def plot_generation(sample, model, patch_size, device, logdir, epoch, name):

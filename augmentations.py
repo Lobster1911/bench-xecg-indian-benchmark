@@ -174,9 +174,66 @@ class Normalize(nn.Module):
 
 
     def forward(self, signal):
-        std = signal.std(axis=(0, -1))
-        std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-        return (signal - signal.mean(axis=(0, -1))) / std
+        # we should have one end and one start for each lead
+        mask = (signal != 0).float()
+        # set false to nan values
+        mask_start = mask.cumsum(0)
+        mask_start[mask_start == 0] = float('nan')
+        start = mask_start.argmin(0)
+
+        mask_end = mask.flip(0).cumsum(0).flip(0)
+        mask_end[mask_end == 0] = torch.nan
+        end = mask_end.argmin(0)
+
+        # if start !+ all zero print
+        if (start != 0).any():
+            print('start of real signal:', start)
+        if ((end != signal.shape[0] - 1) & (end != 0)).any():
+            print('end of real signal:', end)
+
+        # Create range tensor: (time, 1)
+        time_range = torch.arange(signal.shape[0], device=signal.device).unsqueeze(1)
+
+        # Create valid mask: (time, num_leads)
+        valid_mask = (time_range >= start.unsqueeze(0)) & (time_range < end.unsqueeze(0))
+
+        # Count valid samples per lead
+        count = valid_mask.sum(dim=0, keepdim=True).float()  # (1, num_leads)
+        count = torch.clamp(count, min=1)  # avoid division by zero
+
+        # Compute mean over valid regions
+        masked_signal = signal * valid_mask
+        mean = masked_signal.sum(dim=0, keepdim=True) / count  # (1, num_leads)
+
+        # Compute std over valid regions
+        diff = (signal - mean) * valid_mask
+        var = (diff ** 2).sum(dim=0, keepdim=True) / count  # (1, num_leads)
+        std = torch.sqrt(var)
+        std = torch.where(std == 0, torch.ones_like(std), std)  # replace 0 with 1
+        # print('mean, std:', mean, std)
+
+        # Normalize only valid regions
+        normalized = (signal - mean) / std
+        signal = torch.where(valid_mask, normalized, signal)
+
+        return signal
+
+        # calculate the mean and std only on the valid part of the signal for each lead
+        # for lead in range(signal.shape[-1]):
+        #     if start[lead] >= end[lead]:
+        #         continue # skip leads that are fully zero
+            
+        #     valid_signal = signal[start[lead]:end[lead], lead]
+        #     mean = valid_signal.mean()
+        #     std = valid_signal.std()
+        #     if std == 0:
+        #         std = 1 # avoid division by zero, samples with std = 0 are all zero
+        #     signal[start[lead]:end[lead], lead] = (valid_signal - mean) / std
+
+        # Normalize across the entire signal
+        # std = signal.std(axis=(0, -1))
+        # std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
+        # return (signal - signal.mean(axis=(0, -1))) / std
     
 class RandomCrop(nn.Module):
     """

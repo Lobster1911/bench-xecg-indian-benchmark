@@ -21,30 +21,50 @@ class ECGIncartDataset(PretrainDataset):
         super().__init__(config, split=split, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         
         self.data_folder = config.data_folder_incart
-        self.win_len = 10
+        self.win_len = config.win_len_incart
 
-        self.load_records(split)
+        self.load_records()
+        self.load_samples()
 
-    def load_records(self, subset):
+    def load_records(self):
         with open(os.path.join(self.data_folder, 'RECORDS'), 'r') as f:
             self.records = [line.strip()[:3] for line in f.readlines()]
-            print(f'INCART: loaded {len(self.records)} records for {subset}')
+            print(f'INCART: loaded {len(self.records)}')
+
+    def load_samples(self):
+        self.samples = []
+
+        def process_patient(patient):
+            signal, header = wfdb.rdsamp(os.path.join(self.data_folder, f'{patient}'))
+
+            signal = self.resample_if_needed(signal, header)
+
+            samples = []
+            for start in range(0, len(signal), self.win_len * self.sampling_freq):
+                end = start + self.win_len * self.sampling_freq
+                # if the segment is long enough
+                if end <= len(signal) and (end - start) >= self.sampling_freq * 5: 
+                    segment = signal[start:end, :]
+                    samples.append((segment, header))
+
+            return samples
+
+        results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.records)
+
+        for samples in results:
+            self.samples.extend(samples)
+
+        print(f'Incart: loaded {len(self.samples)} samples from {len(self.records)} records.')
 
     @override
-    def __getitem__(self, idx):
-        patient = self.records[idx]
-
-        signal, info = wfdb.rdsamp(os.path.join(self.data_folder, str(patient)))
-        # get a random 10s window
-
-        sample_fs = info['fs']
-        random_start = np.random.randint(0, len(signal) - self.win_len * sample_fs)
-        random_end = random_start + self.win_len * sample_fs
+    def __len__(self):
+        return len(self.samples)
         
-        signal = signal[random_start:random_end]
-
+    @override
+    def __getitem__(self, idx):
+        signal, info = self.samples[idx]
+        
         self.map_leads_and_clean(signal, info)
-        signal = self.resample_if_needed(signal, info)
 
         if self.global_augmentations is not None:
             global_signals = [ self.global_augmentations(signal) for _ in range(self.n_global_view)]

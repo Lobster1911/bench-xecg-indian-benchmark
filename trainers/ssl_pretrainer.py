@@ -1,7 +1,7 @@
 import lightning as L
 from utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, masked_cosine_loss, SimDINOv2Loss
 from torch.nn import functional as F
-from utils.plot_utils import plot_reconstruction, plot_generation
+from utils.plot_utils import plot_reconstruction, plot_generation, plot_local_views
 import numpy as np
 import torch
 import lightning
@@ -47,6 +47,7 @@ class PretrainedNetwork(L.LightningModule):
         self.start_train_head_at_epoch = config.start_train_head_at_epoch
         self.lambda_code_rate =  config.lambda_code_rate
         self.devices = config.devices
+        self.sampling_freq = config.sampling_freq
 
         self.ema_0 = config.ema_0
         self.ema_1 = config.ema_1
@@ -144,7 +145,7 @@ class PretrainedNetwork(L.LightningModule):
         if self.logger is None:
             return super().on_validation_epoch_end()
         
-        self.log_sample_plots(self.trainer.train_dateloaders, 0, -42)
+        self.log_sample_plots(self.trainer.train_dataloaders, 0, -42)
 
         return super().on_train_epoch_end()
 
@@ -152,7 +153,9 @@ class PretrainedNetwork(L.LightningModule):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
-        self.knn_evaluation()
+
+        if self.current_epoch > 0:
+            self.knn_evaluation()
 
         if self.logger is None:
             return super().on_validation_epoch_end()
@@ -164,7 +167,7 @@ class PretrainedNetwork(L.LightningModule):
     def log_sample_plots(self, dataloader, fixed_idx1, fixed_idx2):
         # save the plots of the reconstruction for some samples
         sample_1 = dataloader.dataset[fixed_idx1]
-        sample_2 = dataloader.dataset[fixed_idx1]
+        sample_2 = dataloader.dataset[fixed_idx2]
 
         # get two random samples from the training dataset
         idx_3 = np.random.randint(0, len(dataloader.dataset))
@@ -175,12 +178,14 @@ class PretrainedNetwork(L.LightningModule):
 
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
 
-        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        local_views = plot_local_views(sample_4, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'local_views_sample_s')
+        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
             self.logger.log_image(key="reconstructions", images=[img_1, img_2, img_3, img_4])
+            self.logger.log_image(key="local_views", images=[local_views])
 
     
     def reconstruct_batch(self, batch, step):
@@ -234,8 +239,8 @@ class PretrainedNetwork(L.LightningModule):
 
         self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
 
-        rank_me = [self.rank_me(out['cls']) for out in global_out]
-        self.log(f"{step}_rank_me", (sum(rank_me) / len(rank_me)).item(), prog_bar=True, sync_dist=self.devices == 2)
+        # rank_me = [self.rank_me(out['cls']) for out in global_out]
+        # self.log(f"{step}_rank_me", (sum(rank_me) / len(rank_me)).item(), prog_bar=True, sync_dist=self.devices == 2)
 
         # log norm of output
         with torch.no_grad():
