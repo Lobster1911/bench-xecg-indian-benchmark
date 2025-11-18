@@ -17,7 +17,7 @@ class pretrainedxLSTM(BaseModel):
         self.dropout = nn.Dropout(config.dropout)
         self.patch_size = config.patch_size
         self.bidirectional = config.bidirectional
-        self.use_teacher_student = config.use_teacher_student
+        self.use_teacher_student = config.strategy == 'lejepa'
         self.mask_ratio = config.mask_ratio
         self.embedding_size = config.embedding_size
         self.cls_type = config.cls_type
@@ -192,7 +192,7 @@ class pretrainedxLSTM(BaseModel):
     
     def get_padding_mask(self, x):
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
-        num_patches = x.shape[1] // self.patch_size
+        num_patches = x.shape[-2] // self.patch_size
         padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)[:, :, 0].unsqueeze(-1).expand(-1, -1, self.embedding_size)
         return padding_mask_patched
 
@@ -202,7 +202,7 @@ class pretrainedxLSTM(BaseModel):
         """
         # check when the x was all 0 and set the mask to 0
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
-        num_patches = x.shape[1] // self.patch_size
+        num_patches = x.shape[-2] // self.patch_size
 
         if self.masking_type == 'random':
             # masking the signal

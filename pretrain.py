@@ -30,12 +30,12 @@ def pretrain(config, run=None, wandb=False):
     # knn datasets:
     knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
     knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True, pin_memory=True)
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True, pin_memory=True)
+    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
+    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True), drop_last=True)
 
     # keep only 10% of the dataset
     if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
-    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), drop_last=True, pin_memory=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config), drop_last=True, pin_memory=True, prefetch_factor=4)
     len_train_dataset = len(train_dataset)
 
     # cat the two dataloaders
@@ -51,7 +51,7 @@ def pretrain(config, run=None, wandb=False):
             len_train_dataset=len_train_dataset, 
             config=config, 
             knn_train_dataloader=knn_train_dataloader, 
-            knn_val_dataloader=knn_val_dataloader
+            knn_val_dataloader=knn_val_dataloader,
         )
     else:
         model = PretrainedNetwork(
@@ -76,7 +76,7 @@ def pretrain(config, run=None, wandb=False):
             max_epochs=config.epochs, 
             logger=wand_logger, 
             callbacks=[checkpoint_callback, early_stopping, lr_monitor], 
-            gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
+            gradient_clip_val=config.grad_clip,
             accelerator='gpu',
             devices=num_gpus,
             strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto', 
@@ -89,7 +89,7 @@ def pretrain(config, run=None, wandb=False):
             logger=False,
             max_epochs=config.epochs, 
             callbacks=[checkpoint_callback, early_stopping], 
-            gradient_clip_val=config.grad_clip if not config.use_teacher_student else None,
+            gradient_clip_val=config.grad_clip,
             accelerator='gpu',
             devices=num_gpus,
             strategy='ddp_find_unused_parameters_true' if num_gpus > 1 else 'auto',

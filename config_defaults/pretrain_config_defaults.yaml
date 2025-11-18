@@ -32,13 +32,13 @@ patch_size: 25
 embedding_size: 128
 activation_fn: gelu
 xlstm_config: [ 'm', 's', 'm', 's', 'm', 's', 'm' ]
-wandb_log: false
+wandb_log: true
 num_heads: 4
 encoder_type: original
 weight_tying: false
 patch_embedding: linear
 bidirectional: false
-strategy: next_token_prediction # masked_token_prediction
+strategy: 'sim_dino_v2' # masked_token_prediction
 mask_ratio: 0.5 # only for masked_token_prediction
 monitor_metric: val_nrmse
 monitor_delay_epochs: 2

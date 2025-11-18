@@ -175,14 +175,14 @@ class Normalize(nn.Module):
 
     def forward(self, signal):
         # we should have one end and one start for each lead
-        mask = (signal != 0).float()
+        mask = (signal != 0).astype(np.float32)
         # set false to nan values
         mask_start = mask.cumsum(0)
-        mask_start[mask_start == 0] = float('nan')
+        mask_start[mask_start == 0] = np.nan
         start = mask_start.argmin(0)
 
-        mask_end = mask.flip(0).cumsum(0).flip(0)
-        mask_end[mask_end == 0] = torch.nan
+        mask_end = np.flip(np.flip(mask, axis=0).cumsum(0), axis=0)
+        mask_end[mask_end == 0] = np.nan
         end = mask_end.argmin(0)
 
         # if start !+ all zero print
@@ -192,29 +192,37 @@ class Normalize(nn.Module):
             print('end of real signal:', end)
 
         # Create range tensor: (time, 1)
-        time_range = torch.arange(signal.shape[0], device=signal.device).unsqueeze(1)
+        time_range = np.arange(signal.shape[0])[:, np.newaxis]
+
+        start = np.atleast_1d(start)
+        start_broadcast = start[np.newaxis, :]
+        end = np.atleast_1d(end)
+        end_broadcast = (end + 1)[np.newaxis, :]
+
+        valid_mask = (time_range >= start_broadcast) & (time_range < end_broadcast)
+        valid_mask = valid_mask.astype(np.float32) # Ensure mask is float for multiplication
 
         # Create valid mask: (time, num_leads)
-        valid_mask = (time_range >= start.unsqueeze(0)) & (time_range < end.unsqueeze(0))
+        # valid_mask = (time_range >= start.unsqueeze(0)) & (time_range < end.unsqueeze(0))
 
         # Count valid samples per lead
-        count = valid_mask.sum(dim=0, keepdim=True).float()  # (1, num_leads)
-        count = torch.clamp(count, min=1)  # avoid division by zero
+        count = valid_mask.sum(axis=0, keepdims=True)  # (1, num_leads)
+        count = np.clip(count, a_min=1, a_max=None)  # avoid division by zero
 
         # Compute mean over valid regions
         masked_signal = signal * valid_mask
-        mean = masked_signal.sum(dim=0, keepdim=True) / count  # (1, num_leads)
+        mean = masked_signal.sum(axis=0, keepdims=True) / count  # (1, num_leads)
 
         # Compute std over valid regions
         diff = (signal - mean) * valid_mask
-        var = (diff ** 2).sum(dim=0, keepdim=True) / count  # (1, num_leads)
-        std = torch.sqrt(var)
-        std = torch.where(std == 0, torch.ones_like(std), std)  # replace 0 with 1
+        var = (diff ** 2).sum(axis=0, keepdims=True) / count  # (1, num_leads)
+        std = np.sqrt(var)
+        std = np.where(std == 0, np.ones_like(std), std)  # replace 0 with 1
         # print('mean, std:', mean, std)
 
         # Normalize only valid regions
         normalized = (signal - mean) / std
-        signal = torch.where(valid_mask, normalized, signal)
+        signal = np.where(valid_mask, normalized, signal)
 
         return signal
 
@@ -246,9 +254,10 @@ class RandomCrop(nn.Module):
 
     def forward(self, signal):
         # Get the size of the signal
-        end = (signal != 0).flip(0).cumsum(0).flip(0).max(dim=-1)[0].max(dim=-1)[0].numpy()
+        end = np.flip(np.flip((signal != 0), axis=0).cumsum(0), axis=0).max(axis=-1).max(axis=-1)
         # start of signal: there may be padding at the beginning of the signal
-        start = (signal != 0).cumsum(dim=0).max(dim=-1)[0].max(dim=-1)[0].numpy() 
+        start = (signal != 0).cumsum(axis=0).max(axis=-1).max(axis=-1)
+
         if not (signal[0] == 0).all():
             start = 0 # if the signal do not starts with zeros, we can start from the beginning
 
@@ -261,6 +270,8 @@ class RandomCrop(nn.Module):
 
         start_idx = np.random.randint(low=start, high=signal_length - target_length + start)
         # Crop the signal
+
+        # print('RandomCrop: crop_size =', self.crop_size, ', target_length =', target_length, ', start_idx =', start_idx, 'shape =', signal[start_idx:start_idx + target_length, ...].shape)
         return signal[start_idx:start_idx + target_length, ...]
     
 class CropFixedLen(nn.Module):
@@ -276,7 +287,9 @@ class CropFixedLen(nn.Module):
             return signal
         # Get the size of the signal
         if signal.shape[0] > self.length:
+            # ('Cropping signal from length', signal.shape[0], 'to', self.length, 'shape:', signal[:self.length, ...].shape)
             return  signal[:self.length, ...]
+        
         return signal
 
 
@@ -292,7 +305,6 @@ class RandomDropLeads(nn.Module):
     def forward(self, signal):
         if self.training and self.probability > 0: # Also check if probability is non-zero
             # Create a copy to avoid modifying the original tensor inplace
-            signal_out = signal.clone()
             
             # Determine leads to remove (ensure consistent device if signal is on GPU)
             leads_to_remove_np = np.random.random(signal.shape[-1]) < self.probability
@@ -308,9 +320,10 @@ class RandomDropLeads(nn.Module):
                     random_lead = np.random.randint(0, signal.shape[-1])
                     leads_to_remove[random_lead] = False
                 
+            signal_out = signal.copy()
+            signal_out[:, leads_to_remove] = 0
 
-            # Apply modification to the copy
-            signal_out[..., leads_to_remove] = 0
+            # ('RandomDropLeads shape:', signal_out.shape, 'dropped leads:', torch.where(leads_to_remove)[0].cpu().numpy())
             return signal_out
         else:
             # If not training or probability is 0, return the original signal
@@ -330,7 +343,7 @@ class Jitter(object):
         if self.prob == 0. or np.random.uniform() > self.prob: return sample
 
         # 3. Generate noise for the *entire* batch.
-        noise = torch.randn_like(sample) * self.sigma
+        noise = np.random.randn(*sample.shape) * self.sigma
 
         # 4. Calculate the amplitude scaling for the *entire* batch.
         amplitude_scaling = self.amplitude * sample
@@ -470,11 +483,11 @@ def resample_signal(signal: torch.Tensor, current_freq: float = 500, target_freq
         torch.Tensor: A tensor of shape (C, new_L) resampled to the target frequency.
     """
     signal = signal.transpose(0, 1)
-    num_channels, signal_length = signal.shape
+    signal_length, _  = signal.shape
     target_length = int(signal_length * target_freq / current_freq)
-    resampled = np.array([resample(channel, target_length) for channel in signal.numpy()])
-    signal = torch.tensor(resampled, dtype=signal.dtype)
-    return signal.transpose(0, 1)
+    resampled = np.array([resample(channel, target_length) for channel in signal])
+    # print('Resampling from', current_freq, 'Hz to', target_freq, 'Hz. New length:', target_length, 'Shape:', resampled.shape)
+    return resampled #.transpose(0, 1)
     
 class Rescaling(object):
     """
@@ -568,6 +581,8 @@ class CropResizing(object):
             # only crop the signal
             cropped_sample = torch.zeros_like(sample)
             cropped_sample = sample[start_idx:start_idx+crop_len, ...]
+
+        # print('CropResizing: crop_len =', crop_len, ', start_idx =', start_idx, 'shape =', cropped_sample.shape)
 
         return cropped_sample
 

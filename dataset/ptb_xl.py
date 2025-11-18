@@ -129,9 +129,9 @@ def make_collate_fn(config, downstream=False, split='train'):
 
         # pad the signals to the same length
         if split == 'train' and config.shuffle_baseline_wander_in_batch:
-            signals = baseline_shuffler(pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size))
+            signals = baseline_shuffler(pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size))
         else:
-            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
             
         tortn = {
             'signals': signals,

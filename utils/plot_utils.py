@@ -54,7 +54,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
             for j in range(0, x.shape[1], patch_size):
                 ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
                 
-            if training_strategy == 'masked_token_prediction':
+            if training_strategy == 'sim_dino_v2':
                 if mask.shape[0] == 1:
                     ax_mask = mask.squeeze()
                 else:
@@ -73,7 +73,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
 
             # ax.set_yticks([])
             if i == 0:
-                if training_strategy == 'masked_token_prediction':
+                if training_strategy == 'sim_dino_v2':
                     ax.legend(['Original', 'Reconstructed', 'Mask'], loc='upper left')
                 else:
                     ax.legend(['Original', 'Reconstructed'], loc='upper left')

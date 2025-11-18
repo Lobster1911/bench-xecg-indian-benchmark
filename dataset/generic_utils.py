@@ -109,10 +109,10 @@ def make_collate_fn_task(config, key_label='age'):
         if 'signal' in batch[0]:
             # If 'signal' is present, use it
             signals = [item['signal'] for item in batch]
-            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
         else:
             signals = [item['global_signals'][0] for item in batch]
-            signals = pad(torch.nn.utils.rnn.pad_sequence(signals, batch_first=True), patch_size=config.patch_size)
+            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
 
         if isinstance(key_label, list):
             return {
@@ -141,10 +141,11 @@ def pad(x, patch_size):
     return x
 
 def pad_multi_view_batch(batch, key, patch_size):
+    # signals are a list of different views for each sample in the batch
     signals = [sample[key] for sample in batch]
     signals = list(map(list, zip(*signals)))
     signals = [
-        pad(torch.nn.utils.rnn.pad_sequence(g_signal, batch_first=True), patch_size)
-        for g_signal in signals
+        pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signal], batch_first=True).float(), patch_size)
+        for signal in signals
     ]
     return signals

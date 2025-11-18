@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset, random_split
-import torch
 import numpy as np
 import wfdb
 import os
@@ -46,7 +45,7 @@ class ECGCODE15AgeDataset(ECGCODE15Dataset):
 
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
-        obj['age'] = torch.tensor(self.tab_data.loc[self.records[idx], 'age'], dtype=torch.float32)
+        obj['age'] = self.tab_data.loc[self.records[idx], 'age']
         return obj
     
 class ECGCODE15MortalityDataset(ECGCODE15Dataset):
@@ -64,8 +63,8 @@ class ECGCODE15MortalityDataset(ECGCODE15Dataset):
 
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
-        obj['death'] = torch.tensor(self.tab_data.loc[self.records[idx], 'death'], dtype=torch.bool)
-        obj['timey'] = torch.tensor(self.tab_data.loc[self.records[idx], 'timey'], dtype=torch.float32)
+        obj['death'] = self.tab_data.loc[self.records[idx], 'death']
+        obj['timey'] = self.tab_data.loc[self.records[idx], 'timey']
         return obj
 
 class ECGCODEDataset(PretrainDataset):

@@ -1,12 +1,9 @@
-import torch
 import os
-import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
 from pandarallel import pandarallel
-from dataset.generic_utils import get_max_n_jobs
-from functools import lru_cache
+import torch
 
 pandarallel.initialize(progress_bar=False, verbose=0)
 
@@ -53,6 +50,7 @@ class PretrainDataset(torch.utils.data.Dataset):
         else:
             local_signals = []
 
+
         return  {
             'global_signals': global_signals,
             'local_signals': local_signals,
@@ -71,13 +69,10 @@ class PretrainDataset(torch.utils.data.Dataset):
                 else:
                     s[:, self.leads.index(l)] = signal[:, info['sig_name'].index(lead)]
 
-        return torch.tensor(s, dtype=torch.float32)
+        return s
     
     def resample_if_needed(self, signal, info):
         if self.sampling_freq != info['fs']:
             signal = nk.signal_resample(signal, sampling_rate=info['fs'], desired_sampling_rate=self.sampling_freq, method='FFT')   
-            signal = torch.tensor(signal, dtype=torch.float32)
             
         return signal
-                
-
