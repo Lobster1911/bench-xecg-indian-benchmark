@@ -107,7 +107,7 @@ class PretrainedNetwork(L.LightningModule):
             self.update_scheduled_weight_decay(opt_core)
             return
         else:
-            return rec_loss
+            return pretraining_loss
         
     def update_scheduled_weight_decay(self, opt_core):
         # linear decay
@@ -211,17 +211,17 @@ class PretrainedNetwork(L.LightningModule):
 
         global_out = self.model(global_signals.reshape(-1, global_signals.shape[2], global_signals.shape[3]), masking=False, reconstruct=False)
         global_out_cls = global_out['cls'].reshape(global_signals.shape[0], global_signals.shape[1],  global_out['cls'].shape[-1])  # [bs, n_global_views, dim]
-        # print(f'Global out CLS shape: {global_out_cls.shape}')
+        # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
         global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
 
         local_out = self.model(local_signals.reshape(-1, local_signals.shape[2], local_signals.shape[3]), masking=False, reconstruct=False)
         local_out_cls = local_out['cls'].reshape(local_signals.shape[0], local_signals.shape[1], local_out['cls'].shape[-1])  # [bs, n_local_views, dim]
-        # print(f'Local out CLS shape: {local_out_cls.shape}')
+        # print(f'Local out CLS shape: {local_out_cls.shape}') [n_local_views, bs, dim]
 
         all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=0)  # [bs, global_views + local_views, dim]
         # print(f'All view CLS shape: {all_view_cls.shape}')
 
-        similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean() 
+        similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean()
         self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.devices == 2)
 
         # sigreg = self.lejepa_loss(all_view_cls)

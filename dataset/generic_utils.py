@@ -160,13 +160,14 @@ def pad_multi_view_batch(sample_list, patch_size):
     
     sample_list = [[sample[i] for sample in sample_list] for i in range(len(sample_list[0]))]
 
-    tortn =  torch.nn.utils.rnn.pad_sequence([
-        pad(torch.nn.utils.rnn.pad_sequence([
-            torch.from_numpy(sig) 
-            for sig in signal
-        ], batch_first=True).float(), patch_size)
+    topad = [ 
+        pad(torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(sig) for sig in signal], batch_first=True).float(), patch_size).permute(1, 0, 2)
         for signal in sample_list
-    ], batch_first=True)
+    ]
+
+    # print('topad shapes: ', [top.shape for top in topad])
+    tortn =  torch.nn.utils.rnn.pad_sequence(topad, batch_first=True).permute(0, 2, 1, 3)
 
     # print(f'Padded multi-view batch to shape: {tortn.shape}')
     return tortn
+
