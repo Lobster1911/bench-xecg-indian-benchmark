@@ -209,23 +209,25 @@ class PretrainedNetwork(L.LightningModule):
         global_signals = batch["global_signals"]
         local_signals = batch["local_signals"]
 
-        global_input = torch.stack(global_signals, dim=1)
-        global_input = global_input.reshape(-1, global_input.shape[2], global_input.shape[3])  # combine views and batch size
-        global_out = self.model(global_input, masking=False, reconstruct=False)
-        global_out_cls = global_out['cls'].reshape(-1, len(global_signals), global_out['cls'].shape[1])
-        global_mean_cls = global_out_cls.mean(dim=1)  # [bs, dim]
+        global_out = self.model(global_signals.reshape(-1, global_signals.shape[2], global_signals.shape[3]), masking=False, reconstruct=False)
+        global_out_cls = global_out['cls'].reshape(global_signals.shape[0], global_signals.shape[1],  global_out['cls'].shape[-1])  # [bs, n_global_views, dim]
+        # print(f'Global out CLS shape: {global_out_cls.shape}')
+        global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
 
-        local_input = torch.stack(local_signals, dim=1)
-        local_input = local_input.reshape(-1, local_input.shape[2], local_input.shape[3])  # combine views and batch size
-        local_out = self.model(local_input, masking=False, reconstruct=False)
-        local_out_cls = local_out['cls'].reshape(-1, len(local_signals), local_out['cls'].shape[1])
+        local_out = self.model(local_signals.reshape(-1, local_signals.shape[2], local_signals.shape[3]), masking=False, reconstruct=False)
+        local_out_cls = local_out['cls'].reshape(local_signals.shape[0], local_signals.shape[1], local_out['cls'].shape[-1])  # [bs, n_local_views, dim]
+        # print(f'Local out CLS shape: {local_out_cls.shape}')
 
-        all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=1)  # [bs, global_views + local_views, dim]
+        all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=0)  # [bs, global_views + local_views, dim]
+        # print(f'All view CLS shape: {all_view_cls.shape}')
 
-        similarity = (global_mean_cls.unsqueeze(1) - all_view_cls).pow(2).mean() 
+        similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean() 
         self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.devices == 2)
 
-        sigreg = self.lejepa_loss(all_view_cls)
+        # sigreg = self.lejepa_loss(all_view_cls)
+        # print('sigreg:', sigreg.item())
+
+        sigreg = torch.mean(torch.stack([self.lejepa_loss(samples) for samples in all_view_cls]))
         self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.devices == 2)
 
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg

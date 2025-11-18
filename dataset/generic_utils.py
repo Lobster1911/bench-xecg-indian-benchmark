@@ -84,20 +84,28 @@ def make_collate_fn(config):
     def collate_fn(batch):
         # Pad and clean global signals
         result = {
-            'global_signals': pad_multi_view_batch(batch, 'global_signals', config.patch_size),
+            'global_signals': pad_multi_view_batch([sample['global_signals'] for sample in batch], config.patch_size),
         }
 
         if config.shuffle_baseline_wander_in_batch:
             # Apply baseline shuffling to the global signals
-            result['global_signals'] = [baseline_shuffler(signal) for signal in result['global_signals']]
+            result['global_signals'] = torch.stack([
+                baseline_shuffler(result['global_signals'][view, ...]) 
+                for view in range(result['global_signals'].shape[0])
+            ], dim=0)
+
+            # print(f'Applied baseline shuffling to global signals with shape: {result["global_signals"].shape}')
 
         # Optional: handle local signals if present
         if 'local_signals' in batch[0] and batch[0]['local_signals'] is not None:
-            result['local_signals'] = pad_multi_view_batch(batch, 'local_signals', config.patch_size)
-
+            result['local_signals'] = pad_multi_view_batch([sample['local_signals'] for sample in batch], config.patch_size)
+            
             if config.shuffle_baseline_wander_in_batch:
                 # Apply baseline shuffling to the local signals
-                result['local_signals'] = [baseline_shuffler(signal) for signal in result['local_signals']]
+                result['local_signals'] = torch.stack([
+                    baseline_shuffler(result['local_signals'][view, ...]) 
+                    for view in range(result['local_signals'].shape[0])
+                ], dim=0)
 
         return result
 
@@ -140,12 +148,25 @@ def pad(x, patch_size):
         x = x[:, :-excess, :]
     return x
 
-def pad_multi_view_batch(batch, key, patch_size):
-    # signals are a list of different views for each sample in the batch
-    signals = [sample[key] for sample in batch]
-    signals = list(map(list, zip(*signals)))
-    signals = [
-        pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signal], batch_first=True).float(), patch_size)
-        for signal in signals
-    ]
-    return signals
+def pad_multi_view_batch(sample_list, patch_size):
+    """
+    Pads a batch of multi-view signals to ensure each signal's length is a multiple of patch_size.
+    Args:
+        sample_list (list): Batched list of multi-view signals, where each element is a list of views
+        patch_size (int): The patch size to pad to
+    Returns:
+        torch.Tensor: Padded batch of multi-view signals of shape (batch_size, n_views, seq_len, n_leads)
+    """
+    
+    sample_list = [[sample[i] for sample in sample_list] for i in range(len(sample_list[0]))]
+
+    tortn =  torch.nn.utils.rnn.pad_sequence([
+        pad(torch.nn.utils.rnn.pad_sequence([
+            torch.from_numpy(sig) 
+            for sig in signal
+        ], batch_first=True).float(), patch_size)
+        for signal in sample_list
+    ], batch_first=True)
+
+    # print(f'Padded multi-view batch to shape: {tortn.shape}')
+    return tortn
