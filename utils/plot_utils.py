@@ -188,5 +188,63 @@ def plot_generation(sample, model, patch_size, device, logdir, epoch, name):
         plt.close()
         return path
 
+def plot_latent_space(z, epoch, logdir):
+    """
+    Performs SVD on the covariance matrix of embeddings to check for dimensional collapse.
+    z: Tensor of shape [N_samples, Embedding_Dim]
+    """
+    # Move to CPU/Numpy for analysis (SVD on large matrix can be heavy on GPU)
+    z = z.float()
+    
+    # 1. Center the embeddings
+    z = z - z.mean(dim=0)
+    
+    # 2. Compute Covariance Matrix
+    N, D = z.shape
+    if N < 2: return # Not enough samples
+
+    cov_matrix = (z.T @ z) / (N - 1)
+    
+    # 3. SVD
+    # Compute singular values of the covariance matrix
+    _, S, _ = torch.svd(cov_matrix)
+    
+    # 4. Calculate Effective Rank (Entropy)
+    total_variance = torch.sum(S)
+    p_vals = S / total_variance
+    entropy = -torch.sum(p_vals * torch.log(p_vals + 1e-12))
+    effective_rank = torch.exp(entropy)
+    
+    # Log scalar metrics
+    # self.log('val_effective_rank', effective_rank.item(), prog_bar=True)
+    # self.log('val_embedding_variance', total_variance.item(), prog_bar=False)
+
+    # 5. Visualizations
+    fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+    
+    # Plot Spectrum (Log scale)
+    s_np = S.cpu().numpy()
+    ax[0].plot(s_np, marker='.', markersize=2)
+    ax[0].set_yscale('log')
+    ax[0].set_title(f'Singular Value Spectrum (Eff Rank: {effective_rank:.1f}/{D})')
+    ax[0].set_xlabel('Singular Value Index')
+    ax[0].set_ylabel('Value')
+    ax[0].grid(True, which="both", ls="-", alpha=0.2)
+
+    # Plot Covariance Heatmap (First 50 dims)
+    cov_np = cov_matrix.cpu().numpy()
+    vis_dim = min(50, D)
+    sns.heatmap(cov_np[:vis_dim, :vis_dim], ax=ax[1], cmap='viridis', center=0, vmin=-0.1, vmax=0.1, cbar=True)
+    ax[1].set_title(f'Covariance (First {vis_dim} dims)')
+    
+    plt.tight_layout()
+
+    os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
+    path = f'{logdir}/epoch_{epoch}/latent_space.png'
+    plt.savefig(path)
+    plt.close()
+
+    return effective_rank.item(), total_variance.item(), path
+
 
     

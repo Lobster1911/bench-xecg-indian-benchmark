@@ -3,13 +3,17 @@ from utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, ma
 from lejepa.epps_pulley import EppsPulley
 from lejepa.slicing import SlicingUnivariateTest
 from torch.nn import functional as F
-from utils.plot_utils import plot_reconstruction, plot_generation, plot_local_views
+from utils.plot_utils import plot_reconstruction, plot_generation, plot_local_views, plot_latent_space
 import numpy as np
 import torch
 import lightning
 import trainers.common as common
 from threadpoolctl import threadpool_limits
 from sklearn.metrics import f1_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+import io
+from PIL import Image
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multiclass import OneVsRestClassifier
@@ -53,6 +57,7 @@ class PretrainedNetwork(L.LightningModule):
         self.plot_samples = config.plot_samples
         self.sync_dist = config.devices >= 2 if config.devices is not None else False
 
+        self.validation_step_outputs = [] 
 
         if self.pretraining_strategy == 'sim_dino_v2':
             self.sim_dino_loss = SimDINOv2Loss(eps=0.05)
@@ -144,8 +149,13 @@ class PretrainedNetwork(L.LightningModule):
         teacher_param.data = teacher_param.data * beta + (1.0 - beta) * student_param.data
 
     def validation_step(self, batch, _):
-        loss = self.reconstruct_batch(batch, step='val')
-        return loss
+        losses = self.reconstruct_batch(batch, step='val')
+        embeddings, pretraining_loss = losses['embeddings'], losses['pretraining_loss']
+
+        embedding_mean_over_views = embeddings.detach().cpu().mean(0)
+        self.validation_step_outputs.append(embedding_mean_over_views)
+
+        return pretraining_loss
     
     def test_step(self, batch, _):
         loss = self.reconstruct_batch(batch, step='test')
@@ -162,6 +172,11 @@ class PretrainedNetwork(L.LightningModule):
 
         return super().on_train_epoch_end()
 
+    def on_validation_epoch_start(self):
+        # Clear storage at start of validation
+        self.validation_step_outputs = []
+        super().on_validation_epoch_start()
+
     def on_validation_epoch_end(self):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
@@ -173,8 +188,16 @@ class PretrainedNetwork(L.LightningModule):
         
         self.log_sample_plots(self.trainer.val_dataloaders, 115, -25, stage_name='val')
 
+        if len(self.validation_step_outputs) > 0:
+
+            effective_rank, total_variance, path = plot_latent_space(torch.cat(self.validation_step_outputs, dim=0), self.current_epoch, self.logger.log_dir)
+            self.log('val_effective_rank', effective_rank, prog_bar=True)
+            self.log('val_embedding_variance', total_variance, prog_bar=False)
+            self.logger.log_image(key="latent_space_analysis", images=[path])
+            self.validation_step_outputs = []
+
         return super().on_validation_epoch_end()
-    
+
     def log_sample_plots(self, dataloader, fixed_idx1, fixed_idx2, stage_name=''):
         # save the plots of the reconstruction for some samples
         sample_1 = dataloader.dataset[fixed_idx1]
@@ -237,7 +260,7 @@ class PretrainedNetwork(L.LightningModule):
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg
         self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
 
-        return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss}
+        return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss, 'embeddings': all_view_cls}
 
     def reconstruct_batch_sim_dino_v2(self, batch, step):
         global_signals = batch["global_signals"]
@@ -480,4 +503,3 @@ class PretrainedNetwork(L.LightningModule):
             return common.configure_optimizer_teacher_student(self)
         else:
             return common.configure_optimizers(self)
-

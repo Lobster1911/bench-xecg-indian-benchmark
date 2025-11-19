@@ -13,7 +13,7 @@ def all_reduce(x, op="AVG"):
         return x
 
 
-class EppsPulley(UnivariateTest):
+class FastEppsPulley(UnivariateTest):
     """
     Fast Epps-Pulley two-sample test statistic for univariate distributions.
 
