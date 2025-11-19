@@ -57,7 +57,7 @@ class PretrainedNetwork(L.LightningModule):
             self.sim_dino_loss = SimDINOv2Loss(eps=0.05)
 
         if self.pretraining_strategy == 'lejepa':
-            univariate_test = EppsPulley(n_points=17)
+            univariate_test = EppsPulley(n_points=17, t_range=(-5, 5))
             self.lejepa_loss = SlicingUnivariateTest(
                 univariate_test=univariate_test, 
                 num_slices=1024
@@ -83,7 +83,8 @@ class PretrainedNetwork(L.LightningModule):
     def training_step(self, batch, _):
         losses = self.reconstruct_batch(batch, step='train')
         rec_loss, pretraining_loss = losses['reconstruction_loss'], losses['pretraining_loss']
-
+        
+        # only for teacher student architectures
         if not self.automatic_optimization:
             opt_core, opt_head = self.optimizers()
             sched_core, sched_head = self.lr_schedulers()
@@ -118,8 +119,7 @@ class PretrainedNetwork(L.LightningModule):
         wd = self.wd + (self.final_wd - self.wd) * (step / total_steps)
     
         for param_group in opt_core.param_groups:
-            param_group['weight_decay'] = wd
-            
+            param_group['weight_decay'] = wd 
 
     def optimizer_zero_grad(self, epoch, batch_idx, optimizer):
         optimizer.zero_grad(set_to_none=True)
@@ -189,13 +189,16 @@ class PretrainedNetwork(L.LightningModule):
         log_dir = self.logger.log_dir if self.logger.log_dir is not None else self.logger.experiment.dir
 
         local_views = plot_local_views(sample_4, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'local_views_sample_s')
-        img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-        img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
-            self.logger.log_image(key=f"reconstructions_{stage_name}", images=[img_1, img_2, img_3, img_4])
             self.logger.log_image(key=f"local_views_{stage_name}", images=[local_views])
+
+        if self.pretraining_strategy == 'sim_dino_v2':
+            img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+            img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+            img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+            img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+            if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
+                self.logger.log_image(key=f"reconstructions_{stage_name}", images=[img_1, img_2, img_3, img_4])
 
     def reconstruct_batch(self, batch, step):
         if self.pretraining_strategy == 'sim_dino_v2':
@@ -210,28 +213,28 @@ class PretrainedNetwork(L.LightningModule):
         local_signals = batch["local_signals"]
 
         global_out = self.model(global_signals.reshape(-1, global_signals.shape[2], global_signals.shape[3]), masking=False, reconstruct=False)
-        global_out_cls = global_out['cls'].reshape(global_signals.shape[0], global_signals.shape[1],  global_out['cls'].shape[-1])  # [bs, n_global_views, dim]
+        global_out_cls = global_out['cls'].reshape(global_signals.shape[0], global_signals.shape[1], global_out['cls'].shape[-1])  # [n_global_views, bs dim]
         # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
         global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
 
         local_out = self.model(local_signals.reshape(-1, local_signals.shape[2], local_signals.shape[3]), masking=False, reconstruct=False)
-        local_out_cls = local_out['cls'].reshape(local_signals.shape[0], local_signals.shape[1], local_out['cls'].shape[-1])  # [bs, n_local_views, dim]
+        local_out_cls = local_out['cls'].reshape(local_signals.shape[0], local_signals.shape[1], local_out['cls'].shape[-1])  # [n_local_views, bs dim]
         # print(f'Local out CLS shape: {local_out_cls.shape}') [n_local_views, bs, dim]
 
-        all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=0)  # [bs, global_views + local_views, dim]
+        all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=0)  # [global_views + local_views, bs, dim]
         # print(f'All view CLS shape: {all_view_cls.shape}')
 
         similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean()
-        self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.devices == 2)
+        self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.devices >= 2)
 
         # sigreg = self.lejepa_loss(all_view_cls)
         # print('sigreg:', sigreg.item())
 
         sigreg = torch.mean(torch.stack([self.lejepa_loss(samples) for samples in all_view_cls]))
-        self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.devices == 2)
+        self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.devices >= 2)
 
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg
-        self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
+        self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.devices >= 2)
 
         return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss}
 

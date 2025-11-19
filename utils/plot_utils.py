@@ -109,7 +109,7 @@ def plot_local_views(sample, patch_size, freq, device, logdir, epoch, name):
         outer_gs.update(wspace=0.2, hspace=0.3)
 
         for idx, signal in enumerate(sample['local_signals']):
-            x = signal.to(device).unsqueeze(0)
+            x = torch.from_numpy(signal).float().unsqueeze(0).to(device)
 
             # Calcolo corretto posizione nella griglia principale
             row = idx // n_cols
