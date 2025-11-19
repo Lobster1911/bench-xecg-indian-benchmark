@@ -51,6 +51,7 @@ class PretrainedNetwork(L.LightningModule):
         self.sampling_freq = config.sampling_freq
         self.use_teacher_student = config.strategy == 'sim_dino_v2'
         self.plot_samples = config.plot_samples
+        self.sync_dist = config.devices >= 2 if config.devices is not None else False
 
 
         if self.pretraining_strategy == 'sim_dino_v2':
@@ -132,7 +133,7 @@ class PretrainedNetwork(L.LightningModule):
         num_training_steps = steps_per_epoch * self.epochs * 2 
         beta = self.ema_0 + self.global_step * (self.ema_1 - self.ema_0) / num_training_steps
         beta = min(max(beta, 0.0), 1.0) # bound to max 1.0
-        self.log('teacher_beta', beta, prog_bar=False, sync_dist=self.devices == 2)
+        self.log('teacher_beta', beta, prog_bar=False, sync_dist=self.sync_dist)
         self.update_module(self.model._teacher, self.model, beta)
         
     def update_module(self, teacher_module, student_module, beta):
@@ -225,16 +226,16 @@ class PretrainedNetwork(L.LightningModule):
         # print(f'All view CLS shape: {all_view_cls.shape}')
 
         similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean()
-        self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.devices >= 2)
+        self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         # sigreg = self.lejepa_loss(all_view_cls)
         # print('sigreg:', sigreg.item())
 
         sigreg = torch.mean(torch.stack([self.lejepa_loss(samples) for samples in all_view_cls]))
-        self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.devices >= 2)
+        self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg
-        self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.devices >= 2)
+        self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss}
 
@@ -275,25 +276,24 @@ class PretrainedNetwork(L.LightningModule):
         cls_tok_teacher_g = torch.stack([g['cls'] for g in global_out_teacher], dim=0)
     
         compression_term, expansion_term = self.sim_dino_loss(cls_tok_stud_g, cls_tok_teacher_g)
-        self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, sync_dist=self.devices == 2)
-        self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, sync_dist=self.devices == 2)
+        self.log(f"{step}_compression_term", compression_term.item(), prog_bar=False, sync_dist=self.sync_dist)
+        self.log(f"{step}_expansion_term", expansion_term.item(), prog_bar=False, sync_dist=self.sync_dist)
 
         stud_embeddings = torch.cat([out['patches'] for out in global_out], dim=1).flatten(0, 1)
         teacher_embeddings = torch.cat([out_t['patches'] for out_t in global_out_teacher], dim=1).flatten(0, 1)
 
         # simplified dino uses only the mse between the embeddigns
         patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
-        self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
+        self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         teacher_student_loss = compression_term + self.lambda_loss * expansion_term + patch_loss
 
-        self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
-
+        self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
         # log norm of output
         with torch.no_grad():
             norm = torch.norm(global_out[0]['patches'], dim=-1)
             norm = norm.mean()
-            self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, sync_dist=self.devices == 2)
+            self.log(f"{step}_norm_emb", norm.item(), prog_bar=False, sync_dist=self.sync_dist)
 
             # log the mean cosine similarity between all samples in the batch
             cos_sim = torch.nn.functional.cosine_similarity(global_out[0]['cls'].unsqueeze(1), global_out[1]['cls'].unsqueeze(0), dim=-1)
@@ -302,8 +302,8 @@ class PretrainedNetwork(L.LightningModule):
             mask = torch.eye(cos_sim.shape[0], device=cos_sim.device).bool()
             cos_sim_diff = (cos_sim[~mask].mean() + cos_sim2[~mask].mean()) / 2
             cos_sim_same = (cos_sim2[mask].mean() + cos_sim[mask].mean()) / 2
-            self.log(f"{step}_cos_sim_different_samples", cos_sim_diff.item(), prog_bar=False, sync_dist=self.devices == 2)
-            self.log(f"{step}_cos_sim_same_samples", cos_sim_same.mean().item(), prog_bar=False, sync_dist=self.devices == 2)
+            self.log(f"{step}_cos_sim_different_samples", cos_sim_diff.item(), prog_bar=False, sync_dist=self.sync_dist)
+            self.log(f"{step}_cos_sim_same_samples", cos_sim_same.mean().item(), prog_bar=False, sync_dist=self.sync_dist)
         
         nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(global_out[0]['reconstruction'], global_signals[0], mask = None) #  out['mask'])
         nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(global_out[1]['reconstruction'], global_signals[1], mask=None) #, out2['mask'])
@@ -316,13 +316,13 @@ class PretrainedNetwork(L.LightningModule):
         if 'grad' in self.loss_type: loss += grad * self.grad_loss_lambda
         if 'min_max' in self.loss_type: loss += min_max * self.min_max_loss_lambda
 
-        self.log(f"{step}_loss", loss.item(), prog_bar=True, sync_dist=self.devices == 2)
-        self.log(f"{step}_mse", mse.item(), prog_bar=False, sync_dist=self.devices == 2)
-        self.log(f"{step}_mae", mae.item(), prog_bar=False, sync_dist=self.devices == 2)
-        self.log(f"{step}_grad", grad.item(), prog_bar=False, sync_dist=self.devices == 2)
-        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False)
+        self.log(f"{step}_loss", loss.item(), prog_bar=True, sync_dist=self.sync_dist)
+        self.log(f"{step}_mse", mse.item(), prog_bar=False, sync_dist=self.sync_dist)
+        self.log(f"{step}_mae", mae.item(), prog_bar=False, sync_dist=self.sync_dist)
+        self.log(f"{step}_grad", grad.item(), prog_bar=False, sync_dist=self.sync_dist)
+        if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, sync_dist=self.sync_dist)
         
-        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, sync_dist=self.devices == 2)
+        self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, sync_dist=self.sync_dist)
 
         return {'reconstruction_loss': loss, 'pretraining_loss': teacher_student_loss}
     
@@ -432,8 +432,8 @@ class PretrainedNetwork(L.LightningModule):
             f1 = f1_score(y_val, y_pred, average='macro')
             f1_train = f1_score(y_train, x_pred, average='macro')
 
-            self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True, sync_dist=self.devices == 2)
-            self.log('downstream_knn_ptbxl_f1_train', f1_train, prog_bar=False, sync_dist=self.devices == 2)
+            self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True, sync_dist=self.sync_dist)
+            self.log('downstream_knn_ptbxl_f1_train', f1_train, prog_bar=False, sync_dist=self.sync_dist)
     
     def get_params(self):
         if self.layerwise_lr_decay > 0.:
