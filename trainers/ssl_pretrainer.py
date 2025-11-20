@@ -471,6 +471,7 @@ class PretrainedNetwork(L.LightningModule):
         linear_probe_config = {
             "C": 1,
             "random_state": 42,
+            "max_iter": 1000,
         }
         self.evaluate_on_model_type(train_data, val_data, "lp", LogisticRegression, linear_probe_config)
 
