@@ -401,12 +401,12 @@ class PretrainedNetwork(L.LightningModule):
         
         return x, reconstruction, None, None
     
-    @torch.no_grad()
     def get_feature_data(self, dataloader):
         all_features = {}
         all_labels = []
         for batch in dataloader:
             signal = batch["signals"]
+            self.model.eval()
             features = self.model.get_features(signal.to(self.device))
             for k, v in features.items():
                 if k not in all_features:
@@ -445,13 +445,13 @@ class PretrainedNetwork(L.LightningModule):
             self.log(f'ptb-xl/val_{feature_type}_{model_name}_f1', f1_val)
 
 
-    @torch.no_grad()
     def eval_model_downstream(self):
         """
         Evaluate the quality of model features using KNN on a classification task, e.g. PTB-XL superclasses.
         """
-        train_data = self.get_feature_data(self.knn_train_dataloader)
-        val_data = self.get_feature_data(self.knn_val_dataloader)
+        with torch.no_grad():
+            train_data = self.get_feature_data(self.knn_train_dataloader)
+            val_data = self.get_feature_data(self.knn_val_dataloader)
 
         # knn_config = {
         #     "n_neighbors": 10,

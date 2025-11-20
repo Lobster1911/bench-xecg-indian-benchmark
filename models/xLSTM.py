@@ -256,7 +256,7 @@ class pretrainedxLSTM(BaseModel):
         if self.cls_type == 'attn_pool':
             tortn['attn_pool'] = cls
 
-        if self.cls_type == 'token' and self.cls_type == 'token_2':
+        if self.cls_type == 'token' or self.cls_type == 'token_2':
             tortn['token'] = cls
 
         return tortn
