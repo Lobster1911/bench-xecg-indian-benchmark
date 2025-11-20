@@ -15,8 +15,11 @@ import seaborn as sns
 import io
 from PIL import Image
 
+
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LogisticRegression
 
 # define the LightningModule
 class PretrainedNetwork(L.LightningModule):
@@ -181,7 +184,7 @@ class PretrainedNetwork(L.LightningModule):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
-        self.knn_evaluation()
+        self.eval_model_downstream()
 
         if self.logger is None or not self.plot_samples:
             return super().on_validation_epoch_end()
@@ -399,64 +402,78 @@ class PretrainedNetwork(L.LightningModule):
         return x, reconstruction, None, None
     
     @torch.no_grad()
-    def knn_evaluation(self):
-        """
-        Evaluating KNN performance on the validation set of PTB-XL as a metric
-        """
-        self.model.eval()
-        all_features = []
-        # all_features_teacher = []
+    def get_feature_data(self, dataloader):
+        all_features = {}
         all_labels = []
-        # loop the knn dataloader to get the embeddings
-        for sample in self.knn_train_dataloader:
-            out = self.model(sample["signals"].to(self.device), masking=False, reconstruct=False)
-            # out_teacher = self.model.teacher_fwd(sample["signals"].to(self.device))
+        for batch in dataloader:
+            signal = batch["signals"]
+            features = self.model.get_features(signal.to(self.device))
+            for k, v in features.items():
+                if k not in all_features:
+                    all_features[k] = []
+                all_features[k].append(v.detach().cpu())
+            all_labels.append(batch['class_labels'].detach().cpu())
 
-            # all_features_teacher.append(out_teacher['cls'].detach().cpu())
-            all_features.append(out['cls'].detach().cpu())
-            all_labels.append(sample['class_labels'].detach().cpu())
+        output = {}
 
-        X_train = torch.cat(all_features).numpy()
-        # X_train_teacher = torch.cat(all_features_teacher).numpy()
+        for k in all_features:
+            output[k] = torch.cat(all_features[k]).numpy()
+        output["label"] = torch.cat(all_labels).numpy()
+        return output
 
-        y_train = torch.cat(all_labels).numpy()
-        
-        knn = KNeighborsClassifier(n_neighbors=5)
-        # knn_teacher = KNeighborsClassifier(n_neighbors=5)
-        model = OneVsRestClassifier(knn)
-        # model_teacher = OneVsRestClassifier(knn_teacher)
+    def evaluate_on_model_type(self, train_data: dict[str, np.array], val_data: dict[str, np.array], model_name: str, model_class, model_config: dict):
+        y_train = train_data["label"]
+        y_val = val_data["label"]
 
-        with threadpool_limits(limits=1):
-            model.fit(X_train, y_train)
-            # model_teacher.fit(X_train_teacher, y_train)
+        # all key that are not 'label'
+        feature_types = [k for k in train_data if k != "label"]
+        for feature_type in feature_types:
+            x_train = train_data[feature_type]
+            x_val = val_data[feature_type]
 
-            # get the validation part
-            all_features_val = []
-            # all_features_teacher_val = []
-            all_labels_val = []
+            model = model_class(**model_config)
+            model = OneVsRestClassifier(model, n_jobs=1)
+            model.fit(x_train, y_train)
 
-            for sample in self.knn_val_dataloader:
-                out = self.model(sample["signals"].to(self.device))
-                # out_teacher = self.model.teacher_fwd(sample["signals"].to(self.device))
+            val_pred = model.predict(x_val)
+            train_pred = model.predict(x_train)
 
-                all_features_val.append(out['cls'].detach().cpu())
-                all_labels_val.append(sample['class_labels'].detach().cpu())
-                # all_features_teacher_val.append(out_teacher['cls'].detach().cpu())
+            f1_val = f1_score(y_val, val_pred, average='macro')
+            f1_train = f1_score(y_train, train_pred, average='macro')
 
-            X_val = torch.cat(all_features_val).numpy()
-            # X_val_teacher = torch.cat(all_features_teacher_val).numpy()
-            y_val = torch.cat(all_labels_val).numpy()
+            self.log(f'ptb-xl/train_{feature_type}_{model_name}_f1', f1_train)
+            self.log(f'ptb-xl/val_{feature_type}_{model_name}_f1', f1_val)
 
-            y_pred = model.predict(X_val)
-            # y_pred_teacher = model_teacher.predict(X_val_teacher)
-            x_pred = model.predict(X_train)
-            # x_pred_teacher = model_teacher.predict(X_train_teacher)
 
-            f1 = f1_score(y_val, y_pred, average='macro')
-            f1_train = f1_score(y_train, x_pred, average='macro')
+    @torch.no_grad()
+    def eval_model_downstream(self):
+        """
+        Evaluate the quality of model features using KNN on a classification task, e.g. PTB-XL superclasses.
+        """
+        train_data = self.get_feature_data(self.knn_train_dataloader)
+        val_data = self.get_feature_data(self.knn_val_dataloader)
 
-            self.log('downstream_knn_ptbxl_f1', f1, prog_bar=True, sync_dist=self.sync_dist)
-            self.log('downstream_knn_ptbxl_f1_train', f1_train, prog_bar=False, sync_dist=self.sync_dist)
+        # knn_config = {
+        #     "n_neighbors": 10,
+        # }
+        # self.evaluate_on_model_type(train_data, val_data, "knn", KNeighborsClassifier, knn_config)
+
+        mlp_config = {
+            "hidden_layer_sizes": [256, 128, 128, 64],
+            "random_state": 42,
+            "max_iter": 64,
+            "early_stopping": True,
+            "validation_fraction": 0.2,
+            "n_iter_no_change": 5,
+        }
+        self.evaluate_on_model_type(train_data, val_data, "mlp", MLPClassifier, mlp_config)
+
+        linear_probe_config = {
+            "C": 1,
+            "random_state": 42,
+        }
+        self.evaluate_on_model_type(train_data, val_data, "lp", LogisticRegression, linear_probe_config)
+
     
     def get_params(self):
         if self.layerwise_lr_decay > 0.:

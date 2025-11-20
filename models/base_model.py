@@ -33,6 +33,12 @@ class BaseModel(nn.Module):
         """
         raise NotImplementedError()
 
+    def get_features(self, x):
+        """
+        This function should be the complete forward pass apart from the classification head.
+        """
+        raise NotImplementedError
+
     def get_params_layerwise_decay(self, lr_decay, lr, wd):
         layers = self.get_layers()
         num_layers = len(layers) + 1 

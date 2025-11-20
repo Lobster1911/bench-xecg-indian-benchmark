@@ -74,20 +74,20 @@ class pretrainedxLSTM(BaseModel):
         param.requires_grad = False
         return param
     
-    def pooling(self, out, padding_mask=None):
+    def pooling(self, out, padding_mask=None, pooling_type='avg'):
         cls= None
-        if self.cls_type == 'max':
+        if pooling_type == 'max':
             if padding_mask is None:
                 cls = out.max(dim=1)[0]
             else:
                 cls = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
-        elif self.cls_type == 'mean' or self.cls_type == 'avg':
+        elif pooling_type == 'mean' or pooling_type == 'avg':
             if padding_mask is None:
                 cls = out.mean(dim=1)
             else:
                 cls = out.masked_fill(padding_mask, 0).sum(dim=1) / (out.shape[1] - padding_mask.sum(dim=1)).clamp(min=1)
 
-        elif self.cls_type == 'mix':
+        elif pooling_type == 'mix':
             if padding_mask is None:
                 max_p = out.max(dim=1)[0]
                 mean_p = out.mean(dim=1)
@@ -95,15 +95,15 @@ class pretrainedxLSTM(BaseModel):
                 max_p = out.masked_fill(padding_mask, -torch.inf).max(dim=1)[0]
                 mean_p = out.masked_fill(padding_mask, 0).sum(dim=1) / (out.shape[1] - padding_mask.sum(dim=1)).clamp(min=1)
             cls = torch.cat([max_p, mean_p], dim=-1)
-        elif self.cls_type == 'token':
+        elif pooling_type == 'token':
             cls = out[:, -1, :]
             out = out[:, :-1, :]
-        elif self.cls_type == 'token_2':
+        elif pooling_type == 'token_2':
             cls_1 = out[:, 0, :]
             cls_2 = out[:, -1, :]
             out = out[:, 1:-1, :]
             cls = cls_1 + cls_2
-        elif self.cls_type == 'attn_pool' or self.cls_type == 'lin_attn_pool':
+        elif pooling_type == 'attn_pool' or pooling_type == 'lin_attn_pool':
             if padding_mask is None:
                 cls = self.attn_pool(out).squeeze()
             else:
@@ -127,10 +127,10 @@ class pretrainedxLSTM(BaseModel):
         if self.num_reg_tokens > 0:
             out = self.remove_reg_tokens(out)
 
-        cls, out = self.pooling(out, padding_mask)
+        cls, out = self.pooling(out, padding_mask, pooling_type=self.cls_type)
         return cls, out
-    
-    def forward(self, x, masking=True, reconstruct=True):
+
+    def mask_signal_if_needed(self, x, masking):
         padding_mask = self.get_padding_mask(x)
 
         if masking:   # masking
@@ -151,8 +151,12 @@ class pretrainedxLSTM(BaseModel):
             )
             # x_emb[patched_mask] = self.mask_token
 
+        return x_emb, padding_mask
+    
+    def forward(self, x, masking=True, reconstruct=True):
+        x_emb, mask = self.mask_signal_if_needed(x, masking)
         
-        cls, out = self.forward_core(x_emb, padding_mask=padding_mask)
+        cls, out = self.forward_core(x_emb, padding_mask=mask)
 
         # reconstruct signal
         if reconstruct:
@@ -226,6 +230,36 @@ class pretrainedxLSTM(BaseModel):
             return [param for name, param in self.named_parameters() if "teacher" not in name and 'reconstruction' not in name]
         
         return self.parameters()
+
+    def get_features(self, x):
+        """
+        This function should be the complete forward pass apart from the classification head.
+        """
+        x_emb, mask = self.mask_signal_if_needed(x, False)
+        
+        cls, out = self.forward_core(x_emb, padding_mask=mask)
+
+        tortn = {}
+
+        if self.cls_type != 'avg' and self.cls_type != 'mean':
+            avg, _ = self.pooling(out, padding_mask=mask, pooling_type='avg')
+            tortn['avg'] = avg
+        else:
+            tortn['avg'] = cls
+        
+        if self.cls_type == 'max':
+            max, _ = self.pooling(out, padding_mask=mask, pooling_type='max')
+            tortn['max'] = max
+        else:
+            tortn['max'] = cls
+
+        if self.cls_type == 'attn_pool':
+            tortn['attn_pool'] = cls
+
+        if self.cls_type == 'token' and self.cls_type == 'token_2':
+            tortn['token'] = cls
+
+        return tortn
     
     def get_layers(self):
         """
