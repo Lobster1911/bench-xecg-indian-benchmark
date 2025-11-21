@@ -247,7 +247,7 @@ class pretrainedxLSTM(BaseModel):
         else:
             tortn['avg'] = cls
         
-        if self.cls_type == 'max':
+        if self.cls_type != 'max':
             max, _ = self.pooling(out, padding_mask=mask, pooling_type='max')
             tortn['max'] = max
         else:
