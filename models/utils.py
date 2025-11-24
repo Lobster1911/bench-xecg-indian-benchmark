@@ -12,7 +12,7 @@ from transformer import encoder
 
 def get_normalization_layer(config, embedding_size=None):
     if config.cls_normalization == 'layer':
-        return nn.LayerNorm(embedding_size)
+        return nn.LayerNorm(embedding_size, elementwise_affine=False)
     elif config.cls_normalization == 'batch':
         return nn.BatchNorm1d(embedding_size)
     elif config.cls_normalization == 'instance':

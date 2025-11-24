@@ -13,10 +13,8 @@ class xECGClassification(xECG):
         self.linear_probing = linear_probing
         super(xECGClassification, self).__init__(cls_type=cls_type, config=config)
 
-        self.head = nn.Sequential(
-            get_normalization_layer(config, config['embedding_size']),
-            nn.Linear(config['embedding_size'], num_classes)
-        )
+        self.head = nn.Linear(config['embedding_size'], num_classes)
+        
 
     def forward(self, x):
         if self.linear_probing:
@@ -38,10 +36,8 @@ class xECGFeatureClassification(xECG):
         self.linear_probing = linear_probing
         super(xECGFeatureClassification, self).__init__(cls_type=None, config=config)
 
-        self.head = nn.Sequential(
-            get_normalization_layer(config, config['embedding_size']),
-            nn.Linear(config['embedding_size'], num_classes)
-        )
+        self.head = nn.Linear(config['embedding_size'], num_classes)
+        
 
     def forward(self, x):
         if self.linear_probing:
@@ -72,11 +68,8 @@ class xECGMinuteLevelClassification(xECG):
         self.linear_probing = linear_probing
         super(xECGFeatureClassification, self).__init__(cls_type=cls_type, config=config)
 
-        self.head = nn.Sequential(
-            get_normalization_layer(config, config['embedding_size']),
-            nn.Linear(config['embedding_size'], num_classes)
-        )
-
+        self.head = nn.Linear(config['embedding_size'], num_classes)
+        
     def forward(self, x):
         if self.linear_probing:
             with torch.no_grad():

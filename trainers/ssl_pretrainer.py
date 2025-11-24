@@ -239,18 +239,21 @@ class PretrainedNetwork(L.LightningModule):
         global_signals = batch["global_signals"]
         local_signals = batch["local_signals"]
 
-        global_out = self.model(global_signals.reshape(-1, global_signals.shape[2], global_signals.shape[3]), masking=False, reconstruct=False)
-        global_out_cls = global_out['cls'].reshape(global_signals.shape[0], global_signals.shape[1], global_out['cls'].shape[-1])  # [n_global_views, bs dim]
-        # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
-        global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
+        n_global_views, bs, seq_len, n_channels = global_signals.shape
 
-        local_out = self.model(local_signals.reshape(-1, local_signals.shape[2], local_signals.shape[3]), masking=False, reconstruct=False)
-        local_out_cls = local_out['cls'].reshape(local_signals.shape[0], local_signals.shape[1], local_out['cls'].shape[-1])  # [n_local_views, bs dim]
+        global_out = self.model(global_signals.reshape(-1, seq_len, n_channels), masking=False, reconstruct=False)
+        global_out_cls = global_out['cls'].reshape(n_global_views, bs, global_out['cls'].shape[-1])  # [n_global_views, bs dim]
+        # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
+        
+        n_local_views, bs, seq_len, n_channels = local_signals.shape
+        local_out = self.model(local_signals.reshape(-1, seq_len, n_channels), masking=False, reconstruct=False)
+        local_out_cls = local_out['cls'].reshape(n_local_views, bs, local_out['cls'].shape[-1])  # [n_local_views, bs dim]
         # print(f'Local out CLS shape: {local_out_cls.shape}') [n_local_views, bs, dim]
 
         all_view_cls = torch.cat([global_out_cls, local_out_cls], dim=0)  # [global_views + local_views, bs, dim]
         # print(f'All view CLS shape: {all_view_cls.shape}')
 
+        global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
         similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean()
         self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.sync_dist)
 

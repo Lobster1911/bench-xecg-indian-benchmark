@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from models.utils import get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head,  get_transformer
+from models.utils import get_normalization_layer, get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head,  get_transformer
 import copy
 from models.pooling import AttentionPooling, LinearAttentionPooling
 from models.base_model import BaseModel
@@ -51,6 +51,8 @@ class pretrainedxLSTM(BaseModel):
           
         if reconstruction:
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
+
+        self.normalization_layer = get_normalization_layer(config, config.embedding_size)
 
     def init_teacher(self):
         self._teacher = self.create_teacher_module()
@@ -107,7 +109,9 @@ class pretrainedxLSTM(BaseModel):
             if padding_mask is None:
                 cls = self.attn_pool(out).squeeze()
             else:
-                cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()      
+                cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()  
+
+        cls = self.normalization_layer(cls)    
         return cls, out
     
     def forward_core(self, x, padding_mask=None):
