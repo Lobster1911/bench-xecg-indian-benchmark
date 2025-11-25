@@ -1,6 +1,7 @@
 import os
 import lightning as L
 from lightning.pytorch.loggers import WandbLogger
+from dataset import mit_bih
 from models.xLSTM import pretrainedxLSTM
 import dataset.generic_utils as generic_utils
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
@@ -11,6 +12,7 @@ import dataset.ptb_xl as ptb_xl
 from torch.utils.data import DataLoader, Subset
 from dataset.dataset_preparation_utils import load_datasets
 from trainers.common import DelayedCheckpoint
+from dataset.generic_utils import get_transforms
 import time
 
 # argparse
@@ -27,14 +29,22 @@ def pretrain(config, run=None, wandb=False):
 
     train_dataset,val_dataset = load_datasets(config)
 
-    # knn datasets:
-    knn_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
-    knn_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
-    knn_train_dataloader = DataLoader(knn_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
-    knn_val_dataloader = DataLoader(knn_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
+    # downstream ptb_xl dataset
+    ptb_xl_train_dataset = ptb_xl.ECGPTBXLDataset(config, split='train', global_augmentations=None, local_augmentations=None)
+    ptb_xl_val_dataset = ptb_xl.ECGPTBXLDataset(config, split='val', global_augmentations=None, local_augmentations=None)
+    ptb_xl_train_dataloader = DataLoader(ptb_xl_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
+    ptb_xl_val_dataloader = DataLoader(ptb_xl_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=ptb_xl.make_collate_fn(config, split='val', downstream=True))
+
+    # downstream mit-bih dataset
+    mit_bih_train_dataset = mit_bih.ECGMITBIHDataset(config, split='train', augmentations=None)
+    mit_bih_val_dataset = mit_bih.ECGMITBIHDataset(config, split='val', augmentations=None)
+    mit_bih_train_dataloader = DataLoader(mit_bih_train_dataset, batch_size=config.batch_size, shuffle=True, collate_fn=mit_bih.make_collate_fn(config))
+    mit_bih_val_dataloader = DataLoader(mit_bih_val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config))
 
     # keep only 10% of the dataset
-    if config.debug: train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
+    if config.debug: 
+        train_dataset = Subset(train_dataset, range(0, len(train_dataset) // 100))
+        config.xlstm_config = ['m', 'm', 'm']
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn(config))
     len_train_dataset = len(train_dataset)
 
@@ -50,16 +60,20 @@ def pretrain(config, run=None, wandb=False):
             model=base_model, 
             len_train_dataset=len_train_dataset, 
             config=config, 
-            knn_train_dataloader=knn_train_dataloader, 
-            knn_val_dataloader=knn_val_dataloader,
+            ptb_xl_train_dataloader=ptb_xl_train_dataloader, 
+            ptb_xl_val_dataloader=ptb_xl_val_dataloader,
+            mit_bih_train_dataloader=mit_bih_train_dataloader,
+            mit_bih_val_dataloader=mit_bih_val_dataloader,
         )
     else:
         model = PretrainedNetwork(
             model=base_model, 
             len_train_dataset=len_train_dataset,
             config=config, 
-            knn_train_dataloader=knn_train_dataloader, 
-            knn_val_dataloader=knn_val_dataloader,
+            ptb_xl_train_dataloader=ptb_xl_train_dataloader, 
+            ptb_xl_val_dataloader=ptb_xl_val_dataloader,
+            mit_bih_train_dataloader=mit_bih_train_dataloader,
+            mit_bih_val_dataloader=mit_bih_val_dataloader,
         )
         
     checkpoint_callback = DelayedCheckpoint(delay_epochs=config.monitor_delay_epochs, monitor=config.monitor_metric, mode=config.monitor_mode)

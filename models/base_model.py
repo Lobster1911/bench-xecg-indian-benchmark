@@ -33,7 +33,7 @@ class BaseModel(nn.Module):
         """
         raise NotImplementedError()
 
-    def get_features(self, x):
+    def get_features(self, x, feature_classification=False):
         """
         This function should be the complete forward pass apart from the classification head.
         """

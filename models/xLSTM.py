@@ -235,7 +235,7 @@ class pretrainedxLSTM(BaseModel):
         
         return self.parameters()
 
-    def get_features(self, x):
+    def get_features(self, x, feature_classification=False):
         """
         This function should be the complete forward pass apart from the classification head.
         """
@@ -243,6 +243,9 @@ class pretrainedxLSTM(BaseModel):
         
         cls, out = self.forward_core(x_emb, padding_mask=mask)
 
+        if feature_classification:
+            return {'feat': out}
+        
         tortn = {}
 
         if self.cls_type != 'avg' and self.cls_type != 'mean':
@@ -262,8 +265,9 @@ class pretrainedxLSTM(BaseModel):
 
         if self.cls_type == 'token' or self.cls_type == 'token_2':
             tortn['token'] = cls
-
+        
         return tortn
+
     
     def get_layers(self):
         """

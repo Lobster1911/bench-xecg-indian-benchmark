@@ -217,18 +217,17 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
     
     
     def predict_batch(self, batch):
-        x = batch["signal"]
+        x = batch["signals"]
+        targets = batch['labels'].long()
         # print(f"x shape: {x.shape}")
 
         if self.linear_probing:
             self.model.set_eval_linear_probing()
 
         if self.single_hb:
-            targets = batch['label'].long()
             cls = self.model(x).unsqueeze(1)  # [bs, 1, num_classes]
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets + 1, weight=self.weights, ignore_index=-1)
         else:
-            targets = batch['label'].unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
             cls = self.model(x)
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
 
@@ -245,8 +244,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
 def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
-        signal = sample['signal'].to(device).unsqueeze(0)
-        target = sample['label'].to(device).unsqueeze(0)
+        signal = sample['signals'].to(device).unsqueeze(0)
+        targets = sample['labels'].to(device).unsqueeze(0)
 
         predicted = model(signal)
 
@@ -255,7 +254,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
         #     signal = signal[:, :max_length, :]
         #    target = target[:, :max_length]
 
-        targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
+        # targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
         fig, ax = plt.subplots(figsize=(25, 5))
 
         to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()

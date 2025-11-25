@@ -16,10 +16,9 @@ import io
 from PIL import Image
 
 
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import Perceptron
 
 # define the LightningModule
 class PretrainedNetwork(L.LightningModule):
@@ -28,8 +27,10 @@ class PretrainedNetwork(L.LightningModule):
             model, 
             len_train_dataset,
             config,
-            knn_train_dataloader,
-            knn_val_dataloader
+            ptb_xl_train_dataloader=None,
+            ptb_xl_val_dataloader=None,
+            mit_bih_train_dataloader=None,
+            mit_bih_val_dataloader=None,
         ):
         super().__init__()
         self.lr = config.lr
@@ -81,8 +82,11 @@ class PretrainedNetwork(L.LightningModule):
             self.stud_temp = config.stud_temp
         
 
-        self.knn_train_dataloader = knn_train_dataloader
-        self.knn_val_dataloader = knn_val_dataloader
+        self.ptb_xl_train_dataloader = ptb_xl_train_dataloader
+        self.ptb_xl_val_dataloader = ptb_xl_val_dataloader
+
+        self.mit_bih_train_dataloader = mit_bih_train_dataloader
+        self.mit_bih_val_dataloader = mit_bih_val_dataloader
 
     def configure_model(self):
         # Ensure model is properly initialized before DDP
@@ -184,7 +188,11 @@ class PretrainedNetwork(L.LightningModule):
         """
         When the validation loop ends, some representative plots from different classes are saved on wandb
         """
-        self.eval_model_downstream()
+        if self.epochs < 1:
+            return super().on_validation_epoch_end()
+        
+        self.eval_model_downstream_mit_bih()
+        self.eval_model_downstream_ptb_xl()
 
         if self.logger is None or not self.plot_samples:
             return super().on_validation_epoch_end()
@@ -404,29 +412,40 @@ class PretrainedNetwork(L.LightningModule):
         
         return x, reconstruction, None, None
     
-    def get_feature_data(self, dataloader):
+    def get_feature_data(self, dataloader, feature_classification=False):
         all_features = {}
         all_labels = []
         for batch in dataloader:
             signal = batch["signals"]
             self.model.eval()
-            features = self.model.get_features(signal.to(self.device))
+            features = self.model.get_features(signal.to(self.device), feature_classification=feature_classification)
             for k, v in features.items():
                 if k not in all_features:
                     all_features[k] = []
-                all_features[k].append(v.detach().cpu())
-            all_labels.append(batch['class_labels'].detach().cpu())
+                
+                if feature_classification:
+                    all_features[k].append(v.reshape(-1, v.shape[-1]).detach().cpu())
+                else:
+                    all_features[k].append(v.detach().cpu())
+
+            if feature_classification:
+                all_labels.append(batch['labels'].reshape(-1).detach().cpu())
+            else:
+                all_labels.append(batch['class_labels'].detach().cpu())
 
         output = {}
 
         for k in all_features:
             output[k] = torch.cat(all_features[k]).numpy()
         output["label"] = torch.cat(all_labels).numpy()
+
         return output
 
-    def evaluate_on_model_type(self, train_data: dict[str, np.array], val_data: dict[str, np.array], model_name: str, model_class, model_config: dict):
+    def evaluate_on_model_type(self, train_data: dict[str, np.array], val_data: dict[str, np.array], model_name: str, task_name: str, model_class, model_config: dict):
         y_train = train_data["label"]
         y_val = val_data["label"]
+
+        print(f"Evaluating {model_name} on {task_name} task")
 
         # all key that are not 'label'
         feature_types = [k for k in train_data if k != "label"]
@@ -435,7 +454,7 @@ class PretrainedNetwork(L.LightningModule):
             x_val = val_data[feature_type]
 
             model = model_class(**model_config)
-            model = OneVsRestClassifier(model, n_jobs=1)
+            model = OneVsRestClassifier(model, n_jobs=-1)
             model.fit(x_train, y_train)
 
             val_pred = model.predict(x_val)
@@ -444,40 +463,62 @@ class PretrainedNetwork(L.LightningModule):
             f1_val = f1_score(y_val, val_pred, average='macro')
             f1_train = f1_score(y_train, train_pred, average='macro')
 
-            self.log(f'ptb-xl/train_{feature_type}_{model_name}_f1', f1_train)
-            self.log(f'ptb-xl/val_{feature_type}_{model_name}_f1', f1_val)
+            self.log(f'{task_name}/train_{feature_type}_{model_name}_f1', f1_train)
+            self.log(f'{task_name}/val_{feature_type}_{model_name}_f1', f1_val)
 
-
-    def eval_model_downstream(self):
+    def eval_model_downstream_ptb_xl(self):
         """
         Evaluate the quality of model features using KNN on a classification task, e.g. PTB-XL superclasses.
         """
+        if self.ptb_xl_train_dataloader is None or self.ptb_xl_val_dataloader is None:
+            return
+        
         with torch.no_grad():
-            train_data = self.get_feature_data(self.knn_train_dataloader)
-            val_data = self.get_feature_data(self.knn_val_dataloader)
-
-        # knn_config = {
-        #     "n_neighbors": 10,
-        # }
-        # self.evaluate_on_model_type(train_data, val_data, "knn", KNeighborsClassifier, knn_config)
+            train_data_ptb_xl = self.get_feature_data(self.ptb_xl_train_dataloader, feature_classification=False)
+            val_data_ptb_xl = self.get_feature_data(self.ptb_xl_val_dataloader, feature_classification=False)
 
         mlp_config = {
-            "hidden_layer_sizes": [256, 128, 128, 64],
+            "hidden_layer_sizes": [256, 128, 64],
             "random_state": 42,
             "max_iter": 64,
             "early_stopping": True,
-            "validation_fraction": 0.2,
-            "n_iter_no_change": 5,
         }
-        self.evaluate_on_model_type(train_data, val_data, "mlp", MLPClassifier, mlp_config)
 
         linear_probe_config = {
-            "C": 1,
             "random_state": 42,
-            "max_iter": 1000,
+            "max_iter": 128,
+            "early_stopping": True
         }
-        self.evaluate_on_model_type(train_data, val_data, "lp", LogisticRegression, linear_probe_config)
 
+        self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "mlp", 'ptb-xl', MLPClassifier, mlp_config)
+        self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "lp", 'ptb-xl', Perceptron, linear_probe_config)
+
+    def eval_model_downstream_mit_bih(self):
+        """
+        Evaluate the quality of model features using KNN on a classification task, e.g. PTB-XL superclasses.
+        """
+        if self.mit_bih_train_dataloader is None or self.mit_bih_val_dataloader is None:
+            return
+        
+        with torch.no_grad():
+            train_data_mit_bih = self.get_feature_data(self.mit_bih_train_dataloader, feature_classification=True)
+            val_data_mit_bih = self.get_feature_data(self.mit_bih_val_dataloader, feature_classification=True)
+
+        # mlp_config = {
+        #     "hidden_layer_sizes": [256, 128, 64],
+        #     "random_state": 42,
+        #     "max_iter": 16,
+        #     "early_stopping": True,
+        # }
+
+        linear_probe_config = {
+            "random_state": 42,
+            "max_iter": 32,
+            "early_stopping": True
+        }
+
+        # self.evaluate_on_model_type(train_data_mit_bih, val_data_mit_bih, "mlp", 'mit-bih', MLPClassifier, mlp_config)
+        self.evaluate_on_model_type(train_data_mit_bih, val_data_mit_bih, "lp", 'mit-bih', Perceptron, linear_probe_config)
     
     def get_params(self):
         if self.layerwise_lr_decay > 0.:

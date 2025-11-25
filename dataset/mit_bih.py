@@ -350,6 +350,8 @@ def make_collate_fn(config, split='train'):
             labels = [item['label'] for item in batch]
             labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
+        labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
+
 
         if 'r_peak_orig' not in batch[0].keys():
             r_peaks_orig = None
@@ -365,8 +367,7 @@ def make_collate_fn(config, split='train'):
             
 
         return {
-            'signal': signals,
-            'label': labels,
+            'signals': signals,
             'patient_ids': torch.tensor(patients),
             'r_peak': r_peaks,
             'labels': labels,
