@@ -93,3 +93,9 @@ n_global_view: 2
 
 sampling_freq: 100
 lambda_code_rate: 0.1
+
+# mit bih 
+win_len: 1800
+context_len: 0
+skip_majority_class_samples: false
+split_val_by_patient: true
