@@ -49,7 +49,7 @@ def train(config, run=None, wandb=False):
             elif config.win_len == 500:
                 weights = torch.tensor([2.2468e-01, 7.8135e+00, 2.7218e+00, 1.8698e+01, 2.5163e+03]).to('cuda')
             else:
-                weights = get_training_class_weights(train_dataset, label_key='labels', do_not_consider_classes=[-1]).to('cuda')
+                weights = get_training_class_weights(train_dataset, label_key='label', do_not_consider_classes=[-1]).to('cuda')
             
             # weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
         elif config.num_classes == 3: 
@@ -69,7 +69,7 @@ def train(config, run=None, wandb=False):
     print(f"Test dataset size: {len(test_dataset)}")
 
 
-    base_model = utils.get_base_model(config, feature_classification=True, compile_model=False)
+    base_model = utils.get_base_model(config, feature_classification=True, compile_model=True)
 
     if config.r_peaks_detection:
        model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)

@@ -244,8 +244,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
 def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
-        signal = sample['signals'].to(device).unsqueeze(0)
-        targets = sample['labels'].to(device).unsqueeze(0)
+        signal = sample['signal'].to(device).unsqueeze(0)
+        targets = sample['label'].to(device).unsqueeze(0)
 
         predicted = model(signal)
 

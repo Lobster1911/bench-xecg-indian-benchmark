@@ -200,9 +200,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         start = sample['start']
         end = sample['end']
         signal = self.signals[patient][start:end]
-        signal = torch.tensor(signal, dtype=torch.float32)
 
-        r_peaks_mask = torch.zeros(signal.shape[0], dtype=torch.float32)
+        r_peaks_mask = np.zeros(signal.shape[0], dtype=np.float32)
         indexes = np.round(np.array(sample['around_r_peaks']) * self.freq_factor).astype(int) - start
         # print(f"indexes: {indexes}, start: {start}, freq_factor: {self.freq_factor}")
         r_peaks_mask[indexes] = 1
@@ -211,7 +210,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             signal = self.augmentations(signal)
 
         orig_start = np.round(start / self.freq_factor)
-        around_r_peaks = torch.tensor([r - orig_start for r in sample['around_r_peaks']])
+        around_r_peaks = np.array([r - orig_start for r in sample['around_r_peaks']])
 
         return {
             'signal': signal,
@@ -224,7 +223,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
     def get_item_classification(self, idx):
         sample = self.samples[idx]
         patient = sample['patient']
-        signal = torch.tensor(self.signals[patient], dtype=torch.float32)
+        signal = self.signals[patient]
         header = self.headers[patient]
 
         len_signal = signal.shape[0]
@@ -245,7 +244,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         if self.augmentations is not None:
             window_signal = self.augmentations(window_signal)
         
-        labels_mask = torch.zeros(window_signal.shape[0], dtype=torch.float32) - 1
+        labels_mask = np.zeros(window_signal.shape[0], dtype=np.float32) - 1
 
         for r, l in sample['around_r_peaks']:
             # print(r, l)
@@ -276,13 +275,13 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         # print('leads', leads)
 
-        signal_to_return = torch.zeros(signal.shape[0], len(self.leads_to_use), dtype=torch.float32)
+        signal_to_return = np.zeros((signal.shape[0], len(self.leads_to_use)), dtype=np.float32)
         # if the leads to use are not present in the signal set them to zero
         # leads present in the signal that are not in the leads to use are removed
         # the rest is kept unchanged
         for i, lead in enumerate(self.leads_to_use):
             if lead not in leads:
-                signal_to_return[:, i] = torch.zeros(signal.shape[0])
+                signal_to_return[:, i] = np.zeros(signal.shape[0])
             else:
                 signal_to_return[:, i] = signal[:, leads.index(lead)]
         return signal_to_return
@@ -311,7 +310,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
         patient = sample['patient']
-        signal = torch.tensor(sample['signal'], dtype=torch.float32)
+        signal = sample['signal']
         r_peak = sample['r_peak'][0]
         header = self.headers[patient]
 
@@ -325,7 +324,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
             'signal': signal,
             'patient_id': patient,
             # 'r_peaks': torch.tensor([1.0] if r_peak >= 0 else [0.0], dtype=torch.float32),
-            'label': torch.tensor([self.get_label_int(sample['r_peak'][1])], dtype=torch.float32) if r_peak >= 0 else torch.tensor([-1.0], dtype=torch.float32),
+            'label': np.array([self.get_label_int(sample['r_peak'][1])]) if r_peak >= 0 else np.array([-1.0], dtype=np.float32),
         }
 
 
@@ -335,19 +334,19 @@ def make_collate_fn(config, split='train'):
         baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
     
     def collate_fn(batch):
-        signals = [item['signal'] for item in batch]
+        signals = [torch.from_numpy(item['signal']) for item in batch]
         patients = [item['patient_id'] for item in batch]
         
         if 'r_peak' not in batch[0].keys(): 
             r_peaks = None
         else:
-            r_peaks = [item['r_peak'] for item in batch]
+            r_peaks = [torch.from_numpy(item['r_peak']) for item in batch]
             r_peaks = torch.nn.utils.rnn.pad_sequence(r_peaks, batch_first=True)
 
         if 'label' not in batch[0].keys():
             labels = None
         else:
-            labels = [item['label'] for item in batch]
+            labels = [torch.from_numpy(item['label']) for item in batch]
             labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
         labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
@@ -356,7 +355,7 @@ def make_collate_fn(config, split='train'):
         if 'r_peak_orig' not in batch[0].keys():
             r_peaks_orig = None
         else:
-            r_peaks_orig = [item['r_peak_orig'] for item in batch]
+            r_peaks_orig = [torch.from_numpy(item['r_peak_orig']) for item in batch]
             r_peaks_orig = torch.nn.utils.rnn.pad_sequence(r_peaks_orig, batch_first=True, padding_value=torch.nan)
 
         # pad to same length and pad to match the patch size module

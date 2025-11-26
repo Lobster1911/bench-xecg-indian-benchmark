@@ -27,7 +27,7 @@ class Standardize:
         loc = torch.mean(x, axis=self.axis, keepdims=True)
         scale = torch.std(x, axis=self.axis, keepdims=True)
         # Set rst = 0 if std = 0
-        return torch.tensor(np.divide(x - loc, scale, out=np.zeros_like(x), where=scale != 0), dtype=x.dtype)
+        return np.divide(x - loc, scale, out=np.zeros_like(x), where=scale != 0)
     
 class SOSFilter:
     """Apply SOS filter to the input sequence.
@@ -40,7 +40,7 @@ class SOSFilter:
         self.sos = butter(order, cutoff, btype=btype, fs=fs, output='sos')
 
     def __call__(self, x):
-        return torch.tensor(sosfiltfilt(self.sos, x.T).copy(), dtype=x.dtype).T
+        return sosfiltfilt(self.sos, x.T).T
 
 class HighpassFilter(SOSFilter):
     """Apply highpass filter to the input sequence.

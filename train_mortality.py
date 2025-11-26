@@ -8,7 +8,7 @@ import dataset.code_dataset as code
 import dataset.generic_utils as generic_utils
 
 import utils.utils as utils
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from dataset.generic_utils import get_transforms
 from trainers.mortality_trainer import TrainerMortality
 
@@ -23,8 +23,14 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: L.seed_everything(42)
 
-    dataset =  code.ECGCODE15MortalityDataset(config, split='train', global_augmentations=get_transforms(config))
+    datasets = []
+    for d in config.training_dataset:
+        if d.lower() == 'code15':
+            datasets.append(code.ECGCODE15MortalityDataset(config, split='train', global_augmentations=get_transforms(config)))
+        if d.lower() == 'mimic':
+            datasets.append(mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='mortality'))
 
+    dataset = ConcatDataset(datasets)
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [int(len(dataset) * 0.8), len(dataset) - int(len(dataset) * 0.8)])
     print(f"Train dataset size: {len(train_dataset)}")
     print(f"Val dataset size: {len(val_dataset)}")
@@ -36,7 +42,7 @@ def train(config, run=None, wandb=False):
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
-    base_model = utils.get_base_model(config, compile_model=False)
+    base_model = utils.get_base_model(config, compile_model=True)
 
     model = TrainerMortality(model=base_model, config=config, len_train_dataset=len(train_dataset))
 

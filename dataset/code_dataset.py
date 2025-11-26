@@ -4,6 +4,7 @@ import wfdb
 import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
+import torch
 
 
 class ECGCODE15Dataset(PretrainDataset):
@@ -63,9 +64,11 @@ class ECGCODE15MortalityDataset(ECGCODE15Dataset):
 
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
-        obj['death'] = self.tab_data.loc[self.records[idx], 'death']
-        obj['timey'] = self.tab_data.loc[self.records[idx], 'timey']
-        return obj
+        return {
+            'signal': obj['global_signals'][0],
+            'death': torch.tensor(self.tab_data.loc[self.records[idx], 'death'], dtype=torch.float32),
+            'timey': torch.tensor(self.tab_data.loc[self.records[idx], 'timey'], dtype=torch.bool)
+        }
 
 class ECGCODEDataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
