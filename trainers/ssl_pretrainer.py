@@ -18,7 +18,7 @@ from PIL import Image
 
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.neural_network import MLPClassifier
-from sklearn.linear_model import Perceptron
+from sklearn.linear_model import Perceptron, LogisticRegression
 
 # define the LightningModule
 class PretrainedNetwork(L.LightningModule):
@@ -486,12 +486,12 @@ class PretrainedNetwork(L.LightningModule):
 
         linear_probe_config = {
             "random_state": 42,
-            "max_iter": 128,
-            "early_stopping": True
+            "C": 1.0,
+            "max_iter": 256,
         }
 
         self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "mlp", 'ptb-xl', MLPClassifier, mlp_config)
-        self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "lp", 'ptb-xl', Perceptron, linear_probe_config)
+        self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "lp", 'ptb-xl', LogisticRegression, linear_probe_config)
 
     def eval_model_downstream_mit_bih(self):
         """
