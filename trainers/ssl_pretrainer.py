@@ -235,10 +235,10 @@ class PretrainedNetwork(L.LightningModule):
             self.logger.log_image(key=f"local_views_{stage_name}", images=[local_views])
 
         if self.pretraining_strategy == 'sim_dino_v2' or self.pretraining_strategy == 'lejepa_masked':
-            img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-            img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-            img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
-            img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
+            img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy)
+            img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy)
+            img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy)
+            img_4 = plot_reconstruction(sample_4, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_n', training_strategy=self.pretraining_strategy)
             if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
                 self.logger.log_image(key=f"reconstructions_{stage_name}", images=[img_1, img_2, img_3, img_4])
 
