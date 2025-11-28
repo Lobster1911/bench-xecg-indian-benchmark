@@ -266,7 +266,8 @@ class PretrainedNetwork(L.LightningModule):
             global_out_masked = self.model(global_signals.reshape(-1, seq_len, n_channels), masking=True, reconstruct=True)
             global_out_masked_features = global_out_masked['patches'].reshape(n_global_views, bs, num_tokens, global_out_masked['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
             global_out_features = global_out['patches'].reshape(n_global_views, bs, num_tokens, global_out['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
-            global_out_mask = global_out_masked['mask'].reshape(n_global_views, bs, num_tokens)  # [n_global_views, bs, tokens]
+            global_out_mask = global_out_masked['mask'].reshape(n_global_views, bs, seq_len)  # [n_global_views, bs, tokens]
+            global_out_mask = global_out_mask.reshape(n_global_views, bs, num_tokens, self.patch_size).max(-1)[0]  # [n_global_views, bs, tokens]
             global_out_masked_reconstruction = global_out_masked['reconstruction'].reshape(n_global_views, bs, seq_len, n_channels)  # [n_global_views, bs, tokens, dim]
             
             mask_loss = masked_mse_loss(global_out_masked_features, global_out_features.detach(), reduction='mean', mask=global_out_mask)

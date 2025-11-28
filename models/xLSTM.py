@@ -146,9 +146,9 @@ class pretrainedxLSTM(BaseModel):
 
         # adding mask tokens
         if masking:
-            batch_size, tokens_num, _ = x.shape
+            batch_size, seq_len, _ = x.shape
             # patching the mask, dimension [batch_size, seq_len]
-            patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
+            patched_mask = mask.view(batch_size, seq_len // self.patch_size, self.patch_size)[:, :, 0]
             x_emb = torch.where(
                 patched_mask.unsqueeze(-1), 
                 self.mask_token.expand_as(x_emb),
@@ -156,7 +156,7 @@ class pretrainedxLSTM(BaseModel):
             )
             # x_emb[patched_mask] = self.mask_token
 
-        return x_emb, padding_mask, patched_mask if masking else None
+        return x_emb, padding_mask, mask if masking else None
     
     def forward(self, x, masking=True, reconstruct=True):
         x_emb, padding_mask, mask = self.mask_signal_if_needed(x, masking)
