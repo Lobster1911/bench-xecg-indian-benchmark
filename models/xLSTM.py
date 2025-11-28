@@ -147,6 +147,7 @@ class pretrainedxLSTM(BaseModel):
         # adding mask tokens
         if masking:
             batch_size, tokens_num, _ = x.shape
+            # patching the mask, dimension [batch_size, seq_len]
             patched_mask = mask.view(batch_size, tokens_num // self.patch_size, self.patch_size)[:, :, 0]
             x_emb = torch.where(
                 patched_mask.unsqueeze(-1), 
@@ -155,12 +156,12 @@ class pretrainedxLSTM(BaseModel):
             )
             # x_emb[patched_mask] = self.mask_token
 
-        return x_emb, padding_mask
+        return x_emb, padding_mask, patched_mask if masking else None
     
     def forward(self, x, masking=True, reconstruct=True):
-        x_emb, mask = self.mask_signal_if_needed(x, masking)
+        x_emb, padding_mask, mask = self.mask_signal_if_needed(x, masking)
         
-        cls, out = self.forward_core(x_emb, padding_mask=mask)
+        cls, out = self.forward_core(x_emb, padding_mask=padding_mask)
 
         # reconstruct signal
         if reconstruct:
@@ -199,6 +200,10 @@ class pretrainedxLSTM(BaseModel):
         return torch.cat([cls_token_1, x, cls_token_2], dim=1)
     
     def get_padding_mask(self, x):
+        """
+        Return a padding mask of shape [batch_size, num_patches, embedding_size]
+        where masked values are set to TRUE
+        """
         padding_mask = (x.abs().sum(dim=-1) == 0).unsqueeze(-1)
         num_patches = x.shape[-2] // self.patch_size
         padding_mask_patched = padding_mask.view(-1, num_patches, self.patch_size)[:, :, 0].unsqueeze(-1).expand(-1, -1, self.embedding_size)
@@ -239,7 +244,7 @@ class pretrainedxLSTM(BaseModel):
         """
         This function should be the complete forward pass apart from the classification head.
         """
-        x_emb, mask = self.mask_signal_if_needed(x, False)
+        x_emb, mask, _ = self.mask_signal_if_needed(x, False)
         
         cls, out = self.forward_core(x_emb, padding_mask=mask)
 

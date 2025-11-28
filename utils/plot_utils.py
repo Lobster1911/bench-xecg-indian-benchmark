@@ -14,14 +14,14 @@ color_2 = (207/ 255, 86/ 255, 86/ 255)
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 
-def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, name, training_strategy, mask_ratio=0.5):
+def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, name, training_strategy):
     with torch.no_grad():
 
-        x = sample['global_signals'][0].to(device).unsqueeze(0)
+        x = torch.tensor(sample['global_signals'][0], dtype=torch.float32).to(device).unsqueeze(0)
         orig_signal = x.clone()
         x = F.pad(x, (0, 0, 0, patch_size - x.shape[1] % patch_size))
 
-        out = model(x)
+        out = model(x, masking=True, reconstruct=True)
         reconstruct = out['reconstruction']
         mask = out['mask']
 
@@ -35,7 +35,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
         reconstruct = reconstruct.view(1, -1, orig_signal.shape[-1])
         orig_signal = orig_signal.view(1, -1, orig_signal.shape[-1])
 
-        fig = plt.figure(figsize=(20, 15))
+        fig = plt.figure(figsize=(15, 10))
         gs = gridspec.GridSpec(x.shape[-1] // 2, 2)
         gs.update(wspace=0.08, hspace=0.16)
 
@@ -58,7 +58,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
             for j in range(0, x.shape[1], patch_size):
                 ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
                 
-            if training_strategy == 'sim_dino_v2':
+            if training_strategy == 'sim_dino_v2' or training_strategy == 'lejepa_masked':
                 if mask.shape[0] == 1:
                     ax_mask = mask.squeeze()
                 else:
@@ -77,7 +77,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
 
             # ax.set_yticks([])
             if i == 0:
-                if training_strategy == 'sim_dino_v2':
+                if training_strategy == 'sim_dino_v2' or training_strategy == 'lejepa_masked':
                     ax.legend(['Original', 'Reconstructed', 'Mask'], loc='upper left')
                 else:
                     ax.legend(['Original', 'Reconstructed'], loc='upper left')
@@ -93,7 +93,7 @@ def plot_reconstruction(sample, model, patch_size, freq, device, logdir, epoch, 
         os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
 
         path = f'{logdir}/epoch_{epoch}/reconstruction_{name}.png'
-        plt.savefig(path)
+        plt.savefig(path, bbox_inches='tight')
         plt.close()
         return path
     

@@ -57,7 +57,7 @@ class PretrainedNetwork(L.LightningModule):
         self.lambda_loss =  config.lambda_loss
         self.devices = config.devices
         self.sampling_freq = config.sampling_freq
-        self.use_teacher_student = config.strategy == 'sim_dino_v2'
+        self.use_teacher_student = False
         self.plot_samples = config.plot_samples
         self.sync_dist = config.devices >= 2 if config.devices is not None else False
 
@@ -65,21 +65,27 @@ class PretrainedNetwork(L.LightningModule):
 
         if self.pretraining_strategy == 'sim_dino_v2':
             self.sim_dino_loss = SimDINOv2Loss(eps=0.05)
+            self.automatic_optimization=False
+            self.use_teacher_student = True
 
-        if self.pretraining_strategy == 'lejepa':
+
+        if self.pretraining_strategy.startswith('lejepa'):
             univariate_test = EppsPulley(n_points=17, t_range=(-5, 5))
             self.lejepa_loss = SlicingUnivariateTest(
                 univariate_test=univariate_test, 
                 num_slices=1024
             )
+            if self.pretraining_strategy == 'lejepa_masked':
+                self.automatic_optimization=False
 
         if self.use_teacher_student:
             self.ema_0 = config.ema_0
             self.ema_1 = config.ema_1
             self.model.init_teacher()
-            self.automatic_optimization=False
             self.teacher_temp = config.teacher_temp
             self.stud_temp = config.stud_temp
+
+            
         
 
         self.ptb_xl_train_dataloader = ptb_xl_train_dataloader
@@ -117,8 +123,9 @@ class PretrainedNetwork(L.LightningModule):
                 opt_head.step()
                 sched_head.step()
 
-            self.update_teacher()
-            self.update_scheduled_weight_decay(opt_core)
+            if self.use_teacher_student:
+                self.update_teacher()
+                self.update_scheduled_weight_decay(opt_core)
             return
         else:
             return pretraining_loss
@@ -227,7 +234,7 @@ class PretrainedNetwork(L.LightningModule):
         if isinstance(self.logger, lightning.pytorch.loggers.WandbLogger):
             self.logger.log_image(key=f"local_views_{stage_name}", images=[local_views])
 
-        if self.pretraining_strategy == 'sim_dino_v2':
+        if self.pretraining_strategy == 'sim_dino_v2' or self.pretraining_strategy == 'lejepa_masked':
             img_1 = plot_reconstruction(sample_1, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_s', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
             img_2 = plot_reconstruction(sample_2, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_v', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
             img_3 = plot_reconstruction(sample_3, self.model, self.patch_size, self.sampling_freq, self.device, log_dir, self.current_epoch, 'sample_t', training_strategy=self.pretraining_strategy, mask_ratio=self.mask_ratio)
@@ -238,7 +245,7 @@ class PretrainedNetwork(L.LightningModule):
     def reconstruct_batch(self, batch, step):
         if self.pretraining_strategy == 'sim_dino_v2':
             return self.reconstruct_batch_sim_dino_v2(batch, step)
-        elif self.pretraining_strategy == 'lejepa':
+        elif self.pretraining_strategy.startswith('lejepa'):
             return self.reconstruct_batch_lejepa(batch, step)
         else:
             raise ValueError(f"Pretraining strategy {self.pretraining_strategy} not implemented yet")
@@ -252,6 +259,20 @@ class PretrainedNetwork(L.LightningModule):
         global_out = self.model(global_signals.reshape(-1, seq_len, n_channels), masking=False, reconstruct=False)
         global_out_cls = global_out['cls'].reshape(n_global_views, bs, global_out['cls'].shape[-1])  # [n_global_views, bs dim]
         # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
+
+        rec_loss = None
+        if self.pretraining_strategy == 'lejepa_masked':
+            num_tokens = seq_len // self.patch_size
+            global_out_masked = self.model(global_signals.reshape(-1, seq_len, n_channels), masking=True, reconstruct=True)
+            global_out_masked_features = global_out_masked['patches'].reshape(n_global_views, bs, num_tokens, global_out_masked['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
+            global_out_features = global_out['patches'].reshape(n_global_views, bs, num_tokens, global_out['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
+            global_out_mask = global_out_masked['mask'].reshape(n_global_views, bs, num_tokens)  # [n_global_views, bs, tokens]
+            global_out_masked_reconstruction = global_out_masked['reconstruction'].reshape(n_global_views, bs, seq_len, n_channels)  # [n_global_views, bs, tokens, dim]
+            
+            mask_loss = masked_mse_loss(global_out_masked_features, global_out_features.detach(), reduction='mean', mask=global_out_mask)
+            self.log(f"{step}_masked_loss", mask_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
+
+            rec_loss = self.reconstruction_head_step(global_out_masked_reconstruction, global_signals, step)
         
         n_local_views, bs, seq_len, n_channels = local_signals.shape
         local_out = self.model(local_signals.reshape(-1, seq_len, n_channels), masking=False, reconstruct=False)
@@ -272,9 +293,13 @@ class PretrainedNetwork(L.LightningModule):
         self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg
+        if self.pretraining_strategy == 'lejepa_masked':
+            lejepa_loss += mask_loss
+
         self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
 
-        return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss, 'embeddings': all_view_cls}
+
+        return {'reconstruction_loss': rec_loss, 'pretraining_loss': lejepa_loss, 'embeddings': all_view_cls}
 
     def reconstruct_batch_sim_dino_v2(self, batch, step):
         global_signals = batch["global_signals"]
@@ -342,9 +367,21 @@ class PretrainedNetwork(L.LightningModule):
             self.log(f"{step}_cos_sim_different_samples", cos_sim_diff.item(), prog_bar=False, sync_dist=self.sync_dist)
             self.log(f"{step}_cos_sim_same_samples", cos_sim_same.mean().item(), prog_bar=False, sync_dist=self.sync_dist)
         
-        nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(global_out[0]['reconstruction'], global_signals[0], mask = None) #  out['mask'])
-        nrmse2, mse2, mae2, grad2, min_max2 = self.calculate_metrics_reconstruction(global_out[1]['reconstruction'], global_signals[1], mask=None) #, out2['mask'])
-        nrmse, mse, mae, grad, min_max = (nrmse + nrmse2) / 2, (mse + mse2) / 2, (mae + mae2) / 2, (grad + grad2) / 2, (min_max + min_max2) / 2
+        rec_loss = self.reconstruction_head_step([g['reconstruction'] for g in global_out], global_signals, step)
+
+        return {'reconstruction_loss': rec_loss, 'pretraining_loss': teacher_student_loss}
+    
+    def reconstruction_head_step(self, global_outs, global_signals, step):
+        nrmses, meses, maes, grads, min_maxs = [], [], [], [], []
+        for global_out, global_signal in zip(global_outs, global_signals):
+            nrmse, mse, mae, grad, min_max = self.calculate_metrics_reconstruction(global_out, global_signal, mask = None) # out['mask'])
+            nrmses.append(nrmse)
+            meses.append(mse)
+            maes.append(mae)
+            grads.append(grad)
+            min_maxs.append(min_max)
+
+        nrmse, mse, mae, grad, min_max = (sum(nrmses) / len(nrmses), sum(meses) / len(meses), sum(maes) / len(maes), sum(grads) / len(grads), sum(min_maxs) / len(min_maxs))
 
         loss = torch.tensor(0.0, device=self.device)
 
@@ -360,8 +397,7 @@ class PretrainedNetwork(L.LightningModule):
         if 'min_max' in self.loss_type: self.log(f"{step}_min_max", min_max.item(), prog_bar=False, sync_dist=self.sync_dist)
         
         self.log(f"{step}_nrmse", nrmse.mean().item(), prog_bar=False, sync_dist=self.sync_dist)
-
-        return {'reconstruction_loss': loss, 'pretraining_loss': teacher_student_loss}
+        return loss
     
     def calculate_metrics_reconstruction(self, rec, target, mask):
         batch_size, tokens_num, channels = target.shape
@@ -561,7 +597,7 @@ class PretrainedNetwork(L.LightningModule):
         return self.reconstruction_lr
 
     def configure_optimizers(self):
-        if self.use_teacher_student:
+        if self.automatic_optimization == False:
             return common.configure_optimizer_teacher_student(self)
         else:
             return common.configure_optimizers(self)
