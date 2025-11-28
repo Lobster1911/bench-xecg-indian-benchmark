@@ -30,6 +30,75 @@ class NonLinearPatchEmbedding(nn.Module):
         x = (x1 + x2).flatten(2).transpose(1, 2)
         return x
     
+
+class ConvPatchEmbedding(nn.Module):
+    def __init__(self, patch_size=25, num_hiddens=256, num_channels=12):
+        super().__init__()
+        
+        # LOGIC TO DETERMINE STRIDES AUTOMATICALLY
+        # We want Total Stride == patch_size.
+        # We try to split it into 2 layers to allow for feature extraction.
+        
+        if patch_size % 4 == 0:
+            # Case for 100, 64, 128, etc.
+            self.stride_1 = 4
+            self.stride_2 = patch_size // 4
+            kernel_1 = 15 # Good default for ~150ms coverage
+            pad_1 = 7     # Keeps size consistent
+        elif patch_size % 5 == 0:
+            # Case for 25, 50, 75
+            self.stride_1 = 5
+            self.stride_2 = patch_size // 5
+            kernel_1 = 11 # Slightly smaller kernel for smaller patches
+            pad_1 = 5
+        elif patch_size % 2 == 0:
+            # Case for 2, 6, 10, etc.
+            self.stride_1 = 2
+            self.stride_2 = patch_size // 2
+            kernel_1 = 7
+            pad_1 = 3
+        else:
+            # Prime numbers or odd sizes (e.g., 23) -> Fallback to single layer
+            self.stride_1 = patch_size
+            self.stride_2 = 1 
+            kernel_1 = patch_size
+            pad_1 = 0
+
+        # Dimension checks
+        mid_channels = num_hiddens // 2
+
+        layers = []
+        
+        # --- LAYER 1: Feature Extraction ---
+        # If stride_1 is patch_size (fallback), this does all the work.
+        layers.append(nn.Conv1d(num_channels, mid_channels, kernel_size=kernel_1, stride=self.stride_1, padding=pad_1, bias=False))
+        layers.append(nn.BatchNorm1d(mid_channels))
+        layers.append(nn.GELU())
+
+        # --- LAYER 2: Aggregation (Only if we split the stride) ---
+        if self.stride_2 > 1:
+            # We set kernel_size equal to stride_2 to fully consume the window
+            layers.append(nn.Conv1d(mid_channels, num_hiddens, kernel_size=self.stride_2, stride=self.stride_2, bias=False))
+            layers.append(nn.BatchNorm1d(num_hiddens))
+            layers.append(nn.GELU())
+        else:
+            # If we didn't split (fallback case), we just project channel dims
+            layers.append(nn.Conv1d(mid_channels, num_hiddens, kernel_size=1, stride=1, bias=False))
+            layers.append(nn.BatchNorm1d(num_hiddens))
+            layers.append(nn.GELU())
+
+        self.stem = nn.Sequential(*layers)
+
+        # Print setup for verification
+        print(f" initialized with Total Stride: {self.stride_1 * self.stride_2} (S1:{self.stride_1} x S2:{self.stride_2})")
+
+    @torch._dynamo.disable
+    def forward(self, x, permute=True):
+        if permute: x = x.permute(0, 2, 1) # [B, C, L]
+        x = self.stem(x)
+        x = x.transpose(1, 2) # [B, N_Patches, Embed_Dim]
+        return x
+    
     
       
 class EmbedPatching(nn.Module):
@@ -45,56 +114,7 @@ class EmbedPatching(nn.Module):
         out = self.deconv(out).transpose(1, 2)
         # print('x shape after deconv', x.shape) [1, 3584, 12]
         return out, x
-    
-class ConvPatchEmbedding(nn.Module):
-    def __init__(self, patch_size=64, num_hiddens=256, num_channels=12):
-        super().__init__()
-        self.patch_size = patch_size
-        k_size1, k_size2, k_size3 = 10, 7, 5
-        self.conv1 = nn.Conv1d(num_channels, num_hiddens // 4, kernel_size=k_size1, stride=1)
-        self.bn1 = nn.BatchNorm1d(num_hiddens // 4)
-        self.conv2 = nn.Conv1d(num_hiddens // 4, num_hiddens // 2, kernel_size=k_size2, stride=1)
-        self.bn2 = nn.BatchNorm1d(num_hiddens // 2)
-        self.conv3 = nn.Conv1d(num_hiddens // 2, num_hiddens, kernel_size=k_size3, stride=1)
-        self.bn3 = nn.BatchNorm1d(num_hiddens)
-
-        self.pool = nn.MaxPool1d(kernel_size=2)
-        self.activation = nn.ReLU()
-
-        # Calculate the output size after the convolutions and pooling
-        out_size = ((patch_size - k_size1 + 1) // 2 - k_size2 + 1) // 2 - k_size3 + 1
-        out_size = (out_size // 2) * num_hiddens
-
-        self.linear = nn.Linear(out_size, num_hiddens)
-
-    def forward(self, x):
-        x = x.permute(0, 2, 1) # put the channels in the middle
-        # transform [bs, n_channels, n_samples] -> [bs, n_channels, n_patches, patch_size]
-        x = x.unfold(2, self.patch_size, self.patch_size).transpose(1, 2)
-        batch_size, n_patches, n_channels, _ = x.shape
-        x = x.reshape(-1, n_channels, self.patch_size) # [bs * n_patches, n_channels, patch_size]
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.activation(x)
-        x = self.pool(x)
-        x = x.flatten(1)
-        # print('x shape after conv', x.shape)
-        x = self.linear(x)
-
-        x = x.reshape(batch_size, n_patches, -1)
-
-        # print('x shape after unfold', x.shape)
-        return x
-    
-    
+     
 class HeadModule(nn.Module):
     
     def __init__(self, inp_size, hidden_size, out_size, dropout=0.1, activation='relu'):
