@@ -244,8 +244,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
 def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
-        signal = sample['signal'].to(device).unsqueeze(0)
-        targets = sample['label'].to(device).unsqueeze(0)
+        signal = torch.from_numpy(sample['signal'], dtype=torch.float32).to(device).unsqueeze(0)
+        targets = torch.from_numpy(sample['label'], dtype=torch.float32).to(device).unsqueeze(0)
 
         predicted = model(signal)
 
@@ -271,8 +271,10 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
             patch_start = i * model.patch_size
             patch_end = patch_start + model.patch_size
 
+            idx = i // model.patch_size
+
             # get the max index of the prediction
-            pred_class = torch.argmax(predicted[0, i]).item()
+            pred_class = torch.argmax(predicted[0, idx]).item()
             ax.text((patch_start + patch_end) / 2, 0.5,
                     f'{get_label(pred_class)}',
                     horizontalalignment='center',
@@ -281,7 +283,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
                     color='green',
                     bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
             # plot the target class below the patch
-            target_class = targets[0, i].item()
+            target_class = targets[0, idx].item()
             ax.text((patch_start + patch_end) / 2, -0.5,
                     f'{get_label(target_class)}',  
                     horizontalalignment='center',

@@ -132,18 +132,21 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             elif subset == 'train':
                 if self.skip_majority_class_samples:
                     for i, r_peak in enumerate(r_peaks):
-                        skip_class = r_peaks[i][1]
+                        # 0 is the position, 1 is the label
+                        actual_class = r_peaks[i][1]
 
-                        if (skip_class != last_class or skipped > 10 or skip_class != 'N'):
+                        if (actual_class != last_class or skipped > 10 or actual_class != 'N'):
                             samples.append({
                                 'patient': patient,
-                                'r_peak': r_peak[0],
+                                'start': max(0, r_peak[0] - self.win_len - self.context_len),
+                                'end': min(r_peak[0] + self.win_len + self.context_len, len_signal),
+                                # 'r_peak': r_peak[0],
                                 'around_r_peaks': [(r, l) for r, l in r_peaks if r_peak[0] - self.win_len + 1 <= r < r_peak[0] + self.win_len - 1],
                             })
                             skipped = 0
                         else:
                             skipped += 1
-                        last_class = skip_class
+                        last_class = actual_class
 
                 else:
                     for i, r_peak in enumerate(r_peaks):

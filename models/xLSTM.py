@@ -24,6 +24,7 @@ class pretrainedxLSTM(BaseModel):
         self.masking_type = config.masking_type
         self.encoder_type = config.encoder_type
         self.sampling_freq = config.sampling_freq
+        self.liner_probing = config.linear_probing
 
         self.patch_embedding = get_patch_embedding(config.patch_embedding, config.patch_size, config.embedding_size, num_channels)
 
@@ -53,6 +54,12 @@ class pretrainedxLSTM(BaseModel):
             self.reconstruction = get_reconstruction_head(config.patch_size, config.embedding_size, num_channels)
 
         self.normalization_layer = get_normalization_layer(config, config.embedding_size)
+
+        if self.linear_probing:
+            # freezing model
+            for name, param in self.named_parameters():
+                if 'head' not in name:  # no freezing last layer
+                    param.requires_grad = False
 
     def init_teacher(self):
         self._teacher = self.create_teacher_module()
