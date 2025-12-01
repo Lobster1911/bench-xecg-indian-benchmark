@@ -40,7 +40,7 @@ proj_factor: 2
 num_heads: 4
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 activation_fn: "gelu"
-cls_type: avg
+cls_type: null
 embedding_size: 1024
 use_final_layer_norm: true
 patch_embedding: linear

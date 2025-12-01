@@ -122,12 +122,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             if self.r_peaks_detection:
                 # len signal and win_len are in the same frequency domain, r_peaks are not
                 for i in range(0, len_signal, self.win_len * 2):
+                    current_r_peaks = [r for r, _ in r_peaks if i <= r < i + self.win_len * 2]
+
                     samples.append({
                         'start': i,
                         'end': min(i + self.win_len * 2, len_signal),
                         'patient': patient,
                         'r_peak': -1,
-                        'around_r_peaks': [r for r, _ in r_peaks if i // self.freq_factor <= r < (i + self.win_len * 2) // self.freq_factor],
+                        'around_r_peaks': current_r_peaks,
                     })
             elif subset == 'train':
                 if self.skip_majority_class_samples:
@@ -205,7 +207,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         signal = self.signals[patient][start:end]
 
         r_peaks_mask = np.zeros(signal.shape[0], dtype=np.float32)
-        indexes = np.round(np.array(sample['around_r_peaks']) * self.freq_factor).astype(int) - start
+        indexes = np.round(np.array(sample['around_r_peaks'])).astype(int) - start
         # print(f"indexes: {indexes}, start: {start}, freq_factor: {self.freq_factor}")
         r_peaks_mask[indexes] = 1
         signal = self.filter_leads(signal, header.__dict__['sig_name'])
@@ -221,7 +223,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             'r_peak': r_peaks_mask,
             'r_peak_orig': around_r_peaks
         }
-
 
     def get_item_classification(self, idx):
         sample = self.samples[idx]
@@ -239,15 +240,16 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             random_shift = random.randint(0, self.context_len // 4) - int(self.context_len // 8)
             if window_start + random_shift >= 0 and window_end - random_shift <= len_signal:
                 window_start = window_start + random_shift
-                window_end = window_end - random_shift
+                window_end = window_end + random_shift
 
         window_signal = signal[window_start:window_end]
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
 
         if self.augmentations is not None:
             window_signal = self.augmentations(window_signal)
-        
-        labels_mask = np.zeros(window_signal.shape[0], dtype=np.float32) - 1
+
+        labels_mask = np.full(window_signal.shape[0], -1, dtype=np.int64)
+        # labels_mask = np.zeros(window_signal.shape[0], dtype=np.long) - 1
 
         for r, l in sample['around_r_peaks']:
             # print(r, l)
@@ -352,8 +354,8 @@ def make_collate_fn(config, split='train'):
             labels = [torch.from_numpy(item['label']) for item in batch]
             labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
-        labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
-
+        if not config.single_hb:
+            labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
 
         if 'r_peak_orig' not in batch[0].keys():
             r_peaks_orig = None

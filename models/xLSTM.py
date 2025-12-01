@@ -78,13 +78,8 @@ class pretrainedxLSTM(BaseModel):
         param.eval()
         return param
     
-    def create_teacher_param(self, original):
-        param = copy.deepcopy(original)
-        param.requires_grad = False
-        return param
-    
     def pooling(self, out, padding_mask=None, pooling_type='avg'):
-        cls= None
+        cls = None
         if pooling_type == 'max':
             if padding_mask is None:
                 cls = out.max(dim=1)[0]
@@ -117,6 +112,8 @@ class pretrainedxLSTM(BaseModel):
                 cls = self.attn_pool(out).squeeze()
             else:
                 cls = self.attn_pool(out.masked_fill(padding_mask, 0)).squeeze()  
+        else:
+            return cls, out
 
         cls = self.normalization_layer(cls)    
         return cls, out
