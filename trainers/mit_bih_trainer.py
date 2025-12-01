@@ -214,12 +214,9 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 traceback.print_exc()
                 print(f"Error plotting R-peaks: {e}")
     
-    
-    
     def predict_batch(self, batch):
         x = batch["signals"]
         targets = batch['labels'].long()
-        # print(f"x shape: {x.shape}")
 
         if self.linear_probing:
             self.model.set_eval_linear_probing()
@@ -229,6 +226,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets + 1, weight=self.weights, ignore_index=-1)
         else:
             cls = self.model(x)
+            print(f"cls shape: {cls.shape}")
             loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
 
         # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
@@ -248,6 +246,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
         targets = torch.from_numpy(sample['label'], dtype=torch.float32).to(device).unsqueeze(0)
 
         predicted = model(signal)
+        targets = targets.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
 
         # consider max 2000 time samples for plotting
         # if signal.shape[1] > max_length:

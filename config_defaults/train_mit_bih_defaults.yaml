@@ -67,6 +67,7 @@ deterministic: true
 r_peaks_detection: false
 
 win_len: 5400
+context_len: 0
 max_length_signal: 3600
 skip_majority_class_samples: true
 
