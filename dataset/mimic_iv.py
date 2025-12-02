@@ -126,6 +126,9 @@ class ECGMIMICDataset(PretrainDataset):
         # fix file name to align with previous implementation
         dat['file_name'] = dat['path']
 
+        # preserve fold column from the original tab_data
+        dat = dat.merge(self.tab_data[['study_id', 'fold']], on='study_id', how='left')
+
         # get only ecgs with timey > 0
         self.tab_data = dat[dat["timey"].notna() & (dat["timey"] > 0)]
         print(self.tab_data.head())
