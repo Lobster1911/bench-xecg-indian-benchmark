@@ -259,13 +259,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
                 # if the r_peak is at the very beginning or very end of a patch, add a label for previous or next (only in training)
                 if self.split == 'train':
                     position = (r - window_start)% 25
+                    print('position', position)
                     # this is when is at the very beginning
                     if position == 0:
-                        labels_mask[max(0, position - 1)] = self.get_label_int(l)
+                        labels_mask[max(0, r - window_start - 1)] = self.get_label_int(l)
                     elif position == 1:
-                        labels_mask[max(0, position - 2)] = self.get_label_int(l)
+                        labels_mask[max(0, r - window_start - 2)] = self.get_label_int(l)
                     elif position == 2:
-                        labels_mask[max(0, position - 3)] = self.get_label_int(l)
+                        labels_mask[max(0, r - window_start - 3)] = self.get_label_int(l)
                     # this is when it is at the very end
                     elif position == 24:
                         labels_mask[min(sig_len - 1, r - window_start + 1)] = self.get_label_int(l)
