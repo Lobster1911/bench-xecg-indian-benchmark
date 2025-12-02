@@ -305,18 +305,19 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
         self.samples = []
         for patient in tqdm(self.patients, desc="Processing patients"):
             for i, r_peak in enumerate(self.r_peaks[patient]):
-                signal = self.signals[patient]
-                self.samples.append({
-                    'patient': patient,
-                    'r_peak': r_peak,
-                    'signal': signal[max(0, r_peak[0] - 200): min(len(signal), r_peak[0] + 200)],
-                })
+                if r_peak[0] > 0:
+                    signal = self.signals[patient]
+                    self.samples.append({
+                        'patient': patient,
+                        'r_peak': r_peak,
+                        'signal': signal[max(0, r_peak[0] - 200): min(len(signal), r_peak[0] + 200)],
+                    })
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
         patient = sample['patient']
         signal = sample['signal']
-        r_peak = sample['r_peak'][0]
+        label = sample['r_peak'][1]
         header = self.headers[patient]
 
         signal = self.filter_leads(signal, header.__dict__['sig_name'])
@@ -328,8 +329,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
         return {
             'signal': signal,
             'patient_id': patient,
-            # 'r_peaks': torch.tensor([1.0] if r_peak >= 0 else [0.0], dtype=torch.float32),
-            'label': np.array([self.get_label_int(sample['r_peak'][1])]) if r_peak >= 0 else np.array([-1.0], dtype=np.float32),
+            'label': np.array([self.get_label_int(label)]),
         }
 
 

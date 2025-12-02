@@ -30,7 +30,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
         self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
 
-        self.single_hb = config.use_ecg_founder
+        self.single_hb = config.single_hb
 
         # add sensitivity and specificity for the first class
         self.val_spec = torchmetrics.Specificity(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
@@ -222,15 +222,16 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             self.model.set_eval_linear_probing()
 
         if self.single_hb:
-            cls = self.model(x).unsqueeze(1)  # [bs, 1, num_classes]
-            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets + 1, weight=self.weights, ignore_index=-1)
+            cls = self.model(x) # [bs, 1, num_classes]
+            targets = targets.squeeze()
+            loss_cls = nn.functional.cross_entropy(cls, targets, weight=self.weights, ignore_index=-1)
+            preds = torch.argmax(cls, dim=-1)
         else:
-            cls = self.model(x)
-            print(f"cls shape: {cls.shape}")
-            loss_cls = nn.functional.cross_entropy(cls.permute(0, 2, 1), targets, weight=self.weights, ignore_index=-1)
-
-        # need to transform the targets to [batch_size, num_patches] where if all the values are -1, then the value is -1 if not is the only value non -1
-        preds = torch.argmax(cls, dim=-1)
+            cls = self.model(x).permute(0, 2, 1)
+            #print('cls shape:', cls.shape)
+            #print('target shape:', targets.shape)
+            loss_cls = nn.functional.cross_entropy(cls, targets, weight=self.weights, ignore_index=-1)
+            preds = torch.argmax(cls, dim=-2)
 
         if self.use_focal_loss:
             pt = torch.exp(-loss_cls)
@@ -238,7 +239,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             gamma = .25
             loss_cls = (alpha * (1-pt)**gamma * loss_cls)
         
-        return loss_cls, preds, targets, cls.permute(0, 2, 1)
+        return loss_cls, preds, targets, cls
 
 def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
@@ -247,6 +248,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
 
         predicted = model(signal)
         targets = targets.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
+
 
         # consider max 2000 time samples for plotting
         # if signal.shape[1] > max_length:
@@ -270,10 +272,8 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
             patch_start = i * model.patch_size
             patch_end = patch_start + model.patch_size
 
-            idx = i // model.patch_size
-
             # get the max index of the prediction
-            pred_class = torch.argmax(predicted[0, idx]).item()
+            pred_class = torch.argmax(predicted[0, i]).item()
             ax.text((patch_start + patch_end) / 2, 0.5,
                     f'{get_label(pred_class)}',
                     horizontalalignment='center',
@@ -282,7 +282,7 @@ def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
                     color='green',
                     bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
             # plot the target class below the patch
-            target_class = targets[0, idx].item()
+            target_class = targets[0, i].item()
             ax.text((patch_start + patch_end) / 2, -0.5,
                     f'{get_label(target_class)}',  
                     horizontalalignment='center',

@@ -43,13 +43,13 @@ def train(config, run=None, wandb=False):
             print('Using class weights for r-peaks detection')
             weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
         if config.num_classes == 5:
-            print('Using class weights for 5 classes')
             if config.win_len == 1600:
                 weights = torch.tensor([2.2425e-01, 8.3814e+00, 2.7265e+00, 1.8476e+01, 2.4445e+03]).to('cuda')
             elif config.win_len == 500:
                 weights = torch.tensor([2.2468e-01, 7.8135e+00, 2.7218e+00, 1.8698e+01, 2.5163e+03]).to('cuda')
             else:
                 weights = get_training_class_weights(train_dataset, label_key='label', do_not_consider_classes=[-1]).to('cuda')
+            print('Using class weights for 5 classes:', weights)
             
             # weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
         elif config.num_classes == 3: 
@@ -69,7 +69,7 @@ def train(config, run=None, wandb=False):
     print(f"Test dataset size: {len(test_dataset)}")
 
 
-    base_model = utils.get_base_model(config, feature_classification=True, compile_model=True)
+    base_model = utils.get_base_model(config, feature_classification=(not config.single_hb), compile_model=False)
 
     if config.r_peaks_detection:
        model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
