@@ -78,3 +78,115 @@ class ECGHEEDBDataset(PretrainDataset):
         }
     
 
+class ECGHEEDBMortalityDataset(ECGHEEDBDataset):
+    def __init__(self, config, global_augmentations=None, local_augmentations=None):
+        """
+        Args:
+            records (list): List of records of ECG traces
+        """
+        super().__init__(config, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
+        # load metadata
+        self.load_metadata()
+
+    def load_metadata(self):
+        i0001_metadata_file = os.path.join(self.data_folder, 'I0001', 'metadata', 'metadata.csv')
+        i0006_metadata_file = os.path.join(self.data_folder, 'I0006', 'metadata', 'metadata.csv')
+
+        self.metadata_df = pd.concat([
+            self.load_metadata_df(i0001_metadata_file),
+            self.load_metadata_df(i0006_metadata_file)
+        ], ignore_index=True)
+
+    def load_metadata_df(self, meta_path):
+        # Define optimal dtypes for memory efficiency
+        optimal_dtypes = {
+            'BDSPPatientID': np.float64,
+            'FileName': 'object',
+            'FileID': 'object',
+
+            # Categorical/Low-Cardinality Strings (saves massive memory)
+            'PatientRace': 'category',
+            'EthnicGroupDSC': 'category',
+            'MaritalStatusDSC': 'category',
+            'ReligionDSC': 'category',
+            'LanguageDSC': 'category',
+            'VeteranStatusDSC': 'category',
+            'SexDSC': 'category',
+            'Sex': 'category',
+            'EducationLevelDSC': 'category',
+            'GenderIdentityDSC': 'category',
+            'SexAssignedAtBirthDSC': 'category',
+
+            # String Columns (likely high cardinality)
+            'PrimaryCauseOfDeathDSC': 'object',
+            'PrimaryCauseOfDeathUNOS': 'object',
+            'FirstContributoryCauseOfDeathDSC': 'object',
+            'FirstContributoryCauseOfDeathUNOS': 'object',
+            'SecondContributoryCauseOfDeathDSC': 'object',
+            'SecondContributoryCauseOfDeathUNOS': 'object',
+
+            # Numeric Columns (Downcast from float64 to float32)
+            'AgeAtAcquisition': np.float32,
+            'AgeAtDeath': np.float32,
+            'AgeAtDeathMA': np.float32,
+            'AgeAtLastVisit': np.float32,
+
+            # Date/Time Columns (Load as string, convert after loading for speed)
+            'DateOfDeath': 'object',
+            'DateOfDeathMARegistryData': 'object',
+            'LastKnownVisitDate': 'object',
+            'ECGAcquisitionTime': 'object',
+            'DateOfBirth': 'object'
+        }
+        df = pd.read_csv(
+            meta_path,
+            dtype=optimal_dtypes,
+            engine='c',
+        )
+
+        date_columns = [
+            'DateOfDeath', 'DateOfDeathMARegistryData', 'LastKnownVisitDate',
+            'ECGAcquisitionTime', 'DateOfBirth'
+        ]
+
+        for col in date_columns:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col], errors='coerce')  # 'coerce' converts invalid dates to NaT
+
+        if "Sex" not in df.columns:
+            df["Sex"] = df["SexDSC"]
+
+        # print("Removing rows with no Sex information:")
+        # print(len(df))
+        # df = df.loc[~df["Sex"].isnull()]
+        # print(len(df))
+
+        # print("Removing rows with no Age information:")
+        # print(len(df))
+        # df = df.loc[~df["AgeAtAcquisition"].isnull()]
+        # print(len(df))
+
+        # df["is_male"] = df["Sex"].str.upper() == "MALE"
+        # df["age"] = df["AgeAtAcquisition"] / 365 # Saved in days. Note that age > 90 is set to 90.
+
+        df["death"] = ~df.DateOfDeath.isnull()
+
+        df["censor_date"] = df["LastKnownVisitDate"]
+        df.loc[df.death, "censor_date"] = df.loc[df.death, "DateOfDeath"]
+        df["time_to_event"] = df["censor_date"] - df["ECGAcquisitionTime"]
+        df["time_to_event_days"] = df["time_to_event"].dt.days
+        df["time_to_event_years"] = df["time_to_event_days"] / 365
+        df['timey'] = df['time_to_event_years']
+
+        return df
+    
+    def __getitem__(self, idx):
+        obj = super().__getitem__(idx)
+        patient = str(self.unique_patients[idx])
+        patient_metadata = self.metadata_df[self.metadata_df['BDSPPatientID'] == float(patient)].iloc[0]
+
+        return {
+            'signal': obj['global_signals'][0],
+            'death': torch.tensor(patient_metadata['death'], dtype=torch.float32),
+            'timey': torch.tensor(patient_metadata['timey'], dtype=torch.float32)
+        }

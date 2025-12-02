@@ -5,6 +5,7 @@ import argparse
 
 import dataset.mimic_iv as mimic
 import dataset.code_dataset as code
+import dataset.heedb as heedb
 import dataset.generic_utils as generic_utils
 
 import utils.utils as utils
@@ -29,6 +30,8 @@ def train(config, run=None, wandb=False):
             datasets.append(code.ECGCODE15MortalityDataset(config, split='train', global_augmentations=get_transforms(config)))
         if d.lower() == 'mimic':
             datasets.append(mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='mortality'))
+        if d.lower() == 'heedb':
+            datasets.append(heedb.ECGHEEDBMortalityDataset(config, global_augmentations=get_transforms(config)))
 
     dataset = ConcatDataset(datasets)
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [int(len(dataset) * 0.8), len(dataset) - int(len(dataset) * 0.8)])
@@ -38,7 +41,7 @@ def train(config, run=None, wandb=False):
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
-    test_dataset = mimic.ECGMIMICDataset(config, split='all', global_augmentations=get_transforms(config, split='test'), downstream_task='mortality')
+    test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='mortality')
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
