@@ -40,6 +40,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.val_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
         self.test_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
 
+        self.predict_no_hb = config.predict_no_hb
+        if self.predict_no_hb:
+            self.num_classes -= 1
+
     def training_step(self, batch, _):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
 
@@ -203,8 +207,28 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 sample_1 = self.trainer.val_dataloaders.dataset[2]
                 sample_2 = self.trainer.val_dataloaders.dataset[3]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
-                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1')
-                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2')
+                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1_val')
+                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2_val')
+
+                if isinstance(self.logger, pl.loggers.WandbLogger):
+                    self.logger.log_image(key="reconstructions_val", images=[img_1, img_2])
+            except Exception as e:
+                # print stack trace
+                import traceback
+                traceback.print_exc()
+                print(f"Error plotting R-peaks: {e}")
+
+    
+    def on_train_epoch_end(self):
+        super().on_test_epoch_end()
+
+        if self.plot_test_predictions:
+            try:
+                sample_1 = self.trainer.train_dataloader.dataset[1]
+                sample_2 = self.trainer.train_dataloader.dataset[3]
+                log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
+                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1_train')
+                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2_train')
 
                 if isinstance(self.logger, pl.loggers.WandbLogger):
                     self.logger.log_image(key="reconstructions_train", images=[img_1, img_2])
@@ -213,10 +237,14 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 import traceback
                 traceback.print_exc()
                 print(f"Error plotting R-peaks: {e}")
-    
+
+
     def predict_batch(self, batch):
         x = batch["signals"]
         targets = batch['labels'].long()
+
+        if self.predict_no_hb:
+            targets += 1
 
         if self.linear_probing:
             self.model.set_eval_linear_probing()
@@ -238,6 +266,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             alpha = 2.
             gamma = .25
             loss_cls = (alpha * (1-pt)**gamma * loss_cls)
+
+        if self.predict_no_hb:
+            preds -= 1
+            targets -= 1
         
         return loss_cls, preds, targets, cls
 

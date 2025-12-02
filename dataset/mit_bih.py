@@ -237,12 +237,13 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
 
         # random shift is a percentage of context_len (let's say max 25% of it)
         if self.context_len > 0 and self.random_shift:
-            random_shift = random.randint(0, self.context_len // 4) - int(self.context_len // 8)
+            random_shift = random.randint(0, self.patch_size // 2) - self.patch_size // 2
             if window_start + random_shift >= 0 and window_end - random_shift <= len_signal:
                 window_start = window_start + random_shift
                 window_end = window_end + random_shift
 
         window_signal = signal[window_start:window_end]
+        sig_len = window_end - window_start
         window_signal = self.filter_leads(window_signal, header.__dict__['sig_name'])
 
         if self.augmentations is not None:
@@ -255,16 +256,25 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             # print(r, l)
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
-            # else:
-            #    print('r-peak out of window: ', r, l, window_start, window_end)
+                # if the r_peak is at the very beginning or very end of a patch, add a label for previous or next (only in training)
+                if self.split == 'train':
+                    position = (r - window_start)% 25
+                    # this is when is at the very beginning
+                    if position == 0:
+                        labels_mask[max(0, position - 1)] = self.get_label_int(l)
+                    elif position == 1:
+                        labels_mask[max(0, position - 2)] = self.get_label_int(l)
+                    elif position == 2:
+                        labels_mask[max(0, position - 3)] = self.get_label_int(l)
+                    # this is when it is at the very end
+                    elif position == 24:
+                        labels_mask[min(sig_len - 1, r - window_start + 1)] = self.get_label_int(l)
+                    elif position == 23:
+                        labels_mask[min(sig_len - 1, r - window_start + 2)] = self.get_label_int(l)
+                    elif position == 22:
+                        labels_mask[min(sig_len - 1, r - window_start + 3)] = self.get_label_int(l)
 
-        # start_original = window_start / self.freq_factor
-        # original_r_peaks = torch.tensor([r - start_original for r, _ in sample['around_r_peaks']], dtype=torch.float32)
-        # print(f"Original r_peaks: {original_r_peaks}")
-        # print(f"Window signal shape: {window_signal.shape}, R peaks mask shape: {r_peaks_mask.shape}, Labels mask shape: {labels_mask.shape}")
 
-        # print('window signal shape', window_signal.shape)
-        # print('annotations', labels_mask)
         return {
             'signal': window_signal,
             'patient_id': patient,

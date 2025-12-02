@@ -68,7 +68,9 @@ def train(config, run=None, wandb=False):
     test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
     print(f"Test dataset size: {len(test_dataset)}")
 
-
+    if config.predict_no_hb:
+        config.num_classes += 1
+        
     base_model = utils.get_base_model(config, feature_classification=(not config.single_hb), compile_model=False)
 
     if config.r_peaks_detection:
