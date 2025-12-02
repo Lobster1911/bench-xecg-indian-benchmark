@@ -18,6 +18,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             
         self.plot_test_predictions = config.plot_test_predictions
 
+        self.predict_no_hb = config.predict_no_hb
+        if self.predict_no_hb:
+            self.num_classes -= 1
+
         self.train_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
         self.valid_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
         self.test_acc = torchmetrics.Accuracy(task='multiclass', num_classes=self.num_classes, average='micro', ignore_index=-1, top_k=1)
@@ -39,10 +43,6 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.test_recall = torchmetrics.Recall(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
         self.val_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
         self.test_precision = torchmetrics.Precision(num_classes=self.num_classes, average=None, ignore_index=-1, task='multiclass', top_k=1)
-
-        self.predict_no_hb = config.predict_no_hb
-        if self.predict_no_hb:
-            self.num_classes -= 1
 
     def training_step(self, batch, _):
         loss_cls, preds, targets, logits = self.predict_batch(batch)
@@ -207,8 +207,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 sample_1 = self.trainer.val_dataloaders.dataset[2]
                 sample_2 = self.trainer.val_dataloaders.dataset[3]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
-                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1_val')
-                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2_val')
+                img_1 = self.plot_mit_bih_pred(sample_1, log_dir, 'mit_1_val')
+                img_2 = self.plot_mit_bih_pred(sample_2, log_dir, 'mit_2_val')
 
                 if isinstance(self.logger, pl.loggers.WandbLogger):
                     self.logger.log_image(key="reconstructions_val", images=[img_1, img_2])
@@ -227,8 +227,8 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 sample_1 = self.trainer.train_dataloader.dataset[1]
                 sample_2 = self.trainer.train_dataloader.dataset[3]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
-                img_1 = plot_mit_bih_pred(sample_1, self.model, self.device, log_dir, self.current_epoch, 'mit_1_train')
-                img_2 = plot_mit_bih_pred(sample_2, self.model, self.device, log_dir, self.current_epoch, 'mit_2_train')
+                img_1 = self.plot_mit_bih_pred(sample_1, log_dir, 'mit_1_train')
+                img_2 = self.plot_mit_bih_pred(sample_2, log_dir, 'mit_2_train')
 
                 if isinstance(self.logger, pl.loggers.WandbLogger):
                     self.logger.log_image(key="reconstructions_train", images=[img_1, img_2])
@@ -243,11 +243,11 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         x = batch["signals"]
         targets = batch['labels'].long()
 
-        if self.predict_no_hb:
-            targets += 1
-
         if self.linear_probing:
             self.model.set_eval_linear_probing()
+
+        if self.predict_no_hb:
+            targets = targets + 1
 
         if self.single_hb:
             cls = self.model(x) # [bs, 1, num_classes]
@@ -268,73 +268,74 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
             loss_cls = (alpha * (1-pt)**gamma * loss_cls)
 
         if self.predict_no_hb:
-            preds -= 1
-            targets -= 1
+            preds = preds - 1
+            preds[preds == -1] = 0
+            targets = targets - 1
+            cls = cls[..., 1:, :]
         
         return loss_cls, preds, targets, cls
 
-def plot_mit_bih_pred(sample, model, device, logdir, epoch, name):
-    with torch.no_grad():
-        signal = torch.from_numpy(sample['signal']).to(device).unsqueeze(0)
-        targets = torch.from_numpy(sample['label']).to(device).unsqueeze(0)
+    def plot_mit_bih_pred(self, sample, logdir, name):
+        with torch.no_grad():
+            signal = torch.from_numpy(sample['signal']).to(self.device).unsqueeze(0)
+            targets = torch.from_numpy(sample['label']).to(self.device).unsqueeze(0)
 
-        predicted = model(signal)
-        targets = targets.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
+            predicted = self.model(signal)
+            targets = targets.unfold(1, self.model.patch_size, self.model.patch_size).max(dim=-1)[0].long()
 
+            # consider max 2000 time samples for plotting
+            # if signal.shape[1] > max_length:
+            #     signal = signal[:, :max_length, :]
+            #    target = target[:, :max_length]
 
-        # consider max 2000 time samples for plotting
-        # if signal.shape[1] > max_length:
-        #     signal = signal[:, :max_length, :]
-        #    target = target[:, :max_length]
+            # targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
+            fig, ax = plt.subplots(figsize=(25, 5))
 
-        # targets = target.unfold(1, model.patch_size, model.patch_size).max(dim=-1)[0].long()
-        fig, ax = plt.subplots(figsize=(25, 5))
+            to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()
 
-        to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()
+            ax.plot(to_plot, label='Original Signal')
 
-        ax.plot(to_plot, label='Original Signal')
+            # Plot vertical lines at each patch
+            for j in range(0, signal.shape[1], self.model.patch_size):
+                ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
 
-        # Plot vertical lines at each patch
-        for j in range(0, signal.shape[1], model.patch_size):
-            ax.axvline(j, color='gray', linestyle='--', linewidth=0.5)
+            # inside each patch plot the prediction above and the target below
 
-        # inside each patch plot the prediction above and the target below
+            for i in range(targets.shape[1]):
+                patch_start = i * self.model.patch_size
+                patch_end = patch_start + self.model.patch_size
 
-        for i in range(targets.shape[1]):
-            patch_start = i * model.patch_size
-            patch_end = patch_start + model.patch_size
+                # get the max index of the prediction
+                pred_class = torch.argmax(predicted[0, i]).item() - 1
+                ax.text((patch_start + patch_end) / 2, 0.5,
+                        f'{get_label(pred_class)}',
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        fontsize=7,
+                        color='green',
+                        bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+                # plot the target class below the patch
+                target_class = targets[0, i].item()
+                ax.text((patch_start + patch_end) / 2, -0.5,
+                        f'{get_label(target_class)}',  
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        fontsize=7,
+                        color='orange',
+                        bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+                
+            ax.set_title('MIT-BIH ECG Signal with Predictions and Targets')
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Amplitude')
+            ax.legend()
 
-            # get the max index of the prediction
-            pred_class = torch.argmax(predicted[0, i]).item()
-            ax.text((patch_start + patch_end) / 2, 0.5,
-                    f'{get_label(pred_class)}',
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    fontsize=7,
-                    color='green',
-                    bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
-            # plot the target class below the patch
-            target_class = targets[0, i].item()
-            ax.text((patch_start + patch_end) / 2, -0.5,
-                    f'{get_label(target_class)}',  
-                    horizontalalignment='center',
-                    verticalalignment='center',
-                    fontsize=7,
-                    color='orange',
-                    bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
-            
-        ax.set_title('MIT-BIH ECG Signal with Predictions and Targets')
-        ax.set_xlabel('Time')
-        ax.set_ylabel('Amplitude')
-        ax.legend()
+            # mkdir if it does not exist
+            os.makedirs(f'{logdir}/epoch_{self.current_epoch}', exist_ok=True)
 
-        # mkdir if it does not exist
-        os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
-
-        path = f'{logdir}/epoch_{epoch}/r_peaks_{name}.png'
-        plt.savefig(path)
-        plt.close()
-        return path
+            path = f'{logdir}/epoch_{self.current_epoch}/r_peaks_{name}.png'
+            plt.savefig(path)
+            plt.close()
+            return path
     
 
 def get_label(label):
