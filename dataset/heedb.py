@@ -75,6 +75,7 @@ class ECGHEEDBDataset(PretrainDataset):
         return  {
             'global_signals': global_signals,
             'local_signals': local_signals,
+            'unique_records': unique_records,
         }
     
 
@@ -182,11 +183,11 @@ class ECGHEEDBMortalityDataset(ECGHEEDBDataset):
     
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
-        patient = str(self.unique_patients[idx])
-        patient_metadata = self.metadata_df[self.metadata_df['BDSPPatientID'] == float(patient)].iloc[0]
+        unique_record = obj['unique_records'][0]
+        ecg_metadata = self.metadata_df[self.metadata_df['FileName'] == float(unique_record)].iloc[0]
 
         return {
             'signal': obj['global_signals'][0],
-            'death': torch.tensor(patient_metadata['death'], dtype=torch.float32),
-            'timey': torch.tensor(patient_metadata['timey'], dtype=torch.float32)
+            'death': torch.tensor(ecg_metadata['death'], dtype=torch.float32),
+            'timey': torch.tensor(ecg_metadata['timey'], dtype=torch.float32)
         }

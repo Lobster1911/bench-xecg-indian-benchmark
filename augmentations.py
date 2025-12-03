@@ -482,12 +482,9 @@ def resample_signal(signal: torch.Tensor, current_freq: float = 500, target_freq
     Returns:
         torch.Tensor: A tensor of shape (C, new_L) resampled to the target frequency.
     """
-    signal = signal.transpose(0, 1)
     signal_length, _  = signal.shape
     target_length = int(signal_length * target_freq / current_freq)
-    resampled = np.array([resample(channel, target_length) for channel in signal])
-    # print('Resampling from', current_freq, 'Hz to', target_freq, 'Hz. New length:', target_length, 'Shape:', resampled.shape)
-    return resampled #.transpose(0, 1)
+    return resample(signal, target_length)
     
 class Rescaling(object):
     """
