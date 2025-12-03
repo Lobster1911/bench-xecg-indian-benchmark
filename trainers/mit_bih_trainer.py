@@ -204,8 +204,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
         if self.plot_test_predictions:
             try:
-                sample_1 = self.trainer.val_dataloaders.dataset[2]
-                sample_2 = self.trainer.val_dataloaders.dataset[3]
+                idx_1 = np.random.randint(0, len(self.trainer.val_dataloaders.dataset))
+                idx_2 = np.random.randint(0, len(self.trainer.val_dataloaders.dataset))
+                sample_1 = self.trainer.val_dataloaders.dataset[idx_1]
+                sample_2 = self.trainer.val_dataloaders.dataset[idx_2]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
                 img_1 = self.plot_mit_bih_pred(sample_1, log_dir, 'mit_1_val')
                 img_2 = self.plot_mit_bih_pred(sample_2, log_dir, 'mit_2_val')
@@ -224,8 +226,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
 
         if self.plot_test_predictions:
             try:
-                sample_1 = self.trainer.train_dataloader.dataset[1]
-                sample_2 = self.trainer.train_dataloader.dataset[3]
+                idx_1 = np.random.randint(0, len(self.trainer.train_dataloader.dataset))
+                idx_2 = np.random.randint(0, len(self.trainer.train_dataloader.dataset))
+                sample_1 = self.trainer.train_dataloader.dataset[idx_1]
+                sample_2 = self.trainer.train_dataloader.dataset[idx_2]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
                 img_1 = self.plot_mit_bih_pred(sample_1, log_dir, 'mit_1_train')
                 img_2 = self.plot_mit_bih_pred(sample_2, log_dir, 'mit_2_train')
@@ -323,6 +327,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                         fontsize=7,
                         color='orange',
                         bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+                
+                # color the patch background if the prediction is correct or not
+                if target_class != -1:
+                    ax.axvspan(patch_start, patch_end, color='green' if pred_class == target_class else 'red', alpha=0.1)
                 
             ax.set_title('MIT-BIH ECG Signal with Predictions and Targets')
             ax.set_xlabel('Time')
