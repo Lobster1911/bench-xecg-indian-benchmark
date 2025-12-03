@@ -161,7 +161,7 @@ def pad_multi_view_batch(sample_list, patch_size):
     sample_list = [[sample[i] for sample in sample_list] for i in range(len(sample_list[0]))]
 
     topad = [ 
-        pad(torch.nn.utils.rnn.pad_sequence([ torch.from_numpy(sig) for sig in signal], batch_first=True).float(), patch_size).permute(1, 0, 2)
+        pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signal], batch_first=True).float(), patch_size).permute(1, 0, 2)
         for signal in sample_list
     ]
 

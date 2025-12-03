@@ -5,6 +5,9 @@ import wfdb
 import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
+from pandarallel import pandarallel
+
+pandarallel.initialize(progress_bar=False, verbose=0)
 
 class ECGHEEDBDataset(PretrainDataset):
     def __init__(self, config, global_augmentations=None, local_augmentations=None):
@@ -75,7 +78,7 @@ class ECGHEEDBDataset(PretrainDataset):
         return  {
             'global_signals': global_signals,
             'local_signals': local_signals,
-            'unique_records': unique_records,
+            'records': records,
         }
     
 
@@ -93,10 +96,27 @@ class ECGHEEDBMortalityDataset(ECGHEEDBDataset):
         i0001_metadata_file = os.path.join(self.data_folder, 'I0001', 'metadata', 'metadata.csv')
         i0006_metadata_file = os.path.join(self.data_folder, 'I0006', 'metadata', 'metadata.csv')
 
-        self.metadata_df = pd.concat([
+        metadata_df = pd.concat([
             self.load_metadata_df(i0001_metadata_file),
             self.load_metadata_df(i0006_metadata_file)
         ], ignore_index=True)
+
+        metadata_df = metadata_df[['BDSPPatientID', 'FileID', 'timey', 'death']]
+
+
+        # keep in tab data only the records with metadata
+        self.tab_data = self.tab_data[self.tab_data['patient_id'].isin(metadata_df['BDSPPatientID'].astype(int).astype(str).values)]
+
+        # merge metadata with tab_data on file name
+        self.tab_data['file_id'] = self.tab_data.parallel_apply(lambda row: str(row['file_name'].split('/')[-1]), axis=1)
+        self.tab_data = pd.merge(self.tab_data, metadata_df, left_on='file_id', right_on='FileID')
+
+        self.unique_patients = self.tab_data['patient_id'].unique()
+        self.patient_to_records = self.tab_data.groupby("patient_id")["file_name"].apply(list).to_dict()
+
+        self.tab_data = self.tab_data.set_index('file_name')
+
+        print('HEEDB: unique patients:', len(self.unique_patients))
 
     def load_metadata_df(self, meta_path):
         # Define optimal dtypes for memory efficiency
@@ -157,19 +177,6 @@ class ECGHEEDBMortalityDataset(ECGHEEDBDataset):
         if "Sex" not in df.columns:
             df["Sex"] = df["SexDSC"]
 
-        # print("Removing rows with no Sex information:")
-        # print(len(df))
-        # df = df.loc[~df["Sex"].isnull()]
-        # print(len(df))
-
-        # print("Removing rows with no Age information:")
-        # print(len(df))
-        # df = df.loc[~df["AgeAtAcquisition"].isnull()]
-        # print(len(df))
-
-        # df["is_male"] = df["Sex"].str.upper() == "MALE"
-        # df["age"] = df["AgeAtAcquisition"] / 365 # Saved in days. Note that age > 90 is set to 90.
-
         df["death"] = ~df.DateOfDeath.isnull()
 
         df["censor_date"] = df["LastKnownVisitDate"]
@@ -179,15 +186,19 @@ class ECGHEEDBMortalityDataset(ECGHEEDBDataset):
         df["time_to_event_years"] = df["time_to_event_days"] / 365
         df['timey'] = df['time_to_event_years']
 
+        df = df.dropna(subset=['BDSPPatientID', 'timey', 'death'])
+
         return df
     
     def __getitem__(self, idx):
         obj = super().__getitem__(idx)
-        unique_record = obj['unique_records'][0]
-        ecg_metadata = self.metadata_df[self.metadata_df['FileName'] == float(unique_record)].iloc[0]
+        record = obj['records'][0]
+
+        # KeyError: (1007376, 'I0001/WFDB/S0003/2009/08/de_120872262_20070704215403_18990731000000')
+        row = self.tab_data.loc[record]
 
         return {
             'signal': obj['global_signals'][0],
-            'death': torch.tensor(ecg_metadata['death'], dtype=torch.float32),
-            'timey': torch.tensor(ecg_metadata['timey'], dtype=torch.float32)
+            'death': torch.tensor(row['death'], dtype=torch.float32),
+            'timey': torch.tensor(row['timey'], dtype=torch.float32)
         }

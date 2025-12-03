@@ -25,12 +25,15 @@ def get_patch_embedding(type, patch_size, num_hiddens, num_channels):
     if type == 'linear':
         print('using linear patch embedding')
         return LinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
-    if type == 'non_linear':
+    elif type == 'non_linear':
         print('using non-linear patch embedding')
         return NonLinearPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
-    if type == 'conv':
+    elif type == 'conv':
         print('using conv patch embedding')
         return ConvPatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
+    elif type == 'attention':
+        print('using conv stride patch embedding')
+        return ChannelAttentivePatchEmbedding(patch_size=patch_size, num_hiddens=num_hiddens, num_channels=num_channels)
     else:
         raise ValueError(f"Patch embedding {type} not supported")
 

@@ -99,6 +99,158 @@ class ConvPatchEmbedding(nn.Module):
         x = x.transpose(1, 2) # [B, N_Patches, Embed_Dim]
         return x
     
+
+
+class ChannelAttentivePatchEmbedding(nn.Module):
+    def __init__(self, patch_size=25, num_hiddens=256, num_channels=1, num_heads=4):
+        super().__init__()
+        self.num_channels = num_channels
+        self.num_hiddens = num_hiddens
+
+        # ------------------------------------------------------------------
+        # 1. INDEPENDENT TEMPORAL PROCESSING (Grouped Convolutions)
+        # ------------------------------------------------------------------
+        # "groups=num_channels" tells PyTorch: 
+        # "Don't mix the leads yet. Apply the same filter to each lead independently."
+        # This is mathematically identical to running a loop over channels, but 100x faster/lighter.
+        
+        # Determine strides (Same logic as before)
+        if patch_size % 4 == 0:
+            s1, s2 = 4, patch_size // 4
+            k1, p1 = 15, 7
+        elif patch_size % 5 == 0:
+            s1, s2 = 5, patch_size // 5
+            k1, p1 = 11, 5
+        elif patch_size % 2 == 0:
+            s1, s2 = 2, patch_size // 2
+            k1, p1 = 7, 3
+        else:
+            s1, s2 = patch_size, 1
+            k1, p1 = patch_size, 0
+
+        mid_channels = num_hiddens // 2
+        
+        # We output (num_channels * mid_channels) filters.
+        # Because groups=num_channels, input channel i only goes to output channels [i*mid : (i+1)*mid]
+        self.stem = nn.Sequential(
+            nn.Conv1d(
+                in_channels=num_channels, 
+                out_channels=num_channels * mid_channels, 
+                kernel_size=k1, stride=s1, padding=p1, 
+                groups=num_channels, bias=False # <--- KEY OPTIMIZATION
+            ),
+            nn.BatchNorm1d(num_channels * mid_channels),
+            nn.GELU(),
+            
+            nn.Conv1d(
+                in_channels=num_channels * mid_channels, 
+                out_channels=num_channels * num_hiddens, 
+                kernel_size=s2 if s2 > 1 else 1, stride=s2, 
+                groups=num_channels, bias=False # <--- KEY OPTIMIZATION
+            ),
+            nn.BatchNorm1d(num_channels * num_hiddens),
+            nn.GELU()
+        )
+
+        self.channel_pos_embed = nn.Parameter(torch.randn(1, num_channels, num_hiddens) * 0.02)
+
+
+        # ------------------------------------------------------------------
+        # 2. SPATIAL CHANNEL ATTENTION (The "Very Small Transformer")
+        # ------------------------------------------------------------------
+        # We use a single Transformer Layer to let channels "talk" to each other
+        self.channel_mixer = nn.TransformerEncoderLayer(
+            d_model=num_hiddens,
+            nhead=num_heads,
+            dim_feedforward=num_hiddens * 2, # Keep it small/efficient
+            dropout=0.1,
+            activation='gelu',
+            batch_first=True,
+            norm_first=True # Pre-Norm is generally more stable
+        )
+        
+        # ------------------------------------------------------------------
+        # 3. AGGREGATION
+        # ------------------------------------------------------------------
+        # Learnable weight to combine channels, or we can just use MeanPool
+        # Using a small linear layer to smooth the transition after MeanPooling
+        self.out_proj = nn.Sequential(
+            nn.LayerNorm(num_hiddens),
+            nn.Linear(num_hiddens, num_hiddens)
+        )
+
+    @torch._dynamo.disable
+    def forward(self, x, permute=True):
+        # x: [Batch, Length, Channels]
+        # print('x shape at ChannelAttentivePatchEmbedding input', x.shape)
+        if permute: 
+            x = x.permute(0, 2, 1) 
+        
+        B, _, _ = x.shape
+        # print('x shape after permute', x.shape)
+        
+        # -------------------------------------------------
+        # Step 1: Independent Channel Processing
+        # -------------------------------------------------
+        # Reshape to treat every channel as an independent sample
+        # [B, C, L] -> [B*C, 1, L]
+        # x_flat = x.reshape(B * C, 1, L)
+        # print('x shape after flatten', x_flat.shape)
+        
+        # Apply Conv Stem
+        # Output: [B*C, num_hiddens, Num_Patches]
+        feat = self.stem(x)
+        # print('feat shape after stem', feat.shape)
+        
+        _, _, N_Patches = feat.shape
+        
+        # -------------------------------------------------
+        # Step 2: Reshape for Channel Attention
+        # -------------------------------------------------
+        # We need [Batch, Num_Patches, Channels, Hidden]
+        # First: [B*C, H, N] -> [B, C, H, N]
+        feat = feat.view(B, self.num_channels, self.num_hiddens, N_Patches)
+        # print('feat shape after view', feat.shape)
+        
+        # Permute to: [B, N_Patches, C, H]
+        # This aligns the "Sequence" for the transformer to be the Channels (C)
+        feat = feat.permute(0, 3, 2, 1) 
+        # print('feat shape after permute', feat.shape)
+
+        # Merge Batch and Time to treat each (TimeStep) as an independent attention problem
+        # [B*N, C, H]
+        feat_for_att = feat.reshape(B * N_Patches, self.num_channels, self.num_hiddens)
+        # print('feat shape after reshape for attention', feat_for_att.shape)
+
+        # add position embedding
+        feat_for_att = feat_for_att + self.channel_pos_embed
+
+        # -------------------------------------------------
+        # Step 3: Apply Attention
+        # -------------------------------------------------
+        # The Transformer attends across C (12 leads).
+        # It learns relationships like "Lead V1 is noisy, trust Lead II more"
+        feat_attended = self.channel_mixer(feat_for_att) # [B*N, C, H]
+        # print('feat shape after channel attention', feat_attended.shape)
+        
+        # -------------------------------------------------
+        # Step 4: Aggregation (Fusion)
+        # -------------------------------------------------
+        # We need to collapse the Channel dimension to get 1 vector per TimeStep
+        # Global Average Pooling across channels is robust here
+        feat_fused = feat_attended.mean(dim=1) # [B*N, H]
+        # print('feat shape after channel fusion', feat_fused.shape)
+        
+        # Unpack back to [Batch, Num_Patches, H]
+        feat_out = feat_fused.view(B, N_Patches, self.num_hiddens)
+        # print('feat shape after final reshape', feat_out.shape)
+        
+        # Final projection/Norm
+        feat_out = self.out_proj(feat_out)
+        # print('feat shape after out_proj', feat_out.shape)
+        
+        return feat_out
+    
     
       
 class EmbedPatching(nn.Module):
