@@ -310,7 +310,10 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
                 patch_end = patch_start + self.model.patch_size
 
                 # get the max index of the prediction
-                pred_class = torch.argmax(predicted[0, i]).item() - 1
+                pred_class = torch.argmax(predicted[0, i]).item() 
+                if self.predict_no_hb:
+                    pred_class = pred_class - 1
+                    
                 ax.text((patch_start + patch_end) / 2, 0.5,
                         f'{get_label(pred_class)}',
                         horizontalalignment='center',
