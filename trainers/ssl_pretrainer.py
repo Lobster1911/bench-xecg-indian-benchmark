@@ -1,7 +1,7 @@
 import lightning as L
 from utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, masked_cosine_loss, SimDINOv2Loss
-from lejepa.epps_pulley import EppsPulley
-from lejepa.slicing import SlicingUnivariateTest
+from lejepa.epps_pulley import EppsPulley, SIGReg
+# from lejepa.slicing import SlicingUnivariateTest, 
 from torch.nn import functional as F
 from utils.plot_utils import plot_reconstruction, plot_generation, plot_local_views, plot_latent_space
 import numpy as np
@@ -70,11 +70,12 @@ class PretrainedNetwork(L.LightningModule):
 
 
         if self.pretraining_strategy.startswith('lejepa'):
-            univariate_test = EppsPulley(n_points=17, t_range=(-5, 5))
-            self.lejepa_loss = SlicingUnivariateTest(
-                univariate_test=univariate_test, 
-                num_slices=1024
-            )
+            # univariate_test = EppsPulley(n_points=17, t_range=(-5, 5))
+            # self.lejepa_loss = SlicingUnivariateTest(
+            #     univariate_test=univariate_test, 
+            #     num_slices=1024
+            # )
+            self.lejepa_loss = SIGReg().to('cuda')
             if self.pretraining_strategy == 'lejepa_masked':
                 self.automatic_optimization=False
 
@@ -260,21 +261,6 @@ class PretrainedNetwork(L.LightningModule):
         global_out_cls = global_out['cls'].reshape(n_global_views, bs, global_out['cls'].shape[-1])  # [n_global_views, bs dim]
         # print(f'Global out CLS shape: {global_out_cls.shape}') [n_global_views, bs, dim]
 
-        rec_loss = None
-        if self.pretraining_strategy == 'lejepa_masked':
-            num_tokens = seq_len // self.patch_size
-            global_out_masked = self.model(global_signals.reshape(-1, seq_len, n_channels), masking=True, reconstruct=True)
-            global_out_masked_features = global_out_masked['patches'].reshape(n_global_views, bs, num_tokens, global_out_masked['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
-            global_out_features = global_out['patches'].reshape(n_global_views, bs, num_tokens, global_out['patches'].shape[-1])  # [n_global_views, bs, tokens, dim]
-            global_out_mask = global_out_masked['mask'].reshape(n_global_views, bs, seq_len)  # [n_global_views, bs, tokens]
-            global_out_mask = global_out_mask.reshape(n_global_views, bs, num_tokens, self.patch_size).max(-1)[0]  # [n_global_views, bs, tokens]
-            global_out_masked_reconstruction = global_out_masked['reconstruction'].reshape(n_global_views, bs, seq_len, n_channels)  # [n_global_views, bs, tokens, dim]
-            
-            mask_loss = masked_mse_loss(global_out_masked_features, global_out_features.detach(), reduction='mean', mask=global_out_mask)
-            self.log(f"{step}_masked_loss", mask_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
-
-            rec_loss = self.reconstruction_head_step(global_out_masked_reconstruction, global_signals, step)
-        
         n_local_views, bs, seq_len, n_channels = local_signals.shape
         local_out = self.model(local_signals.reshape(-1, seq_len, n_channels), masking=False, reconstruct=False)
         local_out_cls = local_out['cls'].reshape(n_local_views, bs, local_out['cls'].shape[-1])  # [n_local_views, bs dim]
@@ -284,23 +270,18 @@ class PretrainedNetwork(L.LightningModule):
         # print(f'All view CLS shape: {all_view_cls.shape}')
 
         global_mean_cls = global_out_cls.mean(dim=0)  # [bs, dim]
-        similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).pow(2).mean()
+        similarity = (global_mean_cls.unsqueeze(0) - all_view_cls).square().mean()
         self.log(f"{step}_similarity_loss", similarity.item(), prog_bar=True, sync_dist=self.sync_dist)
-
-        # sigreg = self.lejepa_loss(all_view_cls)
-        # print('sigreg:', sigreg.item())
 
         sigreg = torch.mean(torch.stack([self.lejepa_loss(samples) for samples in all_view_cls]))
         self.log(f"{step}_sigreg_loss", sigreg.item(), prog_bar=True, sync_dist=self.sync_dist)
 
         lejepa_loss = (1 - self.lambda_loss) * similarity + self.lambda_loss * sigreg
-        if self.pretraining_strategy == 'lejepa_masked':
-            lejepa_loss += mask_loss
 
         self.log(f"{step}_lejepa_loss", lejepa_loss.item(), prog_bar=True, sync_dist=self.sync_dist)
 
 
-        return {'reconstruction_loss': rec_loss, 'pretraining_loss': lejepa_loss, 'embeddings': all_view_cls}
+        return {'reconstruction_loss': None, 'pretraining_loss': lejepa_loss, 'embeddings': all_view_cls}
 
     def reconstruct_batch_sim_dino_v2(self, batch, step):
         global_signals = batch["global_signals"]
@@ -530,6 +511,9 @@ class PretrainedNetwork(L.LightningModule):
         self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "mlp", 'ptb-xl', MLPClassifier, mlp_config)
         self.evaluate_on_model_type(train_data_ptb_xl, val_data_ptb_xl, "lp", 'ptb-xl', LogisticRegression, linear_probe_config)
 
+        del train_data_ptb_xl
+        del val_data_ptb_xl
+
     def eval_model_downstream_mit_bih(self):
         """
         Evaluate the quality of model features using KNN on a classification task, e.g. PTB-XL superclasses.
@@ -556,6 +540,9 @@ class PretrainedNetwork(L.LightningModule):
 
         # self.evaluate_on_model_type(train_data_mit_bih, val_data_mit_bih, "mlp", 'mit-bih', MLPClassifier, mlp_config)
         self.evaluate_on_model_type(train_data_mit_bih, val_data_mit_bih, "lp", 'mit-bih', Perceptron, linear_probe_config)
+
+        del train_data_mit_bih
+        del val_data_mit_bih
     
     def get_params(self):
         if self.layerwise_lr_decay > 0.:

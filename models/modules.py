@@ -10,6 +10,7 @@ class LinearPatchEmbedding(nn.Module):
         super().__init__()
         self.conv = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
 
+    @torch.compiler.disable
     def forward(self, x, permute=True):
         if permute: x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.conv(x).flatten(2).transpose(1, 2)

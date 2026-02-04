@@ -41,12 +41,12 @@ class PretrainDataset(torch.utils.data.Dataset):
         s = self.resample_if_needed(s, info)
 
         if self.global_augmentations is not None:
-            global_signals = [ self.global_augmentations(s) for _ in range(self.n_global_view)]
+            global_signals = [ self.global_augmentations(s).copy() for _ in range(self.n_global_view)]
         else:
             global_signals = [s]
         
         if self.local_augmentations is not None and self.n_local_view > 0:
-            local_signals = [ self.local_augmentations(s) for _ in range(self.n_local_view)]
+            local_signals = [ self.local_augmentations(s).copy() for _ in range(self.n_local_view)]
         else:
             local_signals = []
 

@@ -12,6 +12,7 @@ class ECGPTBXLDataset(PretrainDataset):
         self.data_folder = config.data_folder_ptbxl
         self.labels_file = os.path.join(config.data_folder_ptbxl, '..', 'ptbxl_database.csv')
         self.task = config.task
+        self.classes = config.classes if not None else ['STTC', 'NORM', 'MI', 'HYP', 'CD']
         self.load_tabular_data()
         self.load_records(split, task=config.task)
 
@@ -31,6 +32,15 @@ class ECGPTBXLDataset(PretrainDataset):
             self.tab_data['num_labels'] = self.tab_data.T.parallel_apply(lambda row: sum([1 if label in row['diagnostic_superclass'] else 0 for label in self.classes]))
             # keep only the records with sum == 1
             self.tab_data = self.tab_data[self.tab_data['num_labels'] == 1]
+
+        if self.classes is not None:
+            self.tab_data = self.tab_data[
+                self.tab_data['diagnostic_superclass'].apply(
+                    lambda x: any(item in self.classes for item in x)
+                )
+            ]
+        else: 
+            self.classes = ['NORM', 'MI', 'STTC', 'CD', 'HYP']
         
         self.records = self.get_records()
 
@@ -65,7 +75,6 @@ class ECGPTBXLDataset(PretrainDataset):
         self.tab_data['diagnostic_superclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_superclass'))
         self.tab_data['diagnostic_subclass'] = self.tab_data.scp_codes.apply(lambda x: aggregate_diagnostic(x, statements=statements, column='diagnostic_subclass'))
 
-        self.classes = ['STTC', 'NORM', 'MI', 'HYP', 'CD'] # statements['diagnostic_class'].unique()
         print("Classes for PTB-XL: ", self.classes)
         self.subclasses = ['STTC', 'NST_', 'NORM', 'IMI', 'AMI', 'LVH', 'LAFB/LPFB', 'ISC_', 'IRBBB', '_AVB', 'IVCD', 'ISCA', 'CRBBB', 'CLBBB', 'LAO/LAE', 'ISCI', 'LMI', 'RVH', 'RAO/RAE', 'WPW', 'ILBBB', 'SEHYP', 'PMI'] # statements['diagnostic_subclass'].unique()
         print("Subclasses for PTB-XL: ", self.subclasses)

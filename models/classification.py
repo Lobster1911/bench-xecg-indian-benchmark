@@ -99,6 +99,8 @@ class xLSTMFeatureClassification(pretrainedxLSTM):
             x = self.patch_embedding(x)
             _, features = self.forward_core(x)
 
+        _, features = self.pooling(features)
+
         res = self.head(features)
         return res
 

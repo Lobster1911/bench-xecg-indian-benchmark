@@ -86,7 +86,7 @@ def parse_config(config_file, default_config_file):
         # merged_config.window_size_val = 1000
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
-        merged_config.z_score_norm = True
+        merged_config.normalize = True
 
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.

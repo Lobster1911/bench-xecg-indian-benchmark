@@ -15,6 +15,88 @@ from scipy.signal import butter, resample, sosfiltfilt, square
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 
+class ECGPaperLayoutMask(nn.Module):
+    """
+    Randomly masks the ECG signal to simulate standard clinical print layouts 
+    (3x4 and 2x6 formats).
+    
+    In these formats, not all leads are recorded simultaneously for the full duration.
+    Instead, groups of leads are recorded for short segments of time.
+    
+    Attributes:
+        p (float): Probability of applying the augmentation.
+        format_ratio (float): Probability of choosing 2x6 format when mode is 'random'.
+        mode (str): 'random' (chooses between 3x4 and 2x6), '3x4', or '2x6'.
+        keep_rhythm_strip (bool): If True, one lead (defined by rhythm_lead_idx) 
+                                  is kept for the full duration (simulating the bottom strip on a PDF).
+        rhythm_lead_idx (int): Index of the lead to keep full length (usually 1 for Lead II).
+    """
+    def __init__(self, p=0.5, format_ratio=0.5, mode='random', keep_rhythm_strip=True, rhythm_lead_idx=1):
+        super().__init__()
+        self.p = p
+        self.format_ratio = format_ratio
+        self.mode = mode
+        self.keep_rhythm_strip = keep_rhythm_strip
+        self.rhythm_lead_idx = rhythm_lead_idx
+
+    def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): ECG signal of shape (Batch, Leads, Time) or (Leads, Time).
+                              Assumes 12 leads.
+        """
+        if np.random.rand(1) > self.p:
+            return x
+
+        # Create a mask of ones (keep everything by default)
+        mask = np.zeros_like(x)
+        
+        # Iterate over batch to apply random choices per sample
+
+        # Determine layout for this sample
+        layout = self.mode
+
+        if layout == 'random':
+            layout = '2x6' if np.random.rand(1) < self.format_ratio else '3x4'
+        
+        # Initialize this sample's mask to zeros (we will fill in the 'visible' parts)
+        
+        if layout == '3x4':
+            # 3x4 Format: 4 columns of time, 3 leads per column
+            # Standard sequence: 
+            # Col 1 (0-2.5s): Leads I, II, III (0,1,2)
+            # Col 2 (2.5-5s): Leads aVR, aVL, aVF (3,4,5)
+            # Col 3 (5-7.5s): Leads V1, V2, V3 (6,7,8)
+            # Col 4 (7.5-10s): Leads V4, V5, V6 (9,10,11)
+            
+            segment_len = x.shape[0] // 4
+            
+            # Group 1 (0 - 0.25)
+            mask[0:segment_len, 0:3] = 1
+            # Group 2 (0.25 - 0.50)
+            mask[segment_len:2*segment_len, 3:6] = 1
+            # Group 3 (0.50 - 0.75)
+            mask[2*segment_len:3*segment_len, 6:9] = 1
+            # Group 4 (0.75 - 1.0)
+            mask[3*segment_len:, 9:12] = 1
+        elif layout == '2x6':
+            # 2x6 Format: 2 columns of time, 6 leads per column
+            # Col 1 (0-5s): Leads I-aVF (0-5)
+            # Col 2 (5-10s): Leads V1-V6 (6-11)
+            
+            segment_len = x.shape[0] // 2
+            
+            # Group 1
+            mask[0:segment_len, 0:6] = 1
+            # Group 2
+            mask[segment_len:, 6:12] = 1
+        
+        # Apply Rhythm Strip (keep Lead II visible for whole duration)
+        if self.keep_rhythm_strip:
+            mask[self.rhythm_lead_idx, :] = 1
+        
+        return x * mask
+    
 class Standardize:
     """Standardize the input sequence.
     """
@@ -164,7 +246,6 @@ def extract_baseline_fft_torch(ecg: torch.Tensor, cutoff_freq=0.5, signal_fs=500
 
     return baseline
 
-
 class Normalize(nn.Module):
     """
         Normalize the signal.
@@ -175,21 +256,21 @@ class Normalize(nn.Module):
 
     def forward(self, signal):
         # we should have one end and one start for each lead
-        mask = (signal != 0).astype(np.float32)
+        mask = (np.abs(signal) >= 1e-4).astype(np.float32)
         # set false to nan values
         mask_start = mask.cumsum(0)
-        mask_start[mask_start == 0] = np.nan
+        mask_start[mask_start == 0] = np.inf
         start = mask_start.argmin(0)
 
         mask_end = np.flip(np.flip(mask, axis=0).cumsum(0), axis=0)
-        mask_end[mask_end == 0] = np.nan
+        mask_end[mask_end == 0] = np.inf
         end = mask_end.argmin(0)
 
         # if start !+ all zero print
-        if (start != 0).any():
-            print('start of real signal:', start)
-        if ((end != signal.shape[0] - 1) & (end != 0)).any():
-            print('end of real signal:', end)
+        # if (start != 0).any():
+        #     print('start of real signal:', start)
+        # if ((end != signal.shape[0] - 1) & (end != 0)).any():
+        #    print('end of real signal:', end)
 
         # Create range tensor: (time, 1)
         time_range = np.arange(signal.shape[0])[:, np.newaxis]
@@ -226,22 +307,6 @@ class Normalize(nn.Module):
 
         return signal
 
-        # calculate the mean and std only on the valid part of the signal for each lead
-        # for lead in range(signal.shape[-1]):
-        #     if start[lead] >= end[lead]:
-        #         continue # skip leads that are fully zero
-            
-        #     valid_signal = signal[start[lead]:end[lead], lead]
-        #     mean = valid_signal.mean()
-        #     std = valid_signal.std()
-        #     if std == 0:
-        #         std = 1 # avoid division by zero, samples with std = 0 are all zero
-        #     signal[start[lead]:end[lead], lead] = (valid_signal - mean) / std
-
-        # Normalize across the entire signal
-        # std = signal.std(axis=(0, -1))
-        # std[std == 0] = 1 # avoid division by zero, samples with std = 0 are all zero
-        # return (signal - signal.mean(axis=(0, -1))) / std
     
 class RandomCrop(nn.Module):
     """

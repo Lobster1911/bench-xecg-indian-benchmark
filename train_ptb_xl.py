@@ -29,7 +29,7 @@ def train(config, run=None, wandb=False):
     if config.training_pct < 1.0:
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
 
-    if config.use_class_weights:
+    if config.use_class_weights and config.num_classes == 5:
         # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
         # hardcode for faster initialization
         weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')

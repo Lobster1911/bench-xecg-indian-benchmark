@@ -26,6 +26,10 @@ def get_transforms(config, split='train', type=None):
     if split != 'train': 
         t.transforms.append(CropFixedLen(config.max_length_signal))
         return t
+    
+    if config.random_paper_layout > 0.:
+        t.transforms.append(ECGPaperLayoutMask(p=config.random_paper_layout, format_ratio=config.random_paper_6x2_prob ))
+
 
     if config.random_crop < 1. and config.random_crop > 0.:
         t.transforms.append(RandomCrop(
