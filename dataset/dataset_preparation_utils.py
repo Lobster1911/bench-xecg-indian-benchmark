@@ -131,7 +131,7 @@ def unpad_signal(signal):
     else:
         return signal[start_unpad_idx:end_unpad_idx, :]
 
-def check_sample(record_path):
+def check_sample(record_path, check_less_10_seconds=False, check_variance=False):
     # if record exists
     if not os.path.exists(f'{record_path}.hea'):
         print(f"Record {record_path} does not exist - skipping")
@@ -140,7 +140,7 @@ def check_sample(record_path):
     try:
         record = wfdb.rdrecord(record_path)
         signal = record.p_signal
-        signal = unpad_signal(signal)
+        # signal = unpad_signal(signal)
     except Exception as e:
         print(f"Error in record {record_path}: {e}")
         return False
@@ -154,26 +154,30 @@ def check_sample(record_path):
         print(f"Record {record_path} has nan - skipping")
         return False
     
+    if check_less_10_seconds:
+        # get fs and calculate duration
+        len_seconds = record.sig_len / record.fs
+        reduced_lead = np.concatenate((signal[:, :2], signal[:, 6:]), axis=1)
+        first_15_samples_zero = reduced_lead[:15, :].sum()
+        last_15_samples_zero = reduced_lead[-15:, :].sum()
+
+        if len_seconds < 10 or first_15_samples_zero == 0 or last_15_samples_zero == 0:
+            print(f'Record {record_path} is too short ({len_seconds}s)')
+            return False
+    
     if len(signal) < 360:
         print(f"Record {record_path} has less than 360 samples - skipping")
         return False
-
-    # skip record with too big variance and high values
-    if np.var(signal) > 10 and (np.max(signal) >= 15 or np.min(signal) < -15):
-        print(f"Record {record_path} has too high variance - skipping")
-        return False
-    if np.var(signal) < 0.0001:
-        print(f"Record {record_path} has too low variance - skipping")
-        return False
     
-    # check if the signal is empty
-    # signal = torch.tensor(signal, dtype=torch.float32)
-    # sig_len = (signal != 0.).flip(0).cumsum(dim=0).flip(0).max(dim=-1)[0].max(dim=-1)[0]
-    #if sig_len == 0:
-    #    print(f"Record {record_path} is empty - skipping")
-    #    return False
-    #del signal
-    
+    if check_variance:
+        # skip record with too big variance and high values
+        if np.var(signal) > 10 and (np.max(signal) >= 15 or np.min(signal) < -15):
+            print(f"Record {record_path} has too high variance - skipping")
+            return False
+        if np.var(signal) < 0.0001:
+            print(f"Record {record_path} has too low variance - skipping")
+            return False
+        
     return True
 
 

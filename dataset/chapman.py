@@ -21,8 +21,9 @@ class ECGChapmanDataset(PretrainDataset):
     def load_tabular_data(self):
         # get the csv file with the tabular data
         self.tab_data = pd.read_csv(self.labels_file)
-        print("tabular data fields for Chapman: ", self.tab_data.head())
-        print(f'Chapman colums {self.tab_data.columns}')
+        print("Chapman&Ningbo - tabular data: ", self.tab_data.head())
+        print(f'Chapman&Ningbo - colums {self.tab_data.columns}')
+        print(f'Chapman&Ningbo - number of samples: {len(self.tab_data)}')
 
     def __len__(self):
         return len(self.records)

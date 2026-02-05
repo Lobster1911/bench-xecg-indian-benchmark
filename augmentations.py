@@ -372,8 +372,8 @@ class RandomDropLeads(nn.Module):
             # Create a copy to avoid modifying the original tensor inplace
             
             # Determine leads to remove (ensure consistent device if signal is on GPU)
-            leads_to_remove_np = np.random.random(signal.shape[-1]) < self.probability
-            leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
+            leads_to_remove = np.random.random(signal.shape[-1]) < self.probability
+            # leads_to_remove = torch.from_numpy(leads_to_remove_np).to(signal.device) # Convert to tensor and move to correct device
 
             # Ensure lead II (index 1 assuming standard 12-lead) is never removed
             if self.keep_lead_II: # Check if there's more than one lead
