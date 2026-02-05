@@ -128,7 +128,6 @@ class SimDINOv2Loss(nn.Module):
         n_loss_terms = len(teacher_feat_list)* len(student_feat_list) - min(len(teacher_feat_list), len(student_feat_list))
         # Sum the cosine similarities
         comp_loss = sim.mean(2).sum()/n_loss_terms
-
         # global_comp_loss = (sim[:, :len(teacher_feat_list)].mean(2).sum()).detach_().div_(len(teacher_feat_list))
         return 1 - comp_loss
     
@@ -143,14 +142,10 @@ class SimDINOv2Loss(nn.Module):
         cov_list = torch.einsum('nbc,nbd->ncd', feat_list, feat_list)
 
         scalar = p / (m * self.eps)
+        I = torch.eye(p, device=cov_list.device)
         loss:torch.Tensor = 0
-
-        I = torch.eye(p, device=cov_list.device, dtype=cov_list.dtype)
         for i in range(num_views):
-            mat = (I + scalar * cov_list[i]).to(torch.float32)
-            loss_term = torch.linalg.cholesky_ex(mat)[0].diagonal().log().sum()
-            loss += loss_term.to(dtype=cov_list.dtype)  # back to original dtype
-
+            loss += torch.linalg.cholesky_ex(I + scalar * cov_list[i])[0].diagonal().log().sum()
         loss /= num_views
         # loss *= (p+m)/(p*m) # the balancing factor gamma, you can also use the next line. This is ultimately a heuristic, so feel free to experiment.
         # loss *= ((self.eps * m) ** 0.5 / p)

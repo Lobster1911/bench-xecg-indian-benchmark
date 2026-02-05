@@ -123,7 +123,7 @@ class PretrainedNetwork(L.LightningModule):
                 self.update_scheduled_weight_decay(opt_core)
             return
         else:
-            return pretraining_loss
+            return rec_loss
         
     def update_scheduled_weight_decay(self, opt_core):
         # linear decay
@@ -287,18 +287,10 @@ class PretrainedNetwork(L.LightningModule):
         global_signals = batch["global_signals"]
         local_signals = batch["local_signals"]
         batch_size, seq_len, num_leads = global_signals[0].shape
-        
-        global_out = []
-        for x in global_signals:
-            global_out.append(self.model(x, masking=True))
 
-        global_out_teacher = []
-        for x in global_signals:
-            global_out_teacher.append(self.model.teacher_fwd(x))
-
-        local_out = []
-        for x in local_signals:
-            local_out.append(self.model(x, masking=False, reconstruct=False))
+        global_out = [self.model(x, masking=True) for x in global_signals]
+        global_out_teacher = [self.model.teacher_fwd(x) for x in global_signals]
+        local_out = [self.model(x, masking=False, reconstruct=False) for x in local_signals]
 
         # compute the loss and use the gradients only when it is needed
         teacher_student_loss = None
@@ -330,8 +322,10 @@ class PretrainedNetwork(L.LightningModule):
         patch_loss = masked_cosine_loss(stud_embeddings, teacher_embeddings, reduction='mean', mask=combined_mask)
         self.log(f"{step}_patch_loss", patch_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
 
-        teacher_student_loss = compression_term + self.lambda_code_rate * expansion_term + patch_loss
+        rank_me = [self.rank_me(out['cls']) for out in global_out]
+        self.log(f"{step}_rank_me", (sum(rank_me) / len(rank_me)).item(), prog_bar=True)
 
+        teacher_student_loss = compression_term + self.lambda_code_rate * expansion_term + patch_loss
         self.log(f"{step}_dino_loss", teacher_student_loss.item(), prog_bar=True, sync_dist=self.devices == 2)
 
         #  = [self.rank_me(out['cls']) for out in global_out]
@@ -374,6 +368,25 @@ class PretrainedNetwork(L.LightningModule):
 
         return {'reconstruction_loss': loss, 'pretraining_loss': teacher_student_loss}
     
+    @torch.no_grad()
+    def rank_me(self, tensor, eps=1e-8):
+        if not torch.isfinite(tensor).all():
+            return torch.tensor(0.0, device=tensor.device)
+        try:
+            _, S, _ = torch.linalg.svd(tensor, full_matrices=False)  # shape: (min(N, D),)
+
+            # Normalize singular values to get a probability distribution
+            S_norm = S / (S.sum() + eps)
+
+            # Entropy of the distribution
+            entropy = -torch.sum(S_norm * torch.log(S_norm + eps))
+
+            # Effective rank
+            rank_me = torch.exp(entropy)
+            return rank_me / tensor.shape[0]
+        except:
+            return torch.tensor(0.0, device=self.device)
+        
     def reconstruction_head_step(self, global_outs, global_signals, step):
         nrmses, meses, maes, grads, min_maxs = [], [], [], [], []
         for global_out, global_signal in zip(global_outs, global_signals):
