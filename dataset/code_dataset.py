@@ -82,6 +82,7 @@ class ECGCODEDataset(PretrainDataset):
         super().__init__(config, global_augmentations=global_augmentations, local_augmentations=local_augmentations)
         self.data_folder = config.data_folder_code
         self.labels_file = config.labels_file_code
+        self.use_single_ecg = config.use_single_ecg
         self.load_tabular_data()
         self.load_records()
 
@@ -105,8 +106,14 @@ class ECGCODEDataset(PretrainDataset):
         self.tab_data['patient_id'] = self.tab_data.parallel_apply(lambda row: row['file_name'].split('/')[1].split('_')[0], axis=1)
         self.unique_patients = self.tab_data['patient_id'].unique()
         self.patient_to_records = self.tab_data.groupby("patient_id")["file_name"].apply(list).to_dict()
+
+    def __getitem__(self, idx):  
+        if self.use_single_ecg:
+            pass
+        else:
+            return self.getitem_unique_patient(idx)          
     
-    def __getitem__(self, idx):
+    def getitem_unique_patient(self, idx):            
         patient = str(self.unique_patients[idx])
         records = self.patient_to_records[patient]
 
@@ -142,5 +149,8 @@ class ECGCODEDataset(PretrainDataset):
             'global_signals': global_signals,
             'local_signals': local_signals,
         }
+    
+    def getitem_single_ecg(self, idx):            
+        return super().__getitem__(idx)
     
 

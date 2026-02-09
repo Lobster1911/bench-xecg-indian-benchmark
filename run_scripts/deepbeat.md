@@ -59,10 +59,10 @@ done
 
 ## xlstm CODE15
 
-for i in {1..5}; do
+for i in {1..4}; do
     sbatch --job-name=xlstm_lp_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_code15_lp.yaml 
 done
 
-for i in {1..5}; do
+for i in {1..4}; do
     sbatch --job-name=xlstm_ft_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_code15_ft.yaml
 done 
