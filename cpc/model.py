@@ -5,25 +5,28 @@ from itertools import chain
 import torch
 import yaml
 import numpy as np
+from models.base_model import BaseModel
 
 from cpc.ts.s4_modules.s4_model import S4Model
 from cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
 
 
-class CPCWrapper(torch.nn.Module):
-    def __init__(self, config_path=None, chunk_size=600):
+class CPCWrapper(BaseModel):
+    def __init__(self, config_path=None, chunk_size=600, linear_probing=False, split_signal=True):
         super().__init__()
         self.config_path = config_path
         self.chunk_size = chunk_size
-
+        self.split_signal = split_signal
+        self.linear_probing = linear_probing
         self.ts_encoder, self.config = self.load_model_from_config(
             config_path=self.config_path
         )
 
-    def forward(self, x, split_signal=False):
+    def forward(self, x):
+        x = x.transpose(1, 2)
         B, C, L = x.shape
         # Split each input into durations of length self.chunk_size
-        if split_signal:
+        if self.split_signal:
             n_chunks = L // self.chunk_size
         
             if n_chunks == 0:
@@ -39,7 +42,7 @@ class CPCWrapper(torch.nn.Module):
         x = self.ts_encoder(x)
 
         # Combine outputs from same original signal
-        if split_signal:
+        if self.split_signal:
             # Reshape back and average: (B, n_chunks, Output_Dim) -> (B, Output_Dim)
             x = x.view(B, n_chunks, -1).mean(dim=1)
 
@@ -53,6 +56,7 @@ class CPCWrapper(torch.nn.Module):
         encoder_hparams["hparams_encoder"] = RNNEncoderConfig(**encoder_hparams["hparams_encoder"])
         s4_hparams = config["s4_hyperparamters"]
         cpc_hparams = config["cpc_hyperparameters"]
+        cpc_hparams["eval_mode"] = "linear" if self.linear_probing else "finetuning"
 
         model = CPCModel(
             encoder_hparams=encoder_hparams,
@@ -90,6 +94,32 @@ class CPCWrapper(torch.nn.Module):
                 param.data = state_dict[name].data.to(param.device)
             elif strict:
                 raise KeyError(f"Buffer {name} not found in state_dict")
+            
+    def training_params(self):
+        """
+        Defines the parameters to be optimized during training. These parameters will receive the main learning rate ([config.lr_head]).
+        """
+        return self.ts_encoder.head.parameters()
+    
+    def finetuning_params(self):
+        """
+        Defines the parameters to be optimized during finetuning. These parameters will receive a smaller learning rate ([config.lr_xlstm]).
+        """
+        params = list(self.ts_encoder.encoder.parameters()) + list(self.ts_encoder.predictor.parameters())
+        return params
+    
+    def set_eval_linear_probing(self):
+        self.eval()
+        self.ts_encoder.head.train()
+
+    def get_params_layerwise_decay(self, lr_decay, lr, wd):
+        encoder_params = list(chain(*[e.parameters() for e in self.ts_encoder.encoder]))
+        predictor_params = list(chain(*[p.parameters() for p in self.ts_encoder.predictor]))
+
+        return [
+            {"params": predictor_params, "lr": lr * lr_decay, "weight_decay": wd},
+            {"params": encoder_params, "lr": lr * lr_decay * lr_decay, "weight_decay": wd}
+        ]
 
 
 class S4Wrapper(torch.nn.Module):
@@ -118,7 +148,7 @@ class CPCModel(torch.nn.Module):
         self.head = torch.nn.Linear(self.feature_dim, num_classes)
 
         if self.eval_mode == "linear":
-            for p in self.rnn_encoder.parameters():
+            for p in self.encoder.parameters():
                 p.requires_grad = False
             self.encoder.eval()
 
@@ -136,18 +166,3 @@ class CPCModel(torch.nn.Module):
         pooled_features = features.mean(dim=1) # Pool the features
         out = self.head(pooled_features)
         return out # TODO: is torch.nan_to_num necessary?
-    
-    def get_params(self):
-        head_params = list(self.head.parameters())
-
-        if self.eval_mode == "linear":
-            return [{"params": head_params, "lr": self.lr}]
-
-        encoder_params = list(chain(*[e.parameters() for e in self.encoder]))
-        predictor_params = list(chain(*[p.parameters() for p in self.predictor]))
-
-        return [
-            {"params": head_params, "lr": self.lr},
-            {"params": predictor_params, "lr": self.lr * self.discriminative_lr_factor},
-            {"params": encoder_params, "lr": self.lr * self.discriminative_lr_factor * self.discriminative_lr_factor}
-        ]

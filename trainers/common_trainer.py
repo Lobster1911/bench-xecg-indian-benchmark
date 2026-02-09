@@ -30,6 +30,7 @@ class CommonTrainerDownstream(pl.LightningModule):
         self.task = config.task
         self.use_st_mem = config.use_st_mem
         self.use_ecg_jepa = config.use_ecg_jepa
+        self.discriminative_lr_factor = config.discriminative_lr_factor
         
     def get_params(self):
         if self.linear_probing:
@@ -37,6 +38,8 @@ class CommonTrainerDownstream(pl.LightningModule):
         elif self.layerwise_lr_decay > 0. and self.layerwise_lr_decay < 1.:
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]   
             params.extend(self.model.get_params_layerwise_decay(self.layerwise_lr_decay, self.lr_xlstm, self.wd))
+        elif self.discriminative_lr_factor is not None:
+            params = self.model.get_params_layerwise_decay(self.discriminative_lr_factor, self.lr_xlstm, self.wd)
         else:
             params = [
                 {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},

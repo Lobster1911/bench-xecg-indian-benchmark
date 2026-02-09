@@ -9,7 +9,7 @@ linear_probing: false
 # max_length_signal: 60
 deterministic: false
 
-use_ecg_jepa: true
+use_ecg_jepa: false
 use_st_mem: false
 use_ecg_founder: false
 
@@ -24,6 +24,7 @@ xlstm_type: transformer
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 checkpoint: pretrain-xLSTM/y7gvl8tt/checkpoints/epoch=10-step=117260.ckpt
 # checkpoint: pretrain-xLSTM/bjtcbcpo/checkpoints/epoch=50-step=656472.ckpt 
+use_ecg_cpc: true
 
 patch_size: 25
 use_final_layer_norm: false
