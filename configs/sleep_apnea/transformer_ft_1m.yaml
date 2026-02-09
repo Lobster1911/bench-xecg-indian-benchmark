@@ -1,0 +1,29 @@
+wandb_log: true
+wandb_group: best_trans_ft_1m
+
+batch_size: 256
+epochs: 20
+
+lr_head: .001
+lr_xlstm: .0001
+
+layerwise_lr_decay: 0.75
+drop_path_prob: 0.5
+wd: 0.1
+
+linear_probing: false
+deterministic: false
+
+embedding_size: 768
+encoder_type: transformer
+checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+patch_embedding: linear
+cls_type: avg
+
+data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
+
+window_size: 60
+context_size: 0 

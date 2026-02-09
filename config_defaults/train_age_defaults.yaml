@@ -58,6 +58,7 @@ nk_clean: false
 normalize: false
 random_crop: 1.
 task: 'multilabel'
+random_paper_layout: 0.
 
 # dataset
 num_classes: 1

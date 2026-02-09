@@ -133,10 +133,9 @@ class ECGHighIntensity(PretrainDataset):
         signal = self.samples[idx]
         r_peaks = self.r_peaks[idx]
         r_peaks_orig_tensor = torch.tensor(r_peaks, dtype=torch.float32)
-        signal = torch.tensor(signal, dtype=torch.float32)
 
         # signal = self.resample_if_needed(signal, self.info_dict)
-        signal = self.map_leads_and_clean(signal.unsqueeze(-1), self.info_dict)
+        signal = self.map_leads_and_clean(np.expand_dims(signal, axis=-1), self.info_dict)
 
         # get a tensor of the same shape of the signal where the r_peaks indexes are set to 1
         r_peaks = r_peaks * self.sampling_freq / self.info_dict['fs']
@@ -156,8 +155,9 @@ class ECGHighIntensity(PretrainDataset):
         # print(f"Signal shape: {signal.shape}, R-peaks shape: {r_peaks_tensor.shape}")
 
         obj = {
-            'signal': signal,
+            'signals': torch.tensor(signal).float(),
             'r_peak': r_peaks_tensor,
             'r_peak_orig': r_peaks_orig_tensor,
         }
+
         return obj

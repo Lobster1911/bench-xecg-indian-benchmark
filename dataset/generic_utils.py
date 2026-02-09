@@ -134,7 +134,11 @@ def make_collate_fn_task(config, key_label='age'):
         elif key_label is not None:
             return {
                 'signals': signals,
-                key_label: torch.stack([item[key_label] for item in batch])
+                key_label: torch.stack([
+                    item[key_label].float() if isinstance(item[key_label], torch.Tensor)
+                    else torch.tensor(item[key_label]).float()
+                    for item in batch
+                ])
             }
         return {
             'signals': signals

@@ -1,0 +1,24 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_stmem_ft
+epochs: 20
+wd: 0.1
+batch_size: 96
+
+lr_head: 0.001
+lr_xlstm: 0.001
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 # 0.75
+
+use_st_mem: true
+
+linear_probing: false
+deterministic: false
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+
+data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
+labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+
+training_pct: 1.

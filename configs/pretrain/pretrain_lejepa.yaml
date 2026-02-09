@@ -1,0 +1,95 @@
+# training loop hyperparameters
+epochs: 100
+lr: 0.00001
+reconstruction_lr: 0.001
+wd: 0.01
+final_wd: 0.01
+layerwise_lr_decay: 1. #0.9
+
+# final_wd: 0.4
+dropout: 0.
+grad_clip: null
+patience: 300
+wandb_log: true
+debug: false
+monitor_metric: val_lejepa_loss
+monitor_mode: min
+monitor_delay_epochs: 2
+optimizer: adamw
+loss_type: mse_min_max
+strategy: lejepa
+num_workers: 64
+
+# xlstm hyperparameters
+embedding_size: 1024
+xlstm_config: ["s","s","m","m","s","s","m","m","s"] #,"m","s","s","m","m","s"]
+# xlstm_config: ['m','m','m','m','m']
+encoder_type: vanilla
+num_heads: 8
+drop_path_prob: 0.
+num_reg_token: 0
+patch_embedding: linear
+bidirectional: true
+cls_type: token_2
+cls_normalization: null # layer # 'batch'
+use_final_layer_norm: false
+max_length_signal: 1200
+# dataloaders
+batch_size: 512
+activation_fn: gelu
+
+# data 
+patch_size: 20
+sampling_freq: 100
+pretrain_datasets: ['code', 'chapman', 'incart', 'heedb']
+precision: '16-mixed'
+plot_samples: true
+
+# augmentations
+normalize: false
+nk_clean: false
+shift_baseline_wander_in_sample: false
+shuffle_baseline_wander_in_batch: true
+random_drop_leads: 0.2
+keep_lead_II: true
+random_surrogate_prob: 0.
+random_jitter_prob: 0.
+random_crop: 0.8
+random_change_amplitude: 0.2
+random_resample: false
+random_paper_layout: 0.3
+random_paper_6x2_prob: 0.5
+
+# low_pass_filter: 50
+
+# schedulers
+use_scheduler: true
+num_epochs_warmup: 3
+
+# teacher student config
+ema_0: 0.99
+ema_1: 1.
+start_train_head_at_epoch: 0
+
+# sim dino hyp
+lambda_loss: 0.7
+n_local_view: 2
+n_global_view: 4
+global_random_crop: 0.9
+local_random_crop: 0.2
+win_len_incart: 12
+
+# folders
+data_folder_mit: '/home/datasets/MIT-BIH_arrhythmia/'
+data_folder_code15: '/scratch/datasets/CODE15/processed/'
+labels_file_code15: '/scratch/datasets/CODE15/processed/exams_filtered.csv'
+data_folder_mimic: '/scratch/datasets/mimic-iv-ecg/raw/'
+labels_file_mimic: '/scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv'
+data_folder_ptbxl: '/scratch/datasets/ptb-xl/raw/1.0.3/records500/'
+labels_file_ptbxl: '/scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv'
+data_folder_chapman: '/home/datasets/ChapmanNingbo/1.0.0/'
+labels_file_chapman:  '/home/datasets/ChapmanNingbo/1.0.0/exams_filtered.csv'
+data_folder_code: '/scratch/datasets/CODE/processed/'
+labels_file_code: '/scratch/datasets/CODE/processed/exams_filtered.csv'
+data_folder_incart: '/home/datasets/incart/'
+data_folder_heedb: '/scratch/datasets/HEEDB/'

@@ -1,0 +1,30 @@
+wandb_log: true
+wandb_group: best_trans_lp
+
+epochs: 20
+batch_size: 96
+lr_head: 0.01
+lr_xlstm: 0.00001
+
+layerwise_lr_decay: 0.75 
+drop_path_prob: 0.5
+wd: 0.1
+
+linear_probing: true
+deterministic: false
+
+embedding_size: 768
+encoder_type: transformer
+checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
+
+skip_majority_class_samples: true
+use_focal_loss: false
+use_class_weights: false
+split_val_by_patient: true
+
+split_val_by_patient: true
+win_len: 500
+max_length_signal: 1000
+
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
+plot_test_predictions: true

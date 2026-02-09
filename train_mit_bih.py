@@ -42,7 +42,7 @@ def train(config, run=None, wandb=False):
         if config.r_peaks_detection:
             print('Using class weights for r-peaks detection')
             weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
-        if config.num_classes == 5:
+        elif config.num_classes == 5:
             if config.win_len == 1600:
                 weights = torch.tensor([2.2425e-01, 8.3814e+00, 2.7265e+00, 1.8476e+01, 2.4445e+03]).to('cuda')
             elif config.win_len == 500:

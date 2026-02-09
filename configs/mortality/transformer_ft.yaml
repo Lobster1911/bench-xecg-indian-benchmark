@@ -1,0 +1,26 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_trans_ft
+epochs: 30
+wd: 0.1
+batch_size: 512
+
+lr_head: 0.001
+lr_xlstm: 0.00001
+drop_path_prob: 0.
+layerwise_lr_decay: 0.75
+
+linear_probing: false
+deterministic: false
+
+embedding_size: 768
+encoder_type: transformer
+checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
+
+use_final_layer_norm: false
+cls_normalization: batch  # 'batch', 'layer', 'instance'
+
+data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
+labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+data_folder_code15: /scratch/datasets/CODE15/processed/
+labels_file_code15: /scratch/datasets/CODE15/processed/exams_filtered.csv

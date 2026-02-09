@@ -31,10 +31,10 @@ class ECGCODE15Dataset(PretrainDataset):
         # set exam_id as index
         print("tabular data fields for CODE 15: ", self.tab_data.head())
 
-        self.tab_data['exam_id'] = self.tab_data.parallel_apply(lambda row: Path(row['file_name']).stem, axis=1)
+        # self.tab_data['exam_id'] = self.tab_data.parallel_apply(lambda row: Path(row['file_name']).stem, axis=1)
 
-        # self.tab_data['valid'] = self.tab_data.parallel_apply(lambda row: os.path.exists(os.path.join(self.data_folder, f"{row['exam_id']}.hea")), axis=1)
-        # self.tab_data = self.tab_data[self.tab_data['valid']]
+        self.tab_data['valid'] = self.tab_data.parallel_apply(lambda row: os.path.exists(os.path.join(self.data_folder, f"{row['exam_id']}.hea")), axis=1)
+        self.tab_data = self.tab_data[self.tab_data['valid']]
 
         self.tab_data.set_index('exam_id', inplace=True)
 

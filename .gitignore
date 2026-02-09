@@ -12,5 +12,5 @@ None
 logs
 checkpoints
 checkpoint
-configs/*
+# configs/*
 figs

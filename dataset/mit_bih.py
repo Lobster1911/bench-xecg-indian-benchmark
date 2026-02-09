@@ -214,8 +214,7 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         if self.augmentations is not None:
             signal = self.augmentations(signal)
 
-        orig_start = np.round(start / self.freq_factor)
-        around_r_peaks = np.array([r - orig_start for r in sample['around_r_peaks']])
+        around_r_peaks = np.array([np.round((r - start) / self.freq_factor) for r in sample['around_r_peaks']])
 
         return {
             'signal': signal,
@@ -364,8 +363,8 @@ def make_collate_fn(config, split='train'):
             labels = [torch.from_numpy(item['label']) for item in batch]
             labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-1)
 
-        if not config.single_hb:
-            labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
+            if not config.single_hb and not config.r_peaks_detection:
+                labels = labels.unfold(1, config.patch_size, config.patch_size).max(dim=-1)[0].long()
 
         if 'r_peak_orig' not in batch[0].keys():
             r_peaks_orig = None

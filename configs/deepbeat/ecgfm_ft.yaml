@@ -1,0 +1,27 @@
+wandb_log: true
+wandb_group: best_ecgfm_ft
+
+epochs: 30
+lr_head: .01
+lr_xlstm: .001
+wd: 0.1
+dropout: 0.
+linear_probing: false
+task: multiclass
+deterministic: false
+
+batch_size: 128
+use_ecg_founder: true
+use_st_mem: false
+use_ecg_jepa: false
+
+num_classes: 2
+data_folder_deepbeat: /scratch/datasets/DeepBeat_PPG
+patience: 5
+drop_path_prob: 0. #5 # 0.75
+layerwise_lr_decay: 1. #75 # 0.75
+
+monitor_metric: val_auroc
+
+num_workers: 64
+data_pct: 0.05

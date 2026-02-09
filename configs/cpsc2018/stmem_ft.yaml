@@ -1,0 +1,21 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_stmem_ft
+epochs: 30
+wd: 0.1
+batch_size: 128
+
+lr_head: 0.0003
+lr_xlstm: 0.0003
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75 # 0.75
+
+use_st_mem: true
+
+linear_probing: false
+deterministic: false
+
+data_folder_cpsc2018: /home/datasets/CPSC2018/
+labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
+
+training_pct: 1.

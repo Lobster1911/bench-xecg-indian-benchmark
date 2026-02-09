@@ -1,0 +1,26 @@
+wandb_log: true
+wandb_group: best_xlstm_ft
+epochs: 30
+lr_head: .001
+lr_xlstm: .00001
+wd: 0.1
+dropout: 0.
+linear_probing: false
+deterministic: false
+
+batch_size: 128
+data_folder_deepbeat: /home/datasets/DeepBeat_PPG/
+
+drop_path_prob: 0.0 # 0.75
+layerwise_lr_decay: 1.0 # 0.75
+data_pct: 0.05
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/0rgc8fun/checkpoints/epoch=49-step=504700.ckpt
+
+use_final_layer_norm: false
+
+cls_type: avg
+

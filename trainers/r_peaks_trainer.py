@@ -91,22 +91,11 @@ class TrainingRPeak(CommonTrainerDownstream):
     def validation_step(self, batch, _):
         loss_r_peak_pos, r_peak_pos, r_peaks, r_peaks_orig = self.predict_batch(batch)
 
-        self.valid_rec = self.valid_rec.to(r_peak_pos.device)
         self.valid_rec(r_peak_pos, r_peaks)
-
-        self.valid_f1 = self.valid_f1.to(r_peak_pos.device)
         self.valid_f1(r_peak_pos, r_peaks)
-
-        self.valid_acc = self.valid_acc.to(r_peak_pos.device)
         self.valid_acc(r_peak_pos, r_peaks)
-
-        self.valid_auprc = self.valid_auprc.to(r_peak_pos.device)
         self.valid_auprc(r_peak_pos, r_peaks)
-
-        self.val_distance_150 = self.val_distance_150.to(r_peak_pos.device)
         self.val_distance_150.update(r_peak_pos, r_peaks_orig)
-
-        self.val_distance_20 = self.val_distance_20.to(r_peak_pos.device)
         self.val_distance_20.update(r_peak_pos, r_peaks_orig)
 
         self.log('val_loss', loss_r_peak_pos.detach().item(), prog_bar=True)
@@ -203,7 +192,7 @@ class TrainingRPeak(CommonTrainerDownstream):
                 print(f"Error plotting R-peaks: {e}")
 
     def predict_batch(self, batch):
-        x = batch["signal"]
+        x = batch["signals"]
         # print(f"Signal shape: {x.shape}")
         r_peaks = batch['r_peak'] # [bs, seq_len]
         # print(f"R-peaks shape: {r_peaks.shape}")
@@ -390,12 +379,23 @@ class RPeakDistanceMetric(Metric):
             "f1": f1
         }
     
+    def reset(self):
+        self.total_distance = torch.tensor(0.0)
+        self.total_distance_rp = torch.tensor(0.0)
+        self.num_predictions = torch.tensor(0)
+        self.true_positives = torch.tensor(0)
+        self.false_positives = torch.tensor(0)
+        self.positives = torch.tensor(0)
+        self.false_negatives = torch.tensor(0)
+        self.true_negatives = torch.tensor(0)
+        return super().reset()
+
 
 
 def plot_r_peaks(sample, model, device, logdir, epoch, name):
     with torch.no_grad():
-        signal = sample['signal'].to(device).unsqueeze(0)
-        r_peaks = sample['r_peak'].to(device).unsqueeze(0)
+        signal = torch.from_numpy(sample['signal']).to(device).unsqueeze(0)
+        r_peaks = torch.from_numpy(sample['r_peak']).to(device).unsqueeze(0)
         # print(f"Signal shape: {signal.shape}")
 
         # Get the original R-peaks

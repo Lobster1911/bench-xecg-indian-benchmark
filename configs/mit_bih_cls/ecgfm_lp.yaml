@@ -1,0 +1,24 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_ecgfm_lp
+
+num_classes: 5
+epochs: 20
+
+lr_head: .001
+wd: 0.1
+
+linear_probing: false
+deterministic: false
+batch_size: 256
+num_workers: 64
+
+use_ecg_founder: true
+single_hb: true
+
+skip_majority_class_samples: true
+use_focal_loss: false
+use_class_weights: false
+split_val_by_patient: true
+
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

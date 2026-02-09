@@ -55,3 +55,13 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_sup_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/xlstm_supervised.yaml
 done 
+
+## xlstm CODE15
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_lp_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/xlstm_code15_lp.yaml 
+done
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_ft_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/xlstm_code15_ft.yaml
+done 

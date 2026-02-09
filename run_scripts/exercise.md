@@ -56,3 +56,14 @@ done
 for i in {1..5}; do
     sbatch --job-name=xlstm_sup_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_supervised.yaml
 done 
+
+
+## xlstm CODE15
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_lp_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_code15_lp.yaml 
+done
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_ft_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_code15_ft.yaml
+done 

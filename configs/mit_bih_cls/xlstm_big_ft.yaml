@@ -1,0 +1,36 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_big_xlstm_ft
+epochs: 20
+
+batch_size: 64
+
+lr_head: 0.001
+lr_xlstm: 0.0000001
+
+layerwise_lr_decay: 0.75
+drop_path_prob: 0. # 0.5
+wd: 0.
+
+linear_probing: false
+deterministic: true
+
+skip_majority_class_samples: true
+use_focal_loss: false
+use_class_weights: false
+split_val_by_patient: true
+
+embedding_size: 1536
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+# checkpoint: pretrain-xLSTM/pjbzdezq/checkpoints/epoch=48-step=659442.ckpt
+checkpoint: pretrain-xLSTM/gdky460q/checkpoints/epoch=99-step=1009400.ckpt
+is_recurrent: true
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+
+win_len: 1800
+max_length_signal: 180556
+
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

@@ -57,6 +57,7 @@ shuffle_baseline_wander_in_batch: false
 nk_clean: false
 normalize: false
 random_crop: 1.
+random_paper_layout: 0.
 
 #dataset
 deterministic: true

@@ -1,0 +1,22 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_ecgfm_ft_30s
+
+epochs: 20
+
+lr_head: .001
+lr_xlstm: .000001
+
+wd: 0.1
+linear_probing: false
+deterministic: false
+
+batch_size: 512
+num_workers: 64
+
+use_ecg_founder: true
+
+data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
+
+window_size: 30
+context_size: 0

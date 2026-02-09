@@ -17,7 +17,7 @@ batch_size: 8
 num_workers: 32
 epochs: 30
 linear_probing: false
-precision: 16-mixed  
+precision: 32  
 
 # regularizers
 dropout: 0.
@@ -57,6 +57,7 @@ shuffle_baseline_wander_in_batch: false
 nk_clean: false
 normalize: false
 random_crop: 1.
+random_paper_layout: 0.
 
 # dataset
 monitor_metric: val_f1

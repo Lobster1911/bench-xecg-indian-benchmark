@@ -55,3 +55,13 @@ done
 for i in {1..5}; do
     sbatch --job-name=xlstm_sup_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_supervised.yaml
 done 
+
+## xlstm CODE15
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_lp_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_code15_lp.yaml 
+done
+
+for i in {1..4}; do
+    sbatch --job-name=xlstm_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_code15_ft.yaml
+done 

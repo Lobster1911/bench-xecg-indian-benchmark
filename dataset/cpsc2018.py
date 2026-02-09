@@ -95,8 +95,8 @@ def make_collate_fn(config, split='train'):
         baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
 
     def collate_fn(batch):
-        signals = torch.tensor([item['signal'] for item in batch])
-        class_labels = torch.tensor([item['labels'] for item in batch])
+        signals = [item['signal'] for item in batch]
+        class_labels = [torch.tensor(item['labels']).float() for item in batch]
 
         # pad the signals to the same length
         if split == 'train' and config.shuffle_baseline_wander_in_batch:

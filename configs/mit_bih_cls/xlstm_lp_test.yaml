@@ -1,0 +1,82 @@
+wandb_log: true
+wandb_group: best_heedb_xlstm_lp
+num_classes: 5
+epochs: 20
+
+batch_size: 64
+
+lr_head: 0.001
+lr_xlstm: 0.00001
+
+drop_path_prob: 0.5
+layerwise_lr_decay: 0.75
+
+wd: 0.1
+
+linear_probing: false
+deterministic: true
+
+skip_majority_class_samples: true
+use_focal_loss: false
+use_class_weights: true
+split_val_by_patient: true
+
+# embedding_size: 1024
+encoder_type: vanilla
+# xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+embedding_size: 1024
+xlstm_config: ["s","s","m","m","s","s","m","m","s"] 
+num_heads: 8
+
+# checkpoint: pretrain-xLSTM/wb0y9901/checkpoints/epoch=36-step=374958.ckpt # conv
+#checkpoint: pretrain-xLSTM/3hzlmi4w/checkpoints/epoch=86-step=881658.ckpt
+#patch_embedding: conv
+
+checkpoint: pretrain-xLSTM/kqe8nslg/checkpoints/epoch=12-step=107432.ckpt # pretrain-xLSTM/3hzlmi4w/checkpoints/epoch=86-step=881658.ckpt
+patch_embedding: linear
+patch_size: 20
+
+# checkpoint: pretrain-xLSTM/8ake2jr4/checkpoints/epoch=7-step=66112.ckpt
+# embedding_size: 1536
+# num_heads: 12
+# patch_embedding: conv
+
+# heedb
+# checkpoint: pretrain-xLSTM/8ake2jr4/checkpoints/epoch=5-step=49584.ckpt # conv
+# checkpoint: pretrain-xLSTM/nkjbwtgb/checkpoints/epoch=56-step=314013.ckpt # linear
+# patch_embedding: linear
+
+
+# checkpoint: pretrain-xLSTM/blsq7laa/checkpoints/epoch=13-step=47292.ckpt
+
+# checkpoint: pretrain-xLSTM/gkftv2f4/checkpoints/epoch=48-step=202370.ckpt
+# checkpoint: pretrain-xLSTM/er3aikd6/checkpoints/epoch=31-step=528832.ckpt
+# checkpoint: pretrain-xLSTM/2pbz62io/checkpoints/epoch=19-step=330520.ckpt
+# checkpoint: pretrain-xLSTM/lml19bp0/checkpoints/epoch=37-step=627456.ckpt
+# checkpoint: pretrain-xLSTM/g7o5dy77/checkpoints/epoch=48-step=807814.ckpt
+# checkpoint: pretrain-xLSTM/0rgc8fun/checkpoints/epoch=49-step=504700.ckpt
+is_recurrent: false
+
+single_hb: false
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+cls_type: token_2
+
+num_epochs_warmup: 1
+
+win_len: 1500
+context_len: 20
+max_length_signal: 180556
+
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
+
+monitor_metric: val_auroc
+monitor_mode: max
+
+plot_test_predictions: true
+normalize: true
+# high_pass_filter: 0.1
+# low_pass_filter: 40
+random_shift: true
+predict_no_hb: false
