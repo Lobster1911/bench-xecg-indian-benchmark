@@ -17,3 +17,4 @@ figs
 cpc/extensions/build
 cpc/build
 build
+dist/
