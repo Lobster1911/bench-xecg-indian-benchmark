@@ -7,7 +7,7 @@ num_classes: 5
 epochs: 20
 
 lr_head: 0.0001
-lr_xlstm: 0.0001
+lr_core: 0.0001
 
 layerwise_lr_decay: 0.
 drop_path_prob: 0.

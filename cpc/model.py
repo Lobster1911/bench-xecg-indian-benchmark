@@ -107,7 +107,7 @@ class CPCWrapper(BaseModel):
     
     def finetuning_params(self):
         """
-        Defines the parameters to be optimized during finetuning. These parameters will receive a smaller learning rate ([config.lr_xlstm]).
+        Defines the parameters to be optimized during finetuning. These parameters will receive a smaller learning rate ([config.lr_core]).
         """
         params = list(self.ts_encoder.encoder.parameters()) + list(self.ts_encoder.predictor.parameters())
         return params

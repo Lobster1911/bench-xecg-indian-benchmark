@@ -3,7 +3,7 @@ wandb_log: true
 wandb_group: best_ecgfm_ft
 
 lr_head: .1
-lr_xlstm: .001
+lr_core: .001
 wd: 0.01
 
 dropout: 0.

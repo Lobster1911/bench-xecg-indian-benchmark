@@ -3,7 +3,7 @@ wandb_log: false
 wandb_group: xlstm_no_mimic_ft
 epochs: 15
 lr_head: .1
-lr_xlstm: .001
+lr_core: .001
 wd: 0.1
 linear_probing: false
 deterministic: false

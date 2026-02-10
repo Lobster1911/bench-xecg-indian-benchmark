@@ -3,7 +3,7 @@ wandb_group: best_trans_lp
 
 epochs: 30
 lr_head: .001
-lr_xlstm: .0001
+lr_core: .0001
 wd: 0.1
 linear_probing: true
 deterministic: false

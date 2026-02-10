@@ -12,7 +12,7 @@ use_scheduler: true
 patience: 8
 grad_clip: 3.
 lr_head: 0.001
-lr_xlstm: 0.00001
+lr_core: 0.00001
 batch_size: 64
 num_workers: 32
 epochs: 30

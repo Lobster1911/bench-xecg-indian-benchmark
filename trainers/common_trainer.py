@@ -11,7 +11,7 @@ class CommonTrainerDownstream(pl.LightningModule):
     def __init__(self, model, config,  len_train_dataset, weights=None):
         super().__init__()
         self.lr_head = config.lr_head
-        self.lr_xlstm = config.lr_xlstm
+        self.lr_core = config.lr_core
         self.wd = config.wd
         self.model = model
         self.batch_size = config.batch_size
@@ -37,13 +37,13 @@ class CommonTrainerDownstream(pl.LightningModule):
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]
         elif self.layerwise_lr_decay > 0. and self.layerwise_lr_decay < 1.:
             params = [ {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd, 'name': 'head'} ]   
-            params.extend(self.model.get_params_layerwise_decay(self.layerwise_lr_decay, self.lr_xlstm, self.wd))
+            params.extend(self.model.get_params_layerwise_decay(self.layerwise_lr_decay, self.lr_core, self.wd))
         elif self.discriminative_lr_factor is not None:
-            params = self.model.get_params_layerwise_decay(self.discriminative_lr_factor, self.lr_xlstm, self.wd)
+            params = self.model.get_params_layerwise_decay(self.discriminative_lr_factor, self.lr_core, self.wd)
         else:
             params = [
                 {'params': self.model.training_params(), 'lr': self.lr_head, 'weight_decay': self.wd},
-                {'params': self.model.finetuning_params(), 'lr': self.lr_xlstm, 'weight_decay': self.wd}
+                {'params': self.model.finetuning_params(), 'lr': self.lr_core, 'weight_decay': self.wd}
             ]
         return params
     

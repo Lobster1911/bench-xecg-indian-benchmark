@@ -3,7 +3,7 @@ wandb_group: best_ecgfm_ft
 
 epochs: 30
 lr_head: .01
-lr_xlstm: .001
+lr_core: .001
 wd: 0.1
 dropout: 0.
 linear_probing: false
