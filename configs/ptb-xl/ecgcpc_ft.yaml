@@ -1,18 +1,18 @@
 # training loop hyp
 wandb_log: true
-wandb_group: best_ecgcpc_lp
+wandb_group: best_ecgcpc_ft
 epochs: 30
 wd: 0.001
 batch_size: 256
 
-lr_head: 0.01
-lr_xlstm: 0.01
+lr_head: 0.3
+lr_xlstm: 0.1
 discriminative_lr_factor: 0.1
 precision: '32'
 split_signal: false
 
-linear_probing: true
-deterministic: true
+linear_probing: false
+deterministic: false
 
 use_ecg_cpc: true
 

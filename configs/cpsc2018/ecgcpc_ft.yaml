@@ -1,0 +1,23 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_ecgcpc_ft
+epochs: 30
+wd: 0.001
+batch_size: 256
+
+lr_head: 0.1
+lr_xlstm: 0.1
+discriminative_lr_factor: 0.1
+precision: '32'
+split_signal: false
+
+linear_probing: false
+deterministic: false
+
+use_ecg_cpc: true
+
+data_folder_cpsc2018: /home/datasets/CPSC2018/
+labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
+
+training_pct: 1.
+normalize: true

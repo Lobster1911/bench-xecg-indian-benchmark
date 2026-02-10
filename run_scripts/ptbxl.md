@@ -106,3 +106,14 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl/xlstm_code15_ft.yaml 
 done
+
+
+## ECG CPC
+
+for i in {1..4}; do
+    sbatch --job-name=cpc_lp_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl/ecgcpc_lp.yaml
+done
+
+for i in {1..4}; do
+    sbatch --job-name=cpc_ft_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl/ecgcpc_ft.yaml 
+done

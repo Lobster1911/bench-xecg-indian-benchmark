@@ -24,7 +24,7 @@ class S4Model(nn.Module):
         bidirectional=True, #MODIFIED
         layer_norm = True, # MODIFIED
         pooling = True, # MODIFIED
-        backbone= "s42" # MODIFIED
+        backbone= "s42", # MODIFIED
     ):
         super().__init__()
 
@@ -79,20 +79,14 @@ class S4Model(nn.Module):
             else:
                 self.dropouts.append(nn.Dropout(dropout))
 
-        # Linear decoder
-        # MODIFIED TO ALLOW FOR MODELS WITHOUT DECODER
-        if(d_output is None):
-            self.decoder = None
-        else:
-            self.decoder = nn.Linear(d_model, d_output)
-
     #MODIFIED
     def forward(self, x, rate=1.0):
         """
         Input x is shape (B, d_input, L) if transposed_input else (B, L, d_input)
         """
+        # print('before encoder: ', x.shape)
         x = self.encoder(x)  # (B, d_input, L) -> (B, d_model, L) if transposed_input else (B, L, d_input) -> (B, L, d_model)
-
+        # print('after encoder: ', x.shape)
         if(self.transposed_input is False):
             x = x.transpose(-1, -2)  # (B, L, d_model) -> (B, d_model, L)
         
@@ -122,15 +116,14 @@ class S4Model(nn.Module):
 
         x = x.transpose(-1, -2) # (B, d_model, L) -> (B, L, d_model)
 
+        # print('pre-pool: ', x.shape)
         # MODIFIED ALLOW TO DISABLE POOLING
         if(self.pooling):
             # Pooling: average pooling over the sequence length
             x = x.mean(dim=1)
 
-        # Decode the outputs
-        if(self.decoder is not None):
-            x = self.decoder(x)  # (B, d_model) -> (B, d_output) if pooling else (B, L, d_model) -> (B, L, d_output)
-            
         if(not self.pooling and self.transposed_input is True):
+            # print('pre-transpose: ', x.shape)
             x = x.transpose(-1, -2) # (B, L, d_output) -> (B, d_output, L)
+            # print('post-transpose: ', x.shape)
         return x

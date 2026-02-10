@@ -87,7 +87,7 @@ class ECGCODEDataset(PretrainDataset):
         self.load_records()
 
     def load_records(self):
-        self.records = self.tab_data.index.tolist()
+        self.records = self.tab_data["file_name"].values
         print(f'CODE: sample path: {self.records[0]}')
         print(f'CODE: loaded {len(self.records)} records')
         print(f'CODE: number of unique patients {len(self.unique_patients)}')
@@ -107,18 +107,12 @@ class ECGCODEDataset(PretrainDataset):
         self.unique_patients = self.tab_data['patient_id'].unique()
         self.patient_to_records = self.tab_data.groupby("patient_id")["file_name"].apply(list).to_dict()
 
-    def __getitem__(self, idx):  
-        if self.use_single_ecg:
-            pass
-        else:
-            return self.getitem_unique_patient(idx)          
-    
-    def getitem_unique_patient(self, idx):            
+    def __getitem__(self, idx):           
         patient = str(self.unique_patients[idx])
         records = self.patient_to_records[patient]
 
         # records = self.tab_data[self.tab_data['patient_id'] == int(patient)]['file_name'].tolist()
-        num_views = self.n_global_view # + self.n_local_view
+        num_views = self.n_global_view if not self.use_single_ecg else 1
         if len(records) > num_views:
             records = np.random.choice(records, num_views)
             
@@ -148,9 +142,6 @@ class ECGCODEDataset(PretrainDataset):
         return  {
             'global_signals': global_signals,
             'local_signals': local_signals,
-        }
-    
-    def getitem_single_ecg(self, idx):            
-        return super().__getitem__(idx)
+        }       
     
 

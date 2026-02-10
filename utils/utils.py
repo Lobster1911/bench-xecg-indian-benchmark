@@ -94,14 +94,12 @@ def parse_config(config_file, default_config_file):
         merged_config.normalize = True
     elif merged_config.use_ecg_cpc:
         merged_config.sampling_freq = 240
-        merged_config.low_pass_filter = 50
-        merged_config.high_pass_filter = 0.5
-        # merged_config.max_length_signal = 5000
-        # merged_config.window_size_train = 1000
-        # merged_config.window_size_val = 1000
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
+        # merged_config.low_pass_filter = 50
+        # merged_config.high_pass_filter = 0.5
         merged_config.discriminative_lr_factor = 0.1
+        merged_config.patch_size = 2
 
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.
@@ -160,7 +158,13 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False, comp
             path = './checkpoint/12_lead_ECGFounder.pth'
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     elif config.use_ecg_cpc:
-        base_model = CPCWrapper('./checkpoint/init_dict.yaml', linear_probing=config.linear_probing, split_signal=True)
+        base_model = CPCWrapper(
+            './checkpoint/init_dict.yaml', 
+            linear_probing=config.linear_probing, 
+            split_signal=config.split_signal, 
+            num_classes=config.num_classes,
+            feature_classification=feature_classification
+        )
         base_model.load_weights_from_checkpoint('./checkpoint/last_11597276_state_dict.ckpt')
     else:
         if sleep_apnea:

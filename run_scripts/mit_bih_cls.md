@@ -65,3 +65,13 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_mit slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_cls/xlstm_code15_ft.yaml
 done
+
+## ECG-CPC
+
+for i in {1..4}; do
+    sbatch --job-name=cpc_lp_mit slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_cls/ecgcpc_lp.yaml 
+done
+
+for i in {1..4}; do
+    sbatch --job-name=cpc_ft_mit slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_cls/ecgcpc_lp.yaml
+done

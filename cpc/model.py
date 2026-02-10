@@ -12,12 +12,14 @@ from cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
 
 
 class CPCWrapper(BaseModel):
-    def __init__(self, config_path=None, chunk_size=600, linear_probing=False, split_signal=True):
+    def __init__(self, config_path=None, chunk_size=600, linear_probing=False, split_signal=True, num_classes=5, feature_classification=False):
         super().__init__()
         self.config_path = config_path
         self.chunk_size = chunk_size
         self.split_signal = split_signal
         self.linear_probing = linear_probing
+        self.num_classes = num_classes
+        self.feature_classification = feature_classification
         self.ts_encoder, self.config = self.load_model_from_config(
             config_path=self.config_path
         )
@@ -57,6 +59,8 @@ class CPCWrapper(BaseModel):
         s4_hparams = config["s4_hyperparamters"]
         cpc_hparams = config["cpc_hyperparameters"]
         cpc_hparams["eval_mode"] = "linear" if self.linear_probing else "finetuning"
+        cpc_hparams['num_classes'] = self.num_classes
+        s4_hparams['pooling'] = not self.feature_classification
 
         model = CPCModel(
             encoder_hparams=encoder_hparams,
@@ -113,8 +117,8 @@ class CPCWrapper(BaseModel):
         self.ts_encoder.head.train()
 
     def get_params_layerwise_decay(self, lr_decay, lr, wd):
-        encoder_params = list(chain(*[e.parameters() for e in self.ts_encoder.encoder]))
-        predictor_params = list(chain(*[p.parameters() for p in self.ts_encoder.predictor]))
+        encoder_params = self.ts_encoder.encoder.parameters()
+        predictor_params = self.ts_encoder.predictor.parameters()
 
         return [
             {"params": predictor_params, "lr": lr * lr_decay, "weight_decay": wd},
@@ -163,6 +167,6 @@ class CPCModel(torch.nn.Module):
 
     def forward(self, x):
         features = self.get_features(x)
-        pooled_features = features.mean(dim=1) # Pool the features
-        out = self.head(pooled_features)
+        # print(f'features before head pool', features.shape)
+        out = self.head(features)
         return out # TODO: is torch.nan_to_num necessary?
