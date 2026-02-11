@@ -5,8 +5,8 @@ wandb_group: best_ecgcpc_ft_30s
 wd: 0.001
 batch_size: 96
 
-lr_head: 0.3
-lr_core: 0.3
+lr_head: 1.
+lr_core: 1.
 discriminative_lr_factor: 0.1
 precision: '32'
 split_signal: false
