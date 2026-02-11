@@ -37,10 +37,10 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
     def training_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)
 
-        self.train_acc = self.train_acc.to(preds.device)
+        # self.train_acc = self.train_acc.to(preds.device)
         self.train_acc(preds, targets)
 
-        self.train_f1 = self.train_f1.to(preds.device)
+        # self.train_f1 = self.train_f1.to(preds.device)
         self.train_f1(preds, targets)
 
         self.log('train_loss', loss.detach().item(), prog_bar=True)
@@ -49,12 +49,12 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
 
         # auroc
         # self.train_auroc = self.train_auroc.cpu()
-        self.train_auroc = self.train_auroc.to(logits.device)
+        # self.train_auroc = self.train_auroc.to(logits.device)
         self.train_auroc(logits, targets)
         self.log("train_auroc", self.train_auroc)
 
         # auprc
-        self.train_auprc = self.train_auprc.to(logits.device)
+        # self.train_auprc = self.train_auprc.to(logits.device)
         self.train_auprc(logits, targets)
         self.log("train_auprc", self.train_auprc, prog_bar=True)
 
@@ -63,10 +63,10 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
     def validation_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)
 
-        self.valid_acc = self.valid_acc.to(preds.device)
+        # self.valid_acc = self.valid_acc.to(preds.device)
         self.valid_acc(preds, targets)
 
-        self.valid_f1 = self.valid_f1.to(preds.device)
+        # self.valid_f1 = self.valid_f1.to(preds.device)
         self.valid_f1(preds, targets)
 
         self.log('val_loss', loss.detach().item(), prog_bar=True)
@@ -74,12 +74,12 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.log('val_f1', self.valid_f1, prog_bar=True)
 
         # auroc
-        self.valid_auroc = self.valid_auroc.to(logits.device)
+        # self.valid_auroc = self.valid_auroc.to(logits.device)
         self.valid_auroc(logits, targets)
         self.log('val_auroc', self.valid_auroc, prog_bar=True)
 
         # auprc
-        self.valid_auprc = self.valid_auprc.to(logits.device)
+        # self.valid_auprc = self.valid_auprc.to(logits.device)
         self.valid_auprc(logits, targets)
         self.log('val_auprc', self.valid_auprc, prog_bar=True)
 
@@ -88,11 +88,10 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
     def test_step(self, batch, _):
         loss, logits, preds, targets = self.predict_batch(batch)
 
-        self.test_acc = self.test_acc.to(preds.device)
+        # self.test_acc = self.test_acc.to(preds.device)
         self.test_acc(preds, targets)
 
-
-        self.test_f1 = self.test_f1.to(preds.device)
+        # self.test_f1 = self.test_f1.to(preds.device)
         self.test_f1(preds, targets)
 
         self.log("test_loss", loss.detach().item())
@@ -100,12 +99,12 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.log("test_f1", self.test_f1)
 
         # auroc  
-        self.test_auroc = self.test_auroc.to(logits.device)
+        # self.test_auroc = self.test_auroc.to(logits.device)
         self.test_auroc(logits, targets)
         self.log("test_auroc", self.test_auroc)
 
         # auprc
-        self.test_auprc = self.test_auprc.to(logits.device)
+        # self.test_auprc = self.test_auprc.to(logits.device)
         self.test_auprc(logits, targets)
         self.log("test_auprc", self.test_auprc)
 

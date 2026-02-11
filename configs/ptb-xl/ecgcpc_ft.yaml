@@ -1,0 +1,24 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_ecgcpc_ft
+epochs: 30
+wd: 0.001
+batch_size: 256
+
+lr_head: .03
+lr_core: .03
+discriminative_lr_factor: 0.1
+precision: '32'
+
+linear_probing: false
+deterministic: false
+
+use_ecg_cpc: true
+split_signal: false
+
+
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
+labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
+
+training_pct: 1.
+normalize: false

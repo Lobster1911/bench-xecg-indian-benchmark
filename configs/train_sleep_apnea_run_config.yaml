@@ -11,7 +11,7 @@ use_ecg_jepa: false
 wandb_log: true
 epochs: 15
 lr_head: .0001
-lr_xlstm: .0001
+lr_core: .0001
 wd: 0.01
 dropout: 0.
 linear_probing: false

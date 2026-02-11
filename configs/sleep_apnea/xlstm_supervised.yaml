@@ -6,7 +6,7 @@ batch_size: 32
 epochs: 20
 
 lr_head: .0001
-lr_xlstm: .0001
+lr_core: .0001
 
 layerwise_lr_decay: 1.
 drop_path_prob: 0.

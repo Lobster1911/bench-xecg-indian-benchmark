@@ -5,7 +5,7 @@ wandb_group: best_stmem_ft_3m
 epochs: 20
 
 lr_head: .00003
-lr_xlstm: .00003
+lr_core: .00003
 wd: 0.1
 dropout: 0.
 

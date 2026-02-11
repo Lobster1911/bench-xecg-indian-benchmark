@@ -7,7 +7,7 @@ batch_size: 96
 patience: 30
 
 lr_head: 0.001
-lr_xlstm: 0.00001
+lr_core: 0.00001
 
 use_ecg_founder: true
 

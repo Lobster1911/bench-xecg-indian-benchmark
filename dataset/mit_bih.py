@@ -348,7 +348,7 @@ def make_collate_fn(config, split='train'):
         baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
     
     def collate_fn(batch):
-        signals = [torch.from_numpy(item['signal']) for item in batch]
+        signals = [torch.from_numpy(item['signal'].copy()).float() for item in batch]
         patients = [item['patient_id'] for item in batch]
         
         if 'r_peak' not in batch[0].keys(): 

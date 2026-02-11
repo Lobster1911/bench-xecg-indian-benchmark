@@ -6,7 +6,7 @@ num_classes: 5
 epochs: 30
 
 lr_head: 0.001
-lr_xlstm: 0.001
+lr_core: 0.001
 
 wd: 0.1
 linear_probing: false

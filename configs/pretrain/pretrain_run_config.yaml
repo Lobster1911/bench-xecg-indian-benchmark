@@ -55,7 +55,7 @@ masking_type: 'block' # 'random' or 'block'
 # data 
 patch_size: 25
 sampling_freq: 100
-pretrain_datasets: ['code', 'chapman', 'incart', 'heedb'] #, 'mimic'] #, 'ptbxl]
+pretrain_datasets: ['code', 'chapman', 'incart'] #, 'heedb'] #, 'mimic'] #, 'ptbxl]
 
 # schedulers
 use_scheduler: true

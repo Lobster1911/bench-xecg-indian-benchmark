@@ -1,12 +1,12 @@
 # training loop hyp
 wandb_log: true
-wandb_group: ecg_cpc_lp
+wandb_group: best_ecgcpc_lp
 epochs: 30
-wd: 0.1
+wd: 0.001
 batch_size: 256
 
-lr_head: 0.01
-lr_xlstm: 0.00003
+lr_head: 0.1
+lr_core: 0.01
 discriminative_lr_factor: 0.1
 precision: '32'
 
@@ -14,8 +14,10 @@ linear_probing: true
 deterministic: false
 
 use_ecg_cpc: true
+split_signal: false
 
-data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
-labels_file_ptbxl: /media/Volume/data/PTB-XL/exams_filtered.csv
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
+labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
 
 training_pct: 1.
+normalize: true

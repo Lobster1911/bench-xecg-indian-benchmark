@@ -12,7 +12,7 @@ class BaseModel(nn.Module):
     
     def finetuning_params(self):
         """
-        Defines the parameters to be optimized during finetuning. These parameters will receive a smaller learning rate ([config.lr_xlstm]).
+        Defines the parameters to be optimized during finetuning. These parameters will receive a smaller learning rate ([config.lr_core]).
         """
         params = [param for name, param in self.named_parameters() if 'head' not in name]
         return params

@@ -20,5 +20,12 @@ ulimit -n
 ulimit -n 16384 
 ulimit -n
 
+export PYKEOPS_VERBOSE=1
+export KEOPS_RECOMPILE=1
+
+export CUDA_HOME=/usr/local/cuda
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$CUDA_HOME/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+export LIBRARY_PATH=$CUDA_HOME/lib64:$CUDA_HOME/targets/x86_64-linux/lib:$LIBRARY_PATH
+
 # run script from above
 srun ~/.conda/envs/xlstm_pretrained/bin/python -u $1 --config_file $2

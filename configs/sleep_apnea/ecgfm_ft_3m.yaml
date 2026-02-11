@@ -5,7 +5,7 @@ wandb_group: best_ecgfm_ft_3m
 epochs: 20
 
 lr_head: .0005
-lr_xlstm: .0000005
+lr_core: .0000005
 
 wd: 0.1
 linear_probing: false

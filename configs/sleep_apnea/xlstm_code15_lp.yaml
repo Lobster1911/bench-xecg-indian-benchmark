@@ -6,7 +6,7 @@ batch_size: 128
 epochs: 20
 
 lr_head: 0.001
-lr_xlstm: 0.00001
+lr_core: 0.00001
 
 wd: 0.1
 
