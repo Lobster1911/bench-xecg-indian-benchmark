@@ -68,10 +68,10 @@ done
 
 ## ECG-CPC
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_lp_age slurm_train_l40s.sh train_age.py configs/age/ecgcpc_lp.yaml 
 done
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_ft_age slurm_train_l40s.sh train_age.py configs/age/ecgcpc_ft.yaml
 done 
