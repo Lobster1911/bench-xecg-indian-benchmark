@@ -161,7 +161,7 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False, comp
             path = './checkpoint/12_lead_ECGFounder.pth'
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     elif config.use_ecg_cpc:
-        base_model = CPCWrapper(config, './checkpoint/init_dict.yaml', feature_classification=feature_classification)
+        base_model = CPCWrapper(config, './checkpoint/init_dict.yaml', feature_classification=feature_classification, sleep_apnea=sleep_apnea)
         base_model.load_weights_from_checkpoint('./checkpoint/last_11597276_state_dict.ckpt')
     else:
         if sleep_apnea:

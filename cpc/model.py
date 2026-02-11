@@ -12,24 +12,34 @@ from cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
 from models.utils import get_normalization_layer
 
 class CPCWrapper(BaseModel):
-    def __init__(self, config, config_path=None, chunk_size=600,  feature_classification=False):
+    def __init__(self, config, config_path=None, chunk_size=600,  feature_classification=False, sleep_apnea=False):
         super().__init__()
         self.config_path = config_path
-        self.chunk_size = chunk_size
         self.split_signal = config.split_signal
         self.linear_probing = config.linear_probing
         self.num_classes = config.num_classes
         self.config = config
         self.feature_classification = feature_classification
+        self.sleep_apnea = sleep_apnea
+        self.chunk_size = chunk_size
+
         self.ts_encoder, self.config = self.load_model_from_config(
             config_path=self.config_path
         )
 
     def forward(self, x):
-        x = x.transpose(1, 2)
+        bs = x.shape[0]
+        x, n_chunks = self.chunk_signal_if_needed(x.transpose(1, 2))
+        x = self.ts_encoder(x)
+        x = self.unchunk_signal_if_needed(x, n_chunks, bs)
+
+        return torch.nan_to_num(x)
+    
+    def chunk_signal_if_needed(self, x):
         B, C, L = x.shape
         # Split each input into durations of length self.chunk_size
         if self.split_signal:
+            # in sleep apnea the chunks are every minute, so chunk_size is sampling_freq * 60                
             n_chunks = L // self.chunk_size
         
             if n_chunks == 0:
@@ -40,17 +50,14 @@ class CPCWrapper(BaseModel):
 
             # Reshape: (B, C, n_chunks, chunk_size) -> (B, n_chunks, C, chunk_size) -> (B * n_chunks, C, chunk_size)
             x = x.view(B, C, n_chunks, self.chunk_size).permute(0, 2, 1, 3).reshape(-1, C, self.chunk_size)
-
-        # Pass through model
-        
-        x = self.ts_encoder(x)
-
+        return (x, n_chunks) if self.split_signal else (x, None)
+    
+    def unchunk_signal_if_needed(self, x, n_chunks, batch_size):
         # Combine outputs from same original signal
         if self.split_signal:
             # Reshape back and average: (B, n_chunks, Output_Dim) -> (B, Output_Dim)
-            x = x.view(B, n_chunks, -1).mean(dim=1)
-
-        return torch.nan_to_num(x)
+            x = x.view(batch_size, n_chunks, -1).mean(dim=1)
+        return x
 
     def load_model_from_config(self, config_path):
         with open(config_path, "r") as fp:
@@ -62,7 +69,8 @@ class CPCWrapper(BaseModel):
         cpc_hparams = config["cpc_hyperparameters"]
         cpc_hparams["eval_mode"] = "linear" if self.linear_probing else "finetuning"
         cpc_hparams['num_classes'] = self.num_classes
-        s4_hparams['pooling'] = not self.feature_classification
+        cpc_hparams['sleep_apnea'] = self.sleep_apnea
+        s4_hparams['pooling'] = not self.feature_classification and not self.sleep_apnea # only use pooling if not feature classification or if not sleep apnea (since in sleep apnea the signal is already 1 minute long)
 
         model = CPCModel(
             encoder_hparams=encoder_hparams,
@@ -140,13 +148,18 @@ class S4Wrapper(torch.nn.Module):
 
 
 class CPCModel(torch.nn.Module):
-    def __init__(self, encoder_hparams, config, s4_hparams, num_classes, feature_dim=512, eval_mode="finetuning", lr=1e-3, discriminative_lr_factor=0.1):
+    def __init__(self, encoder_hparams, config, s4_hparams, num_classes, feature_dim=512, eval_mode="finetuning", lr=1e-3, discriminative_lr_factor=0.1, sleep_apnea=False):
         super().__init__()
         self.encoder_hparams = encoder_hparams
         self.s4_hparams = s4_hparams
         self.num_classes = num_classes
         self.feature_dim = feature_dim
         self.eval_mode = eval_mode
+        self.sleep_apnea = sleep_apnea
+        self.context_size = config.context_size
+        self.sampling_freq = config.sampling_freq
+        self.window_size = config.window_size
+        self.patch_size = config.patch_size
         self.lr = lr
         self.discriminative_lr_factor = discriminative_lr_factor
 
@@ -175,5 +188,18 @@ class CPCModel(torch.nn.Module):
     def forward(self, x):
         features = self.get_features(x)
         # print(f'features before head pool', features.shape)
+
+        if self.sleep_apnea:
+            if self.context_size > 0:
+                context_patches = (self.context_size * self.sampling_freq) // self.patch_size // 2
+                window_patches = (self.window_size * self.sampling_freq) // self.patch_size
+                start = context_patches
+                end = context_patches + window_patches
+                # print(f"Features shape before removing context patches: {features.shape}")
+                # print(f"Removing context patches: start {start}, end {end}")
+                features = features[:, start:end, :]
+                # print(f"Features shape after removing context patches: {features.shape}")
+            features = features.mean(dim=1) # average pool over time dimension
+
         out = self.head(features)
         return out # TODO: is torch.nan_to_num necessary?
