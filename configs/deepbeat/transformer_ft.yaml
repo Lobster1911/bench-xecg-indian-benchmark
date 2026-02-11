@@ -16,7 +16,6 @@ encoder_type: transformer
 checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
 
 data_folder_deepbeat: /scratch/datasets/DeepBeat_PPG
-patience: 5
 drop_path_prob: 0.5 # 0.75
 layerwise_lr_decay: 0.75 # 0.75
 

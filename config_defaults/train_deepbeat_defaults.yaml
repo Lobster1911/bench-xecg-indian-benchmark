@@ -9,7 +9,7 @@ sched_decay_factor: 0.8
 use_class_weights: false
 use_focal_loss: false
 use_scheduler: true
-patience: 10
+patience: 5
 grad_clip: 3.
 lr_head: 0.001
 lr_core: 0.00001

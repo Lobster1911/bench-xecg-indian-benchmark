@@ -4,7 +4,7 @@ epochs: 30
 lr_head: .001
 lr_core: .00001
 wd: 0.1
-dropout: 0.
+
 linear_probing: false
 deterministic: false
 

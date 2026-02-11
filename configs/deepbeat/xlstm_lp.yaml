@@ -4,7 +4,6 @@ epochs: 30
 lr_head: .001
 lr_core: .00001
 wd: 0.1
-dropout: 0.
 linear_probing: true
 deterministic: false
 
@@ -12,8 +11,6 @@ deterministic: false
 batch_size: 512
 data_folder_deepbeat: /home/datasets/DeepBeat_PPG/
 
-drop_path_prob: 0.0 # 0.75
-layerwise_lr_decay: 1.0 # 0.75
 data_pct: 0.05
 
 

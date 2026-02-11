@@ -13,15 +13,7 @@ split_signal: false
 
 linear_probing: true
 deterministic: false
-cls_normalization: 'batch'
 
 use_ecg_cpc: true
-
-data_folder_cpsc2018: /home/datasets/CPSC2018/
-labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
-
-training_pct: 1.
-normalize: false
-use_scheduler: true
-
-max_length_signal: 2400
+# data_folder_deepbeat: /scratch/datasets/DeepBeat_PPG
+data_pct: 0.05
