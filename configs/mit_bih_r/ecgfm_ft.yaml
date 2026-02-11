@@ -2,8 +2,6 @@
 wandb_log: true
 wandb_group: best_ecgfm_ft
 
-epochs: 30
-
 lr_head: .001
 lr_core: .00001
 

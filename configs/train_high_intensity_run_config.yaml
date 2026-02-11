@@ -9,7 +9,6 @@ linear_probing: false
 deterministic: false
 batch_size: 8
 patience: 30
-num_classes: 25
 epochs: 30
 
 embedding_size: 1024

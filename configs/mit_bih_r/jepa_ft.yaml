@@ -2,9 +2,6 @@
 wandb_log: true
 wandb_group: best_jepa_ft
 
-num_classes: 5
-epochs: 30
-
 lr_head: 0.001
 lr_core: 0.001
 

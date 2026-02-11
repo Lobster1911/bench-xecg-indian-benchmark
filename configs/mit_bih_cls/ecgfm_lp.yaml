@@ -2,9 +2,6 @@
 wandb_log: true
 wandb_group: best_ecgfm_lp
 
-num_classes: 5
-epochs: 20
-
 lr_head: .001
 wd: 0.1
 

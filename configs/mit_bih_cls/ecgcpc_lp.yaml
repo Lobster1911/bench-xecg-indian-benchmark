@@ -20,7 +20,6 @@ skip_majority_class_samples: true
 use_focal_loss: false
 use_class_weights: false
 split_val_by_patient: true
-win_len: 480
+win_len: 2400
 
-# data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
-# normalize: true
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

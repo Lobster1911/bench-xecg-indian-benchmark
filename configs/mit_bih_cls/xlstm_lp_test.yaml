@@ -1,7 +1,5 @@
 wandb_log: true
 wandb_group: best_heedb_xlstm_lp
-num_classes: 5
-epochs: 20
 
 batch_size: 64
 

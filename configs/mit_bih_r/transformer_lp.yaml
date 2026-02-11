@@ -1,7 +1,6 @@
 wandb_log: true
 wandb_group: best_trans_lp
 
-epochs: 30
 batch_size: 96
 lr_head: 0.01
 

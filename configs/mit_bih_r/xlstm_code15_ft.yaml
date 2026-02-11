@@ -3,9 +3,6 @@ wandb_group: best_code15_xlstm_ft
 
 batch_size: 96
 
-num_classes: 25
-epochs: 30
-
 lr_head: 0.001
 lr_core: 0.001
 

@@ -2,9 +2,6 @@
 wandb_log: true
 wandb_group: best_stmem_ft
 
-num_classes: 5
-epochs: 30
-
 lr_head: .01
 lr_core: .01
 wd: 0.1

@@ -104,6 +104,9 @@ def parse_config(config_file, default_config_file):
     if merged_config.linear_probing:
         merged_config.layerwise_lr_decay = 0.
         merged_config.drop_path_prob = False
+
+    if merged_config.r_peaks_detection:
+        merged_config.num_classes = merged_config.patch_size
     
     return merged_config
 

@@ -1,7 +1,7 @@
 # training loop hyp
 wandb_log: true
 wandb_group: best_ecgcpc_ft
-epochs: 30
+
 wd: 0.001
 batch_size: 256
 
@@ -18,8 +18,10 @@ use_ecg_cpc: true
 
 skip_majority_class_samples: true
 use_focal_loss: false
-use_class_weights: false
+use_class_weights: true
 split_val_by_patient: true
+
 win_len: 2400
 
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
+r_peaks_detection: true

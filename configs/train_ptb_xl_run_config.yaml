@@ -81,7 +81,6 @@ shuffle_baseline_wander_in_batch: false
 random_change_amplitude: 0.
 
 classification_taksk: 'diagnosis_superclass'
-num_classes: 5 # chenge to 23 if diagnosis_subclass
 
 data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
 labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv

@@ -2,8 +2,6 @@ wandb_log: true
 wandb_group: best_trans_ft
 
 batch_size: 96
-num_classes: 5
-epochs: 30
 
 lr_head: 0.01
 lr_core: 0.001
