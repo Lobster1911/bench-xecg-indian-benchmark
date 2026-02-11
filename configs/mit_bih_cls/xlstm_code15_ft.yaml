@@ -33,5 +33,6 @@ patch_embedding: linear
 
 win_len: 3200
 max_length_signal: 180556
+extend_labels: true
 
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

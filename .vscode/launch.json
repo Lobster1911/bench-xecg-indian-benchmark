@@ -11,7 +11,7 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["--config_file", "configs/pretrain_lejepa_run_config.yaml"]
+            "args": ["--config_file", "configs/mit_bih_cls/ecgcpc_lp.yaml"]
         }
     ],
 }

@@ -53,10 +53,14 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.samples = []
         self.patch_size = config.patch_size
         self.num_classes = config.num_classes 
-        self.win_len = config.win_len # defined in timepoints of model's frequency
+
+        # defined in number of timepoints of model's frequency
+        self.win_len = config.win_len 
         self.skip_majority_class_samples = config.skip_majority_class_samples
         self.split_val_by_patient = config.split_val_by_patient
         self.augmentations = augmentations
+
+        # model's sampling freq
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
         self.is_recurrent = config.is_recurrent 
@@ -65,6 +69,8 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         self.freq_factor = self.sampling_freq / self.original_freq
         self.r_peaks_detection = config.r_peaks_detection
         self.random_shift = config.random_shift
+        self.extend_labels = config.extend_labels
+        
         print(f"freq_factor: {self.freq_factor}, sampling_freq: {self.sampling_freq}, original_freq: {self.original_freq}")
 
         self.load_patient_data(split)
@@ -78,7 +84,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             self.patients = train + val if subset == 'train' else test if subset == 'test' else val
 
         self.headers = {}
-        self.annotations = {}
         self.signals = {}
         self.r_peaks = {}
 
@@ -88,9 +93,11 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
             header = wfdb.rdheader(os.path.join(self.data_folder, 'raw', f'{patient}'))
             annotations = wfdb.rdann(os.path.join(self.data_folder + 'raw', f'{patient}'), 'atr')
 
+            # r_peaks are in the original frequency, we will convert them later to the model's frequency after resampling the signal
+            # we also convert the annotation symbol to the main class label and filter only valid annotations
             r_peaks = [(r_peak, convert_label(annotations.symbol[i])) for i, r_peak in enumerate(annotations.sample) if annotations.symbol[i] in valid_annotations]
 
-            # filter classes
+            # filter classes when num_classes is 3 (not used for BenchECG)
             if self.num_classes == 3:
                 r_peaks = [(r_peak, label) for r_peak, label in r_peaks if label in ['N', 'S', 'V']]
 
@@ -99,18 +106,15 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         results = Parallel(n_jobs=-1)(delayed(process_patient)(patient) for patient in self.patients)
         # results = [process_patient(patient) for patient in self.patients]
 
-        ## RESAMPLING SIGNALS
+        ## RESAMPLING SIGNALS and R PEAKS
         for patient, signal, header, annotations, r_peaks in results:
             if self.sampling_freq != header.fs:
                 signal = nk.signal_resample(signal, sampling_rate=header.fs, desired_sampling_rate=self.sampling_freq, method='FFT')
-
+                self.r_peaks[patient] = [(int(np.round(r_peak * self.freq_factor)), label) for r_peak, label in r_peaks]
+        
             self.signals[patient] = signal
             self.headers[patient] = header
-            self.annotations[patient] = annotations
 
-            # RESAMPLE R peaks
-            self.r_peaks[patient] = [(int(np.round(r_peak * self.freq_factor)), label) for r_peak, label in r_peaks]
-            # map labels with r_peaks in a tuple
 
     def load_samples(self, subset):
         def process_sample(patient, r_peaks):
@@ -252,25 +256,24 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # labels_mask = np.zeros(window_signal.shape[0], dtype=np.long) - 1
 
         for r, l in sample['around_r_peaks']:
-            # print(r, l)
             if window_start <= r < window_end:
                 labels_mask[r - window_start] = self.get_label_int(l)
                 # if the r_peak is at the very beginning or very end of a patch, add a label for previous or next (only in training)
-                if self.split == 'train':
-                    position = (r - window_start)% 25
+                if self.split == 'train' and self.extend_labels:
+                    position = (r - window_start) % self.patch_size
                     # this is when is at the very beginning
                     if position == 0:
                         labels_mask[max(0, r - window_start - 1)] = self.get_label_int(l)
-                    elif position == 1:
+                    elif position == 1 and self.patch_size > 2:
                         labels_mask[max(0, r - window_start - 2)] = self.get_label_int(l)
-                    elif position == 2:
+                    elif position == 2 and self.patch_size > 3:
                         labels_mask[max(0, r - window_start - 3)] = self.get_label_int(l)
                     # this is when it is at the very end
-                    elif position == 24:
+                    elif position == self.patch_size - 1:
                         labels_mask[min(sig_len - 1, r - window_start + 1)] = self.get_label_int(l)
-                    elif position == 23:
+                    elif position == self.patch_size - 2 and self.patch_size > 2:
                         labels_mask[min(sig_len - 1, r - window_start + 2)] = self.get_label_int(l)
-                    elif position == 22:
+                    elif position == self.patch_size - 3 and self.patch_size > 3:
                         labels_mask[min(sig_len - 1, r - window_start + 3)] = self.get_label_int(l)
 
 
