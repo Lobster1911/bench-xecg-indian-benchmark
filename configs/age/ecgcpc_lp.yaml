@@ -3,7 +3,7 @@ wandb_log: true
 wandb_group: best_ecgcpc_lp
 wd: 0.001
 
-lr_head: 0.3
+lr_head: 1.
 lr_core: 0.3
 discriminative_lr_factor: 0.1
 precision: '32'
