@@ -39,7 +39,7 @@ log = get_logger(__name__)
 """ Cauchy kernel """
 
 try:  # Try CUDA extension
-    from cpc.extensions.kernels.cauchy import cauchy_mult
+    from cpc.extensions.cauchy.cauchy import cauchy_mult
     has_cauchy_extension = True
 except:
     log.warn(

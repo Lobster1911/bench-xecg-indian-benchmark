@@ -3,7 +3,7 @@ wandb_log: true
 wandb_group: best_ecgcpc_ft_9m
 
 wd: 0.001
-batch_size: 8
+batch_size: 4
 
 lr_head: 0.3
 lr_core: 0.3
@@ -16,7 +16,7 @@ deterministic: false
 
 use_ecg_cpc: true
 
-# data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
+data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
 
 window_size: 60
 context_size: 480
