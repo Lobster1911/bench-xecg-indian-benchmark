@@ -5,16 +5,16 @@ epochs: 30
 wd: 0.001
 batch_size: 256
 
-lr_head: 1.
+lr_head: 0.1
 lr_core: 0.01
 discriminative_lr_factor: 0.1
 precision: '32'
-split_signal: false
 
 linear_probing: true
-deterministic: true
+deterministic: false
 
 use_ecg_cpc: true
+split_signal: false
 
 data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
 labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv

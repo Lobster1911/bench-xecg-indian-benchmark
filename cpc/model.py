@@ -9,16 +9,17 @@ from models.base_model import BaseModel
 
 from cpc.ts.s4_modules.s4_model import S4Model
 from cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
-
+from models.utils import get_normalization_layer
 
 class CPCWrapper(BaseModel):
-    def __init__(self, config_path=None, chunk_size=600, linear_probing=False, split_signal=True, num_classes=5, feature_classification=False):
+    def __init__(self, config, config_path=None, chunk_size=600,  feature_classification=False):
         super().__init__()
         self.config_path = config_path
         self.chunk_size = chunk_size
-        self.split_signal = split_signal
-        self.linear_probing = linear_probing
-        self.num_classes = num_classes
+        self.split_signal = config.split_signal
+        self.linear_probing = config.linear_probing
+        self.num_classes = config.num_classes
+        self.config = config
         self.feature_classification = feature_classification
         self.ts_encoder, self.config = self.load_model_from_config(
             config_path=self.config_path
@@ -41,6 +42,7 @@ class CPCWrapper(BaseModel):
             x = x.view(B, C, n_chunks, self.chunk_size).permute(0, 2, 1, 3).reshape(-1, C, self.chunk_size)
 
         # Pass through model
+        
         x = self.ts_encoder(x)
 
         # Combine outputs from same original signal
@@ -65,6 +67,7 @@ class CPCWrapper(BaseModel):
         model = CPCModel(
             encoder_hparams=encoder_hparams,
             s4_hparams=s4_hparams,
+            config=self.config,
             **cpc_hparams
             )
         
@@ -137,7 +140,7 @@ class S4Wrapper(torch.nn.Module):
 
 
 class CPCModel(torch.nn.Module):
-    def __init__(self, encoder_hparams, s4_hparams, num_classes, feature_dim=512, eval_mode="finetuning", lr=1e-3, discriminative_lr_factor=0.1):
+    def __init__(self, encoder_hparams, config, s4_hparams, num_classes, feature_dim=512, eval_mode="finetuning", lr=1e-3, discriminative_lr_factor=0.1):
         super().__init__()
         self.encoder_hparams = encoder_hparams
         self.s4_hparams = s4_hparams
@@ -149,8 +152,12 @@ class CPCModel(torch.nn.Module):
 
         self.encoder = RNNEncoder(**self.encoder_hparams)
         self.predictor = S4Wrapper(**self.s4_hparams)
-        self.head = torch.nn.Linear(self.feature_dim, num_classes)
 
+        self.head = torch.nn.Sequential(
+            get_normalization_layer(config, self.feature_dim),
+            torch.nn.Linear(self.feature_dim, num_classes)
+        )
+        
         if self.eval_mode == "linear":
             for p in self.encoder.parameters():
                 p.requires_grad = False
