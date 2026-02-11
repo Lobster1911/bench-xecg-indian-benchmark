@@ -20,7 +20,6 @@ drop_path_prob: 0.5
 layerwise_lr_decay: 0.75
 
 skip_majority_class_samples: true
-use_focal_loss: false
 use_class_weights: false
 split_val_by_patient: true
 

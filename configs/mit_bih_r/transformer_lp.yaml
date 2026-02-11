@@ -14,7 +14,6 @@ encoder_type: transformer
 checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
 
 skip_majority_class_samples: true
-use_focal_loss: false
 use_class_weights: true
 split_val_by_patient: true
 

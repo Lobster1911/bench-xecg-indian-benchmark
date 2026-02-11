@@ -45,7 +45,6 @@ grad_clip: 3.
 sampling_freq: 100
 
 use_class_weights: false
-use_focal_loss: false
 
 random_surrogate_prob: 0.
 random_jitter_prob: 0.

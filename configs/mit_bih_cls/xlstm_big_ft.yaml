@@ -16,7 +16,6 @@ linear_probing: false
 deterministic: true
 
 skip_majority_class_samples: true
-use_focal_loss: false
 use_class_weights: false
 split_val_by_patient: true
 

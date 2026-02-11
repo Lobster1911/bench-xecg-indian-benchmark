@@ -69,7 +69,7 @@ class CPCWrapper(BaseModel):
             s4_hparams=s4_hparams,
             config=self.config,
             **cpc_hparams
-            )
+        )
         
         return model, config
     
@@ -154,7 +154,7 @@ class CPCModel(torch.nn.Module):
         self.predictor = S4Wrapper(**self.s4_hparams)
 
         self.head = torch.nn.Sequential(
-            get_normalization_layer(config, self.feature_dim),
+            get_normalization_layer(config, self.feature_dim, permute_for_batchnorm=not s4_hparams['pooling']),
             torch.nn.Linear(self.feature_dim, num_classes)
         )
         

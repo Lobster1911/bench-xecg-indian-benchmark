@@ -9,12 +9,26 @@ from models.modules import *
 import os
 from transformer import encoder
 
+class Permute(nn.Module):
+    def __init__(self, *dims):
+        super().__init__()
+        self.dims = dims
 
-def get_normalization_layer(config, embedding_size=None):
+    def forward(self, x):
+        return x.permute(self.dims)
+
+def get_normalization_layer(config, embedding_size=None, permute_for_batchnorm=False):
     if config.cls_normalization == 'layer':
         return nn.LayerNorm(embedding_size, elementwise_affine=False)
     elif config.cls_normalization == 'batch':
-        return nn.BatchNorm1d(embedding_size)
+        if permute_for_batchnorm:
+            return nn.Sequential(
+                Permute(0, 2, 1), # (B, C, L)
+                nn.BatchNorm1d(embedding_size),
+                Permute(0, 2, 1) # (B, L, C)
+            )
+        else:
+            return nn.BatchNorm1d(embedding_size)
     elif config.cls_normalization == 'instance':
         return nn.InstanceNorm1d(embedding_size)
     else:

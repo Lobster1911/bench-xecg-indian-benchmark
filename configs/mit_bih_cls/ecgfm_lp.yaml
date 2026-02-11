@@ -14,7 +14,6 @@ use_ecg_founder: true
 single_hb: true
 
 skip_majority_class_samples: true
-use_focal_loss: false
 use_class_weights: false
 split_val_by_patient: true
 

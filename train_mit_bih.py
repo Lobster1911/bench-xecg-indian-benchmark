@@ -40,8 +40,10 @@ def train(config, run=None, wandb=False):
 
     if config.use_class_weights:
         if config.r_peaks_detection:
-            print('Using class weights for r-peaks detection')
-            weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
+            # when the patch size is too small we need to set a weight mimicing 1 hb per second
+            param = config.sampling_freq if config.patch_size < 5 else config.patch_size
+            weights = torch.tensor([1/param, (param-1)/param]).to('cuda')
+            print(f'Using class weights for r-peaks detection: {weights}')
         elif config.num_classes == 5:
             if config.win_len == 1600:
                 weights = torch.tensor([2.2425e-01, 8.3814e+00, 2.7265e+00, 1.8476e+01, 2.4445e+03]).to('cuda')

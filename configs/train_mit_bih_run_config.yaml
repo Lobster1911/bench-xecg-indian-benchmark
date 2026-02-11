@@ -46,7 +46,6 @@ batch_size: 96
 optimizer: 'adamw'
 r_peaks_lambda: 0.
 split_val_by_patient: true
-use_focal_loss: false
 clip_grad: 3.
 num_epochs_warmup: 1
 
