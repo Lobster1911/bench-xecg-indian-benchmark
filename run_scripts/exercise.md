@@ -67,3 +67,13 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_code15_ft.yaml
 done 
+
+## ECG-CPC
+
+for i in {1..5}; do
+    sbatch --job-name=cpc_lp_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/ecgcpc_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=cpc_ft_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/ecgcpc_ft.yaml
+done 

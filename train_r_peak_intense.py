@@ -28,8 +28,9 @@ def train(config, run=None, wandb=False):
         config.num_classes = config.patch_size
 
     if config.use_class_weights:
-        print('Using weights for training')
-        weights = torch.tensor([1/config.patch_size, (config.patch_size-1)/config.patch_size]).to('cuda')
+        param = config.sampling_freq if config.patch_size < 5 else config.patch_size
+        weights = torch.tensor([1/param, (param-1)/param]).to('cuda')
+        print(f'Using class weights for r-peaks detection: {weights}')
     else:
         weights = None
 
@@ -47,7 +48,7 @@ def train(config, run=None, wandb=False):
 
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-    base_model = utils.get_base_model(config, feature_classification=True, compile_model=False)
+    base_model = utils.get_base_model(config, feature_classification=True, compile_model=True)
 
     model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
