@@ -65,3 +65,14 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_code15_ft.yaml
 done 
+
+
+## ECG-CPC
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/ecgcpc_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/ecgcpc_ft.yaml
+done 

@@ -65,3 +65,12 @@ done
 for i in {1..4}; do
     sbatch --job-name=xlstm_ft_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/xlstm_code15_ft.yaml
 done 
+
+## ECG-CPC
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/ecgcpc_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_mortality slurm_train_l40s.sh train_mortality.py configs/mortality/ecgcpc_ft.yaml
+done 
