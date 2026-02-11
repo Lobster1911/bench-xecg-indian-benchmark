@@ -8,6 +8,7 @@ lr_core: 0.01
 discriminative_lr_factor: 0.1
 precision: '32'
 split_signal: false
+batch_size: 256
 
 linear_probing: false
 deterministic: false
