@@ -15,5 +15,5 @@ linear_probing: true
 deterministic: false
 
 use_ecg_cpc: true
-# data_folder_deepbeat: /scratch/datasets/DeepBeat_PPG
+data_folder_deepbeat: /scratch/datasets/DeepBeat_PPG
 data_pct: 0.05
