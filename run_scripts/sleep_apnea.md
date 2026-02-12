@@ -74,11 +74,11 @@ for i in {1..4}; do
     sbatch --job-name=xlstm_lp_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_lp.yaml 
 done
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_10s.yaml
 done 
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_20s.yaml
 done 
 
@@ -95,9 +95,9 @@ for i in {1..4}; do
 done 
 
 for i in {1..4}; do
-    sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_5m.yaml
+    sbatch --job-name=cpc_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_5m.yaml
 done 
 
-for i in {1..4}; do
-    sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_9m.yaml
+for i in {1..5}; do
+    sbatch --job-name=cpc_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_9m.yaml
 done 
