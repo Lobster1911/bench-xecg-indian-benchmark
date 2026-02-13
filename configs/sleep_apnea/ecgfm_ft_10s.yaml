@@ -18,5 +18,5 @@ use_ecg_founder: true
 
 data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
 
-window_size: 20
+window_size: 10
 context_size: 0
