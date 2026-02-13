@@ -76,3 +76,14 @@ done
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_mit_r slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_r/ecgcpc_ft.yaml
 done 
+
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_mit_r slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_r/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_mit_r slurm_train_l40s.sh train_mit_bih.py configs/mit_bih_r/xlstm_dinoecg_ft.yaml
+done 

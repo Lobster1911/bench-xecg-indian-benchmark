@@ -1,0 +1,33 @@
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_lp
+
+batch_size: 64
+
+lr_head: 0.001
+lr_core: 0.00001
+
+wd: 0.1
+
+linear_probing: true
+deterministic: false
+
+skip_majority_class_samples: true
+use_class_weights: false
+split_val_by_patient: true
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+is_recurrent: true
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+patch_embedding: linear
+
+win_len: 1800
+max_length_signal: 180556
+precision: '32'
+extend_labels: true
+
+data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

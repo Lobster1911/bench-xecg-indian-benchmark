@@ -1,0 +1,31 @@
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_ft
+
+batch_size: 32
+
+epochs: 20
+
+lr_head: .0003
+lr_core: .00003
+
+layerwise_lr_decay: 0.75
+drop_path_prob: 0.5
+
+wd: 0.1
+
+linear_probing: false
+deterministic: false
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+cls_type: max
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+
+data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
+
+window_size: 60 # 30 minutes in samples
+context_size: 240

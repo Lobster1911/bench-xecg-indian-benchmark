@@ -101,3 +101,13 @@ done
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/ecgcpc_ft_9m.yaml
 done 
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_sa slurm_train_l40s.sh train_sleep_apnea.py configs/sleep_apnea/xlstm_dinoecg_ft.yaml
+done 

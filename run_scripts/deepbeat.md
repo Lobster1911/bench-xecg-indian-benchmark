@@ -77,3 +77,14 @@ done
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/ecgcpc_ft.yaml
 done 
+
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/xlstm_dinoecg_ft.yaml
+done 

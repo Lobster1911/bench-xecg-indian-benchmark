@@ -1,0 +1,23 @@
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_lp
+epochs: 30
+lr_head: .001
+lr_core: .00001
+wd: 0.1
+linear_probing: true
+deterministic: false
+
+batch_size: 512
+data_folder_deepbeat: /home/datasets/DeepBeat_PPG/
+
+data_pct: 0.05
+
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+
+use_final_layer_norm: false
+cls_type: avg
+

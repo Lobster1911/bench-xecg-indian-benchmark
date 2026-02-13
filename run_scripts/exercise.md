@@ -77,3 +77,14 @@ done
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/ecgcpc_ft.yaml
 done 
+
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_exe slurm_train_l40s.sh train_r_peak_intense.py configs/exercise/xlstm_dinoecg_ft.yaml
+done 

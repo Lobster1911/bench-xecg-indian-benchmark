@@ -76,3 +76,14 @@ done
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/ecgcpc_ft.yaml
 done 
+
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_lab slurm_train_l40s.sh train_lab_mimic.py configs/lab/xlstm_dinoecg_ft.yaml
+done 
