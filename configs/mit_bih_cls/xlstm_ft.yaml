@@ -21,13 +21,14 @@ embedding_size: 1024
 encoder_type: vanilla
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 checkpoint: pretrain-xLSTM/0rgc8fun/checkpoints/epoch=49-step=504700.ckpt
-is_recurrent: true
+
+plot_predictions: true
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
 patch_embedding: linear
 
-win_len: 3200
+win_len: 500 # 3200
 max_length_signal: 180556
 extend_labels: true
 

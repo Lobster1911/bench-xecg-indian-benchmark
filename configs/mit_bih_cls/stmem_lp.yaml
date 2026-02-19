@@ -20,4 +20,7 @@ skip_majority_class_samples: true
 use_class_weights: false
 split_val_by_patient: true
 
+# half of 2.325 that is the normal sequence len for st-mem
+win_len: 1163
+
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

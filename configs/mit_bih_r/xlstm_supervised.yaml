@@ -12,6 +12,7 @@ wd: 0.
 
 linear_probing: false
 deterministic: false
+epochs: 30
 
 skip_majority_class_samples: true
 use_class_weights: true

@@ -1,22 +1,23 @@
 # training loop hyp
-wandb_log: false
+wandb_log: true
 wandb_group: best_ecgcpc_lp
 
 wd: 0.001
 batch_size: 32
 
-lr_head: .1
-lr_core: .1
+lr_head: 1.
+lr_core: 1.
 discriminative_lr_factor: 0.1
-precision: '32'
 split_signal: false
 
 linear_probing: true
 deterministic: false
 
 use_ecg_cpc: true
+compile_model: false
+precision: '32'
 
 data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
 
 window_size: 60
-context_size: 120
+context_size: 240

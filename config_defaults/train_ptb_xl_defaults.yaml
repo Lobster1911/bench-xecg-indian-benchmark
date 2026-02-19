@@ -18,6 +18,7 @@ num_workers: 32
 epochs: 30
 linear_probing: false
 precision: 16-mixed  
+compile_model: true
 
 # regularizers
 dropout: 0.

@@ -19,7 +19,7 @@ embedding_size: 1024
 encoder_type: vanilla
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
-is_recurrent: true
+
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'

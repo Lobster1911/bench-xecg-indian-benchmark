@@ -1,9 +1,9 @@
 # training loop hyp
 wandb_log: true
-wandb_group: best_dinoecg_xlstm_ft
+wandb_group: best_heedb_xlstm_ft
 epochs: 30
 wd: 0.1
-batch_size: 128
+batch_size: 256
 
 lr_head: 0.001
 lr_core: 0.00003
@@ -16,15 +16,12 @@ deterministic: false
 embedding_size: 1024
 encoder_type: vanilla
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
-checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
-cls_type: max
+checkpoint: pretrain-xLSTM/y8oelc6y/checkpoints/epoch=80-step=1338768.ckpt
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
 
-data_folder_cpsc2018: /home/datasets/CPSC2018/
-labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
-max_length_signal: 5000
-compile_model: true
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
+labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
 
 training_pct: 1.

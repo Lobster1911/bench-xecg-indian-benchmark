@@ -21,7 +21,7 @@ encoder_type: vanilla
 xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 # checkpoint: pretrain-xLSTM/pjbzdezq/checkpoints/epoch=48-step=659442.ckpt
 checkpoint: pretrain-xLSTM/gdky460q/checkpoints/epoch=99-step=1009400.ckpt
-is_recurrent: true
+
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'

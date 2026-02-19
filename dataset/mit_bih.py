@@ -63,7 +63,6 @@ class ECGMITBIHDataset(torch.utils.data.Dataset):
         # model's sampling freq
         self.sampling_freq = config.sampling_freq
         self.leads_to_use = config.leads
-        self.is_recurrent = config.is_recurrent 
         self.context_len = config.context_len
         self.original_freq = 360
         self.freq_factor = self.sampling_freq / self.original_freq

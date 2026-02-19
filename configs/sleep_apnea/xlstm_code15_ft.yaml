@@ -1,5 +1,5 @@
 wandb_log: true
-wandb_group: best_code_15_xlstm_ft_3m
+wandb_group: best_code15_xlstm_ft_3m
 
 batch_size: 32
 

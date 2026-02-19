@@ -4,6 +4,8 @@ wandb_group: best_stmem_ft
 
 lr_head: .01
 lr_core: .01
+epochs: 30
+
 wd: 0.1
 dropout: 0.
 linear_probing: false

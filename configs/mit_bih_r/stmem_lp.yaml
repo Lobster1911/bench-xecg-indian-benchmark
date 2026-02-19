@@ -3,6 +3,7 @@ wandb_log: true
 wandb_group: best_stmem_lp
 
 lr_head: .001
+epochs: 30
 
 wd: 0.1
 dropout: 0.

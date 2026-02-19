@@ -40,7 +40,7 @@ def evaluate(config, run_id):
         resume="must"   # or "must" if you want to force resume
     )
 
-    base_model = utils.get_base_model(config, compile_model=False)
+    base_model = utils.get_base_model(config)
     model = TrainerMortality(model=base_model, config=config, len_train_dataset=0, evaluate_music=True)
     trainer = utils.get_trainer(config, model, f'train-mortality', wandb=wandb, run=run)
     

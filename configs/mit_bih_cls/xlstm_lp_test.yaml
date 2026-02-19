@@ -52,7 +52,7 @@ patch_size: 20
 # checkpoint: pretrain-xLSTM/lml19bp0/checkpoints/epoch=37-step=627456.ckpt
 # checkpoint: pretrain-xLSTM/g7o5dy77/checkpoints/epoch=48-step=807814.ckpt
 # checkpoint: pretrain-xLSTM/0rgc8fun/checkpoints/epoch=49-step=504700.ckpt
-is_recurrent: false
+
 
 single_hb: false
 

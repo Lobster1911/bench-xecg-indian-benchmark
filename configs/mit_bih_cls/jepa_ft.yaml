@@ -12,6 +12,7 @@ batch_size: 96
 num_workers: 64
 
 use_ecg_jepa: true
+compile_model: false
 
 skip_majority_class_samples: true
 use_class_weights: false
@@ -19,5 +20,7 @@ split_val_by_patient: true
 
 drop_path_prob: 0.5
 layerwise_lr_decay: 0.75
+plot_predictions: true
+win_len: 1250
 
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/

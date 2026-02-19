@@ -22,6 +22,7 @@ class CPCWrapper(BaseModel):
         self.feature_classification = feature_classification
         self.sleep_apnea = sleep_apnea
         self.chunk_size = chunk_size
+        self.patch_size = 2
 
         self.ts_encoder, self.config = self.load_model_from_config(
             config_path=self.config_path

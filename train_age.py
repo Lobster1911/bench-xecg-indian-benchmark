@@ -39,7 +39,7 @@ def train(config, run=None, wandb=False):
     test_mimic = DataLoader(test_mimic, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
     test_cpsc = DataLoader(test_cpsc, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=make_collate_fn_task(config, key_label='age'))
 
-    base_model = utils.get_base_model(config, compile_model=False)
+    base_model = utils.get_base_model(config)
 
     log_every_n_steps = max(1, len(train_dataset) // (config.batch_size * 10))
     print(f"Logging every {log_every_n_steps} steps")

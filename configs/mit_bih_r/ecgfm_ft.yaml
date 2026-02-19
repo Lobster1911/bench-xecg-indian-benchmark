@@ -4,6 +4,7 @@ wandb_group: best_ecgfm_ft
 
 lr_head: .001
 lr_core: .00001
+epochs: 30
 
 wd: 0.1
 linear_probing: false

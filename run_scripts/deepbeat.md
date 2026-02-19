@@ -70,7 +70,7 @@ done
 
 ## ECG-CPC
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=cpc_lp_db slurm_train_l40s.sh train_deepbeat.py configs/deepbeat/ecgcpc_lp.yaml 
 done
 

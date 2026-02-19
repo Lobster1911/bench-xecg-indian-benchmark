@@ -27,5 +27,7 @@ export CUDA_HOME=/usr/local/cuda
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$CUDA_HOME/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
 export LIBRARY_PATH=$CUDA_HOME/lib64:$CUDA_HOME/targets/x86_64-linux/lib:$LIBRARY_PATH
 
+export TORCH_CUDA_ARCH_LIST="8.9"
+
 # run script from above
 srun ~/.conda/envs/xlstm_pretrained/bin/python -u $1 --config_file $2
