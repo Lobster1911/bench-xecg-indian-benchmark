@@ -96,20 +96,27 @@ class ECGPaperLayoutMask(nn.Module):
             mask[self.rhythm_lead_idx, :] = 1
         
         return x * mask
-    
+
 class Standardize:
-    """Standardize the input sequence.
-    """
+    """Standardize the input sequence using NumPy."""
     def __init__(self, axis: Union[int, Tuple[int, ...], List[int]] = (-1, -2)) -> None:
         if isinstance(axis, list):
             axis = tuple(axis)
         self.axis = axis
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
-        loc = torch.mean(x, axis=self.axis, keepdims=True)
-        scale = torch.std(x, axis=self.axis, keepdims=True)
-        # Set rst = 0 if std = 0
-        return np.divide(x - loc, scale, out=np.zeros_like(x), where=scale != 0)
+        # Calculate mean and standard deviation using NumPy
+        loc = np.mean(x, axis=self.axis, keepdims=True)
+        scale = np.std(x, axis=self.axis, keepdims=True)
+        
+        # Initialize output array with zeros
+        res = np.zeros_like(x)
+        
+        # Only perform division where scale is non-zero to avoid NaNs/Infs
+        mask = scale != 0
+        res = np.divide(x - loc, scale, out=res, where=mask)
+        
+        return res
     
 class SOSFilter:
     """Apply SOS filter to the input sequence.
