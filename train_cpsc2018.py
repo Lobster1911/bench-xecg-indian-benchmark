@@ -28,8 +28,9 @@ def train(config, run=None, wandb=False):
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct, key='labels')
 
     if config.use_class_weights:
-        # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
-        weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
+        weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
+        # weights = torch.tensor([3.1714, 1.0653, 1.2444, 0.4102, 0.6416, 3.4688, 0.8866, 1.1167, 0.8114]).to('cuda')
+        # weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
         print(f'Class weights: {weights}')
     else:
         weights = None
@@ -38,9 +39,9 @@ def train(config, run=None, wandb=False):
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='val'))
 
     test_dataset = cpsc2018.ECGCPSC2018Dataset(config, split='test', global_augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=cpsc2018.make_collate_fn(config, split='test'), num_workers=config.num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False,  num_workers=config.num_workers, collate_fn=cpsc2018.make_collate_fn(config, split='test'))
     
-    base_model = utils.get_base_model(config, compile_model=False)
+    base_model = utils.get_base_model(config)
             
     model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
     
