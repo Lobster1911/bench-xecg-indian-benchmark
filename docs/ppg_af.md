@@ -2,7 +2,10 @@
 
 Here is the documentation on how to test your model on PPG Atrial Fibrillation.
 
-Download the dataset from [synapse](https://www.synapse.org/Synapse:syn21985690/wiki/) and set `data_folder_deepbeat` in `config_defaults/train_deepbeat_defaults.yaml`.
+Create a new `yaml` configuration file, this will extend the configuration in `config_defaults/train_deepbeat_defaults.yaml`.
+
+Download the dataset from [synapse](https://www.synapse.org/Synapse:syn21985690/wiki/).
+Then set `data_folder_deepbeat` in the new config file with the folder where you extracted the data.
 
 ## Configuration params
 

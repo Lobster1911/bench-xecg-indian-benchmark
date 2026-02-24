@@ -24,3 +24,4 @@ split_val_by_patient: true
 win_len: 1163
 
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
+plot_predictions: true

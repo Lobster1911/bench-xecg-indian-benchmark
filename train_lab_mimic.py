@@ -41,7 +41,7 @@ def train(config, run=None, wandb=False):
 
     model = TrainingMIMIC_LAB(model=base_model, config=config, len_train_dataset=len(train_dataset))
 
-    trainer = utils.get_trainer(config, model, f'train-lab', wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, f'train-lab', wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')

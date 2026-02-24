@@ -48,7 +48,7 @@ def train(config, run=None, wandb=False):
     map_idx_dataloader = {0: 'ptbxl', 1: 'mimic', 2: 'cpsc'}
     model = RegressionTrainer(model=base_model, config=config, len_train_dataset=len(train_dataset), map_idx_dataloader=map_idx_dataloader)
 
-    trainer = utils.get_trainer(config, model, 'train-age', wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, 'train-age', wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=[test_ptbxl, test_mimic, test_cpsc], ckpt_path='best')
 

@@ -21,7 +21,7 @@ Our code comes with a convenient `models.BaseModel` class. This class has some m
 To easily add a new model to our pipeline follow these steps:
 - Your model should inherit from `models.BaseModel`
 - Add a variable on the configuration (e.g. `use_your_model`) and set it to true
-- In `utils.utils` modify `get_base_model` to properly load your model. That function comes with the parameters `feature_classification`, `minute_aggregation` that will tell you wich kind of output is expected by your model. Look at `models.classification.py` for an example.
+- In `utils.utils` modify `get_base_model` to properly load your model. That function comes with the parameters `feature_classification`. Look at `models.classification.py` for an example.
 - Again in `utils.utils` add to `parse_config` the variable you chose for your model and define there `sampling_freq`, `patch_size`, and some eventual default configuration specific to your model and that will not change with different tasks (e.g. preprocessing hyperparams)
 
 We suggest you to be authenticated with `wandb` to see the logs.

@@ -222,7 +222,7 @@ def format_keys(key):
         
     return key
 
-def get_trainer(config, model, prj_string, wandb=False, run=None):
+def get_trainer(config, prj_string, wandb=False, run=None):
     """
     Define all the callbacks and loggers for the trainer.
     """
@@ -235,7 +235,7 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
             nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
             callbacks.append(nan_stop)
 
-    csv_logger = CSVLogger(save_dir='logs_lightning', name=prj_string, version=run)
+    csv_logger = CSVLogger(save_dir=f'logs_lightning/{prj_string}', name=config.wandb_group)
 
     if wandb:
         print(f"Using WandbLogger for project {prj_string} and run {run}")

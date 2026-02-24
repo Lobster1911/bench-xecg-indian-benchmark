@@ -54,45 +54,46 @@ def parse_config(config_file, default_config_file):
     if merged_config.use_ecg_jepa:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 50
-        # merged_config.max_length_signal = 2500
-        # merged_config.win_len = 1250
         # jepa uses 8 leads
         merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
+
     elif merged_config.use_st_mem:
         merged_config.sampling_freq = 250
         merged_config.patch_size = 75
-        # merged_config.max_length_signal = 2325
-        # merged_config.win_len = 1125
         merged_config.low_pass_filter = 40
         merged_config.high_pass_filter = 0.67
         merged_config.standardize = True
-        # merged_config.window_size_train = 1000
-        # merged_config.window_size_val = 1000
+
     elif merged_config.use_ecg_founder:
-        # merged_config.win_len = 2500
         merged_config.sampling_freq = 500
         merged_config.low_pass_filter = 50
         merged_config.high_pass_filter = 0.5
-        # merged_config.max_length_signal = 5000
-        # merged_config.window_size_train = 1000
-        # merged_config.window_size_val = 1000
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
         merged_config.normalize = True
+
     elif merged_config.use_ecg_cpc:
         merged_config.sampling_freq = 240
         merged_config.layerwise_lr_decay = 1.
         merged_config.drop_path_prob = 0.
-        # merged_config.low_pass_filter = 50
-        # merged_config.high_pass_filter = 0.5
         merged_config.discriminative_lr_factor = 0.1
         merged_config.patch_size = 2
 
     if merged_config.linear_probing:
-        merged_config.layerwise_lr_decay = 0.
-        merged_config.drop_path_prob = False
+        merged_config.layerwise_lr_decay = 1.
+        merged_config.drop_path_prob = 0.
 
     if merged_config.r_peaks_detection:
         merged_config.num_classes = merged_config.patch_size
     
     return merged_config
+
+
+def set_num_classes_r_peaks(config):
+    if config.use_ecg_founder:
+        config.num_classes = 5000
+    else:
+        # ensure that num_classes is equal to patch_size
+        config.num_classes = config.patch_size
+
+    return config

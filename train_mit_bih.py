@@ -10,7 +10,7 @@ import dataset.mit_bih as mit_bih
 from trainers.mit_bih_trainer import TrainingMIT_BIH
 from trainers.r_peaks_trainer import TrainingRPeak
 from utils.utils import get_training_class_weights
-from config import parse_config
+from config import parse_config, set_num_classes_r_peaks
 
 
 import argparse
@@ -26,6 +26,9 @@ def train(config, run=None, wandb=False):
     
     dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.single_hb and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
+
+    if config.r_peaks_detection:
+        config = set_num_classes_r_peaks(config)
 
     if config.split_val_by_patient:
         # splits the validation set by patient
@@ -72,7 +75,7 @@ def train(config, run=None, wandb=False):
         model = TrainingMIT_BIH(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     prj_string = f"train-mitbih-{config.num_classes}" if not config.r_peaks_detection else f"train-mitbih-r_peaks"
-    trainer = utils.get_trainer(config, model, prj_string, wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, prj_string, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')

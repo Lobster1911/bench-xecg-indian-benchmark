@@ -2,7 +2,10 @@
 
 Here is the documentation on how to test your model on MIT-BIH (R-peak detection).
 
-Download the dataset from [physionet](https://www.physionet.org/content/mitdb/1.0.0/) and set `data_folder_mit` in `config_defaults/train_mit_bih_defaults.yaml`.
+Create a new `yaml` configuration file, this will extend the configuration in `config_defaults/train_mit_bih_defaults.yaml`.
+
+Download the dataset from [physionet](https://www.physionet.org/content/mitdb/1.0.0/).
+Then set `data_folder_mit` in the new config file with the folder where you extracted the data.
 
 ## Configuration params
 
@@ -17,17 +20,13 @@ Differently from the classification task, here we use only non overlapping segme
 
 Set `split_val_by_patient` to true if you want the validation set to be divided by patient or false to just shuffle the samples and then random split 80% for training and 20% for valiadtion.
 
-### max_length_signal
-
-You need this config variable to be at least the double of `win_len` or the signal will be cutted and training will fail because of mismatch in size between predictions and targets.
-
 ### r_peaks_detection
 
 For this task `r_peaks_detection` should be set to `true`
 
 ### plot_predictions
 
-If you want to see the prediction of the model on a signal set `plot_predictions` to `true`: it will automatically upload an image to weights and biases.
+If you want to see the prediction of the model on a signal set `plot_predictions` to `true`: it will automatically upload a plot with the ecg and the r-peaks predictions to weights and biases.
 
 ## Run the experiment
 

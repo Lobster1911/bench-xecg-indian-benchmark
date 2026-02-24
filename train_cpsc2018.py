@@ -45,7 +45,7 @@ def train(config, run=None, wandb=False):
     model = TrainingCPSC_2018(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
     
     prj_string = f'train-cpsc2018-{config.task}'
-    trainer = utils.get_trainer(config, model, prj_string, wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, prj_string, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')

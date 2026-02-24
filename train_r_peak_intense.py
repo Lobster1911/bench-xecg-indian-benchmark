@@ -10,7 +10,7 @@ import dataset.intense_exercise as intense_exercise
 import utils.utils as utils
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
-from config import parse_config
+from config import parse_config, set_num_classes_r_peaks
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -20,11 +20,8 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
 
-    if config.use_ecg_founder:
-        config.num_classes = 5000
-    else:
-        # ensure that num_classes is equal to patch_size
-        config.num_classes = config.patch_size
+    config = set_num_classes_r_peaks(config)
+
 
     if config.use_class_weights:
         param = config.sampling_freq if config.patch_size < 5 else config.patch_size
@@ -51,7 +48,7 @@ def train(config, run=None, wandb=False):
 
     model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
-    trainer = utils.get_trainer(config, model, "train-exercise-r_peak", wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, "train-exercise-r_peak", wandb=wandb, run=run)
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 

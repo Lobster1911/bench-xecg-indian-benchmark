@@ -2,8 +2,10 @@
 
 Here you can find the documentation on how to test your model on PTB-XL.
 
-Download the dataset from [physionet](https://physionet.org/content/ptb-xl/1.0.3/) and set `data_folder_ptbxl` in `config_defaults/train_ptb_xl_defaults.yaml`. (point to the `records500` folder)
+Create a new `yaml` configuration file, this will extend the configuration in `config_defaults/train_ptb_xl_defaults.yaml`.
 
+Download the dataset from [physionet](https://physionet.org/content/ptb-xl/1.0.3/).
+Then set `data_folder_ptbxl` in the new config file with the folder where you extracted the data (point to the `records500` folder).
 
 ## Configuration params
 

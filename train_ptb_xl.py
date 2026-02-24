@@ -52,7 +52,7 @@ def train(config, run=None, wandb=False):
     model = TrainingPTB_XL(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)
 
     prj_str = f'train-ptbxl-{config.classification_task}-{config.task}'
-    trainer = utils.get_trainer(config, model, prj_string=prj_str, wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, prj_string=prj_str, wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
