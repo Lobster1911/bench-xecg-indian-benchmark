@@ -18,19 +18,13 @@ To divide each long recording into smaller samples use the variable `win_len`, n
 
 Set `split_val_by_patient` to true if you want the validation set to be divided by patient or false to just shuffle the samples and then random split 80% for training and 20% for valiadtion.
 
-### is_recurrent
-
-If `is_recurrent` is set to true, the whole 30 minute signal is used in validation and testing (use this only if your model can handle long sequences). 
-
-Note that if `is_recurrent` is `true` the signal is divided in overlapping samples centered at each heartbeat of size `win_len*2` in the training set while for the test set only non-overlapping segments are computed.
-
 ### skip_majority_class_samples
 
-Most of the heartbeat are of type N (normal) and thus with `skip_majority_class_samples` set to true we skip - only in training phase - 10 consecutive samples if they are all belonging to the N class. This functionality is used only if `is_recurrent` is `true`.
+Most of the heartbeat are of type N (normal) and thus with `skip_majority_class_samples` set to true we skip - only in training phase - 10 consecutive samples if they are all belonging to the N class.
 
 ### max_length_signal
 
-You need this config variable to be at least the double of `win_len` or the signal will be cutted and training will fail because of mismatch in size between predictions and targets. If `is_recurrent` is true then ensure `max_length_signal` will have the same size of the longest signal (for our xECG that uses 100Hz signals `max_length_signal: 180556`)
+You need this config variable to be at least the double of `win_len` or the signal will be cutted and training will fail because of mismatch in size between predictions and targets. `max_length_signal` will have the same size of the longest signal (for our xECG that uses 100Hz signals `max_length_signal: 180556`)
 
 ### r_peaks_detection
 

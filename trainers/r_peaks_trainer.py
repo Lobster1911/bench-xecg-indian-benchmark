@@ -62,7 +62,7 @@ class TrainingRPeak(CommonTrainerDownstream):
             threshold_window=20
         )
 
-        self.plot_test_predictions = config.plot_test_predictions
+        self.plot_predictions = config.plot_predictions
 
     def training_step(self, batch, _):
         loss_r_peak_pos, r_peak_pos, r_peaks, r_peaks_orig = self.predict_batch(batch)
@@ -178,7 +178,7 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.log('test_f1_20', avg_distance_20['f1'])   
         self.test_distance_20.reset()
 
-        if self.plot_test_predictions:
+        if self.plot_predictions:
             try:
                 sample_1 = self.trainer.test_dataloaders.dataset[0]
                 sample_2 = self.trainer.test_dataloaders.dataset[1]

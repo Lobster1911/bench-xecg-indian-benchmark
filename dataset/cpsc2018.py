@@ -35,7 +35,7 @@ class ECGCPSC2018Dataset(PretrainDataset):
     
     def load_records(self):
         # loop over the folders in self.data_folder
-        all_dirs = [d for d in os.listdir(self.data_folder) if os.path.isdir(os.path.join(self.data_folder, d))]
+        all_dirs = sorted([d for d in os.listdir(self.data_folder) if os.path.isdir(os.path.join(self.data_folder, d))])
         exams = pd.DataFrame()
         all_files = []
         for d in all_dirs:
@@ -63,6 +63,7 @@ class ECGCPSC2018Dataset(PretrainDataset):
         
         self.tab_data = self.tab_data[self.tab_data['file_name'].isin(self.records)]
         print('CPSC2018:', self.tab_data.head())
+        # print('CPSC label distribution: \n', self.tab_data['diagnosis_code'].value_counts())
 
 
     def load_labels(self):
@@ -71,8 +72,7 @@ class ECGCPSC2018Dataset(PretrainDataset):
         for label in labels:
             splitted_labels.extend(label.split(','))
 
-        self.labels_unique = list(set(splitted_labels))
-
+        self.labels_unique = sorted(list(set(splitted_labels)))
     
     def __getitem__(self, idx):
         signal = super().__getitem__(idx)

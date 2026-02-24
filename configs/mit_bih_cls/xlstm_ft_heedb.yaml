@@ -22,7 +22,7 @@ xlstm_config: ["s","s","m","m","s","s","m","m","s"]
 checkpoint: pretrain-xLSTM/g7o5dy77/checkpoints/epoch=48-step=807814.ckpt
 # checkpoint: pretrain-xLSTM/0rgc8fun/checkpoints/epoch=49-step=504700.ckpt
 
-is_recurrent: false
+
 
 use_final_layer_norm: null
 cls_normalization: null  # 'batch', 'layer', 'instance'

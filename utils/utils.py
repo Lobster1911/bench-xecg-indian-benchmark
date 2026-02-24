@@ -35,7 +35,7 @@ except ImportError:
 
 
 
-def get_base_model(config, feature_classification=False, sleep_apnea=False, compile_model=True):
+def get_base_model(config, feature_classification=False, sleep_apnea=False):
     """
     Returns the base model according to the configuration.
     
@@ -43,7 +43,6 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False, comp
         config (ConfigDict): Global configuration.
         feature_classification (bool): Whether to use feature classification of signal level classification
         minute_aggregation (bool): Whether the head should aggregate 1 minute of signal (this is used for the sleep apnea task)
-        compile_model (bool): Whether to compile the model using torch.compile
     Returns:
         nn.Module: The base model.
     """
@@ -111,7 +110,7 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False, comp
             print(message) 
 
     # this gives problem due to reshaping
-    if compile_model:
+    if config.compile_model:
         base_model.compile()
 
     return base_model
@@ -302,10 +301,10 @@ def get_training_class_weights(train_dataset, do_not_consider_classes=[], label_
 
 def get_training_class_weights_multilabel(train_dataset, label_key='label'):
     labels = [sample[label_key] for sample in train_dataset]
-    classes_count = torch.zeros_like(labels[0])
+    classes_count = torch.zeros((len(labels[0]),))
 
     for label in labels:
-        classes_count += label
+        classes_count += torch.tensor(label)
 
     num_classes = classes_count.shape[0]
     total_samples = len(labels)

@@ -1,5 +1,5 @@
 # training loop hyp
-wandb_log: false
+wandb_log: true
 wandb_group: best_ecgcpc_lp
 
 wd: 0.001

@@ -4,6 +4,7 @@ wandb_group: best_ecgfm_lp
 
 lr_head: .001
 wd: 0.1
+epochs: 30
 
 linear_probing: false
 deterministic: false

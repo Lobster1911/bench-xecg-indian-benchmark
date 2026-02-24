@@ -1,0 +1,24 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_lp
+epochs: 30
+wd: 0.1
+batch_size: 256
+
+lr_head: 0.001
+
+linear_probing: true
+deterministic: false
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
+labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
+
+training_pct: 1.

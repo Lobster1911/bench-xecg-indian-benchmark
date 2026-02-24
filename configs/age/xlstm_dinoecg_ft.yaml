@@ -1,0 +1,32 @@
+# training loop hyp
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_ft
+
+lr_head: .01
+lr_core: .00003
+wd: 0.1
+dropout: 0.
+linear_probing: false
+deterministic: false
+
+drop_path_prob: 0.2
+layerwise_lr_decay: 0.75
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s", "s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+use_final_layer_norm: false
+cls_normalization: null
+
+data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
+labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+
+data_folder_code15: /scratch/datasets/CODE15/processed/
+labels_file_code15: /scratch/datasets/CODE15/processed/exams_filtered.csv
+
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
+labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
+
+data_folder_cpsc2018: /home/datasets/CPSC2018/
+labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv

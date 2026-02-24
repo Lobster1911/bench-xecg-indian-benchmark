@@ -22,3 +22,7 @@ sbatch --job-name=xlstm_lp_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-x
 sbatch --job-name=xlstm_ft_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl-time-comparison/xlstm_ft.yaml
 
 sbatch --job-name=xlstm_sup_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl-time-comparison/xlstm_supervised.yaml
+
+sbatch --job-name=cpc_lp_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl-time-comparison/ecgcpc_lp.yaml 
+
+sbatch --job-name=cpc_ft_ptb slurm_train_l40s.sh train_ptb_xl.py configs/ptb-xl-time-comparison/ecgcpc_ft.yaml

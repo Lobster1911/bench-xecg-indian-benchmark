@@ -44,7 +44,7 @@ def train(config, run=None, wandb=False):
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
-    base_model = utils.get_base_model(config, compile_model=False)
+    base_model = utils.get_base_model(config)
 
     model = TrainerMortality(model=base_model, config=config, len_train_dataset=len(train_dataset))
 

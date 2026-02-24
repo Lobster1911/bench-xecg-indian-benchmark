@@ -9,18 +9,20 @@ sched_decay_factor: 0.8
 use_class_weights: true
 use_focal_loss: false
 use_scheduler: true
-patience: 15
+patience: 30
 grad_clip: 3.
 lr_head: 0.001
 lr_core: 0.00001
 batch_size: 64
 num_workers: 32
-epochs: 15
+epochs: 20
 linear_probing: false
-precision: 32
+precision: '16-mixed'
+compile_model: true
 
 monitor_metric: val_f1
 monitor_mode: max
+plot_predictions: false
 
 # regularizers
 dropout: 0.

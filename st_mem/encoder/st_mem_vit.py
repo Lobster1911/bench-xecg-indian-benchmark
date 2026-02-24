@@ -159,6 +159,7 @@ class ST_MEM_ViT(BaseModel):
         return self.norm(x)
 
     def forward(self, series):
+        series = series.float()
         if self.linear_probing:
             with torch.no_grad():
                 x = self.forward_encoding(series)
@@ -184,8 +185,8 @@ class ST_MEM_ViT(BaseModel):
                 end = context_patches + window_patches
                 x = x[:, start:end, :]
 
-            out = self.head(x.mean(dim=1))
-            # print(f"Output shape: {out.shape}")  # Debugging output
+            out = self.head(x)
+            # print(f"out shape: {out.shape}")  # Debugging output
 
             return out
         return self.head(x)

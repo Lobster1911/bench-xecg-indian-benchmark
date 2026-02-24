@@ -58,11 +58,11 @@ done
 
 ## xlstm CODE15
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_lp_age slurm_train_l40s.sh train_age.py configs/age/xlstm_code15_lp.yaml 
 done
 
-for i in {1..4}; do
+for i in {1..5}; do
     sbatch --job-name=xlstm_ft_age slurm_train_l40s.sh train_age.py configs/age/xlstm_code15_ft.yaml
 done 
 
@@ -74,4 +74,14 @@ done
 
 for i in {1..5}; do
     sbatch --job-name=cpc_ft_age slurm_train_l40s.sh train_age.py configs/age/ecgcpc_ft.yaml
+done 
+
+## xlstm DINOECG
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_lp_age slurm_train_l40s.sh train_age.py configs/age/xlstm_dinoecg_lp.yaml 
+done
+
+for i in {1..5}; do
+    sbatch --job-name=xlstm_ft_age slurm_train_l40s.sh train_age.py configs/age/xlstm_dinoecg_ft.yaml
 done 

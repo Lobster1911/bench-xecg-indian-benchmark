@@ -21,6 +21,9 @@ def train(config, run=None, wandb=False):
     # set deterministic training
     if config.deterministic: pl.seed_everything(42)
     
+    # fix max_len signal
+    config.max_length_signal = config.win_len * 2 + config.context_len * 2
+    
     dataset_class = mit_bih.ECGMITBIHDatasetSingleHB if config.single_hb and not config.r_peaks_detection else mit_bih.ECGMITBIHDataset
     print(f"Using dataset class: {dataset_class.__name__}")
 
@@ -52,19 +55,16 @@ def train(config, run=None, wandb=False):
         weights = None
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=mit_bih.make_collate_fn(config))
-    val_batch_size = 1 if config.is_recurrent and not config.r_peaks_detection else config.batch_size
-    val_num_workers = 0 if config.is_recurrent and not config.r_peaks_detection else config.num_workers
-    print("Using val_batch_size:", val_batch_size, "and val_num_workers:", val_num_workers)
-    val_dataloader = DataLoader(val_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=config.num_workers)
 
     test_dataset = dataset_class(config, split='test', augmentations=get_transforms(config, split='test'))
-    test_dataloader = DataLoader(test_dataset, batch_size=val_batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=val_num_workers)
+    test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, collate_fn=mit_bih.make_collate_fn(config), num_workers=config.num_workers)
     print(f"Test dataset size: {len(test_dataset)}")
 
     if config.predict_no_hb:
         config.num_classes += 1
         
-    base_model = utils.get_base_model(config, feature_classification=(not config.single_hb), compile_model=False)
+    base_model = utils.get_base_model(config, feature_classification=(not config.single_hb))
 
     if config.r_peaks_detection:
        model = TrainingRPeak(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)

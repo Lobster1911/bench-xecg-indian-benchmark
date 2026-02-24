@@ -5,6 +5,7 @@ batch_size: 96
 lr_head: 0.01
 
 wd: 0.1
+epochs: 30
 
 linear_probing: true
 deterministic: false

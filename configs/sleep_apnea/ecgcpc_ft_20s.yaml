@@ -3,7 +3,7 @@ wandb_log: true
 wandb_group: best_ecgcpc_ft_20s
 
 wd: 0.001
-batch_size: 256
+batch_size: 128
 
 lr_head: 1.
 lr_core: 1.

@@ -51,7 +51,7 @@ def train(config, run=None, wandb=False):
 
     # feature classification only if the signal is 1 minute long
     feature_classification = config.window_size % 60 == 0
-    base_model = utils.get_base_model(config, feature_classification=feature_classification, sleep_apnea=True, compile_model=False)
+    base_model = utils.get_base_model(config, feature_classification=feature_classification, sleep_apnea=True)
     base_model = utils.change_positional_embedding_if_needed(base_model, config)
             
     model = TrainingSleepApnea(model=base_model, config=config, len_train_dataset=len(train_dataset), weights=weights)

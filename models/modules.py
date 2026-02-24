@@ -10,7 +10,7 @@ class LinearPatchEmbedding(nn.Module):
         super().__init__()
         self.conv = nn.Conv1d(num_channels, num_hiddens, kernel_size=patch_size, stride=patch_size, bias=False)
 
-    @torch.compiler.disable
+    # @torch.compiler.disable
     def forward(self, x, permute=True):
         if permute: x = x.permute(0, 2, 1) # put the channels in the middle
         x = self.conv(x).flatten(2).transpose(1, 2)
@@ -312,7 +312,7 @@ class vanillaxLSTMWrapper(nn.Module):
                     # print('x shape after expand', x.shape)
                 # flip the sequence
                 if i > 0:
-                    x = x.flip(1)
+                    x = x.flip(1).contiguous()
             
             if self.dropout_rates[i] == 0. or not self.training:
                 x = block(x)
@@ -343,18 +343,20 @@ class DropPath(nn.Module):
             else:
                 return block(x)
         
-        # indexes of the batch
-        idxs = torch.randperm(x.shape[0])
-        num_to_keep = int(np.ceil((1.0 - drop_path_prob) * x.shape[0]))
-        idxs_to_keep = idxs[:num_to_keep]  # First N elements are kept
-
+        # Create mask instead of indexing
+        batch_size = x.shape[0]
+        keep_prob = 1.0 - drop_path_prob
+        mask = torch.rand(batch_size, device=x.device) < keep_prob
+        
         if self.is_large_mlstm:
-            out, _ = block(x[idxs_to_keep], None)
-            x[idxs_to_keep] = out
-            # dont need to have a state in training
+            out, _ = block(x, None)
+            # Use where instead of in-place assignment
+            x = torch.where(mask.view(-1, 1, 1), out, x)
             return x, None
         else:
-            x[idxs_to_keep] = block(x[idxs_to_keep])
+            out = block(x)
+            # Use where instead of in-place assignment
+            x = torch.where(mask.view(-1, 1, 1), out, x)
             return x
 
 class mLSTMWrapper(nn.Module):

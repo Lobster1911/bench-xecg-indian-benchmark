@@ -1,0 +1,29 @@
+wandb_log: true
+wandb_group: best_dinoecg_xlstm_lp
+epochs: 30
+
+batch_size: 8
+lr_head: 0.1
+
+layerwise_lr_decay: 0.75 
+drop_path_prob: 0.5
+wd: 0.1
+
+linear_probing: true
+deterministic: false
+
+embedding_size: 1024
+encoder_type: vanilla
+xlstm_config: ["s","s","m","m","s","s","m","m","s"]
+checkpoint: pretrain-xLSTM/5q5muzal/checkpoints/epoch=48-step=496566.ckpt
+
+use_final_layer_norm: false
+cls_normalization: null  # 'batch', 'layer', 'instance'
+patch_embedding: linear
+
+data_folder_high_intensity: /home/datasets/ECG_high_intensity_exercise
+
+r_peaks_detection: true
+plot_test_predictions: true
+
+max_length_signal: 2500

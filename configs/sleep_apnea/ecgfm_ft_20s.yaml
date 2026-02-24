@@ -11,7 +11,7 @@ wd: 0.1
 linear_probing: false
 deterministic: false
 
-batch_size: 512
+batch_size: 384
 num_workers: 64
 
 use_ecg_founder: true

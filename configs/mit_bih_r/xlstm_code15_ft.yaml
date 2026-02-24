@@ -9,6 +9,7 @@ lr_core: 0.001
 layerwise_lr_decay: 0.75
 drop_path_prob: 0.5
 wd: 0.
+epochs: 30
 
 linear_probing: false
 deterministic: false

@@ -14,5 +14,6 @@ use_ecg_jepa: true
 skip_majority_class_samples: true
 use_class_weights: false
 split_val_by_patient: true
+win_len: 1250
 
 data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
