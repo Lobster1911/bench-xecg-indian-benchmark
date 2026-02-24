@@ -155,7 +155,7 @@ class ECGHighIntensity(PretrainDataset):
         # print(f"Signal shape: {signal.shape}, R-peaks shape: {r_peaks_tensor.shape}")
 
         obj = {
-            'signals': torch.tensor(signal).float(),
+            'signals': torch.tensor(signal.copy()).float(),
             'r_peak': r_peaks_tensor,
             'r_peak_orig': r_peaks_orig_tensor,
         }

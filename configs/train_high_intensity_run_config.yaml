@@ -25,7 +25,7 @@ layerwise_lr_decay: 0. # 75
 
 data_folder_sleep_apnea: /media/Volume/data/sleep_apnea/physionet_apnea/
 
-plot_test_predictions: true
+plot_predictions: true
 max_length_signal: 5000
 
 use_ecg_founder: true

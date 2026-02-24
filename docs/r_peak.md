@@ -25,9 +25,9 @@ You need this config variable to be at least the double of `win_len` or the sign
 
 For this task `r_peaks_detection` should be set to `true`
 
-### plot_test_predictions
+### plot_predictions
 
-If you want to see the prediction of the model on a signal set `plot_test_predictions` to `true`: it will automatically upload an image to weights and biases.
+If you want to see the prediction of the model on a signal set `plot_predictions` to `true`: it will automatically upload an image to weights and biases.
 
 ## Run the experiment
 

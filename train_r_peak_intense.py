@@ -21,8 +21,7 @@ def train(config, run=None, wandb=False):
     if config.deterministic: pl.seed_everything(42)
 
     if config.use_ecg_founder:
-        # ensure that num_classes is equal to patch_size
-        config.num_classes = 5000 // 20
+        config.num_classes = 5000
     else:
         # ensure that num_classes is equal to patch_size
         config.num_classes = config.patch_size

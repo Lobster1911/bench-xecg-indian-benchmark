@@ -21,6 +21,6 @@ layerwise_lr_decay: 0.75
 data_folder_high_intensity: /home/datasets/ECG_high_intensity_exercise
 
 r_peaks_detection: true
-plot_test_predictions: true
+plot_predictions: true
 
 max_length_signal: 2500

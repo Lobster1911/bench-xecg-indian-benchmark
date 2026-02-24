@@ -21,6 +21,6 @@ checkpoint: pretrain-xLSTM/iw88p22s/checkpoints/epoch=49-step=504700.ckpt
 
 cls_type: avg
 
-plot_test_predictions: true
+plot_predictions: true
 
 max_length_signal: 1000

@@ -12,9 +12,9 @@ This dataset containg 20 second 12 lead ecgs.
 
 Define `maximum_len_signal` to be the maximum input lenght of the signal your model accepts.
 
-### plot_test_predictions
+### plot_predictions
 
-If you want to see the prediction of the model on a signal set `plot_test_predictions` to `true`: it will automatically upload an image to weights and biases.
+If you want to see the prediction of the model on a signal set `plot_predictions` to `true`: it will automatically upload an image to weights and biases.
 
 
 ## Run the experiment

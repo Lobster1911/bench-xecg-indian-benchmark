@@ -14,6 +14,9 @@ use_ecg_jepa: true
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
+training_dataset: ['code15']
+max_length_signal: 2500
+
 
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
 labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv

@@ -37,5 +37,5 @@ data_folder_mit: /home/datasets/MIT-BIH_arrhythmia/
 monitor_metric: val_auroc
 monitor_mode: max
 
-plot_test_predictions: true
+plot_predictions: true
 random_shift: true

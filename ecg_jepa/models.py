@@ -8,7 +8,11 @@ def load_encoder(ckpt_dir, config, feature_classification=False, sleep_apnea=Fal
     if config.leads is None:
         config.leads = [0,1,2,3,4,5,6,7]
 
-    num_patches = config.max_length_signal // config.patch_size
+    if not config.max_len_signal:
+        # when not specified, assume 10 seconds
+        num_patches = 50
+    else:
+        num_patches = config.max_length_signal // config.patch_size
 
     params = {
         'encoder_embed_dim': 768,
