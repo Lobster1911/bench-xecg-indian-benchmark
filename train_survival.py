@@ -11,7 +11,7 @@ import dataset.generic_utils as generic_utils
 import utils.utils as utils
 from torch.utils.data import DataLoader, ConcatDataset
 from dataset.generic_utils import get_transforms
-from trainers.mortality_trainer import TrainerMortality
+from trainers.survival_trainer import TrainerSurvival
 from config import parse_config
 
 
@@ -28,7 +28,7 @@ def train(config, run=None, wandb=False):
         if d.lower() == 'code15':
             datasets.append(code.ECGCODE15MortalityDataset(config, split='train', global_augmentations=get_transforms(config)))
         if d.lower() == 'mimic':
-            datasets.append(mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='mortality'))
+            datasets.append(mimic.ECGMIMICDataset(config, split='train', global_augmentations=get_transforms(config), downstream_task='survival'))
         if d.lower() == 'heedb':
             datasets.append(heedb.ECGHEEDBMortalityDataset(config, global_augmentations=get_transforms(config)))
 
@@ -40,15 +40,15 @@ def train(config, run=None, wandb=False):
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
-    test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='mortality')
+    test_dataset = mimic.ECGMIMICDataset(config, split='test', global_augmentations=get_transforms(config, split='test'), downstream_task='survival')
     print(f"Test dataset size: {len(test_dataset)}")
     test_dataloader = DataLoader(test_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=generic_utils.make_collate_fn_task(config, ['death', 'timey']))
 
     base_model = utils.get_base_model(config)
 
-    model = TrainerMortality(model=base_model, config=config, len_train_dataset=len(train_dataset))
+    model = TrainerSurvival(model=base_model, config=config, len_train_dataset=len(train_dataset))
 
-    trainer = utils.get_trainer(config, f'train-mortality', wandb=wandb, run=run)
+    trainer = utils.get_trainer(config, f'train-survival', wandb=wandb, run=run)
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
@@ -59,6 +59,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = parse_config(args.config_file, 'config_defaults/train_mortality_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_survival_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

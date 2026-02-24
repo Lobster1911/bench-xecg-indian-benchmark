@@ -16,7 +16,6 @@ Then set `data_folder_ptbxl` in the new config file with the folder where you ex
 Download the CPSC2018 dataset from [physionet](https://physionet.org/content/challenge-2020/1.0.2/training/cpsc_2018/).
 Then set `data_folder_cpsc2018` in the new config file with the folder where you extracted the data.
 
-
 ### MIMIC-IV
 Download the MIMIV-IV-ECG dataset from [physionet](https://physionet.org/content/mimic-iv-ecg/1.0/).
 Then set `data_folder_mimic` in the new config file with the folder where you extracted the data.

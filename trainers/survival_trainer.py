@@ -15,7 +15,7 @@ from torchmetrics import Metric
 
 
 
-class TrainerMortality(CommonTrainerDownstream):
+class TrainerSurvival(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None, evaluate_music=False):
         super().__init__(model, config,  len_train_dataset, weights)
 

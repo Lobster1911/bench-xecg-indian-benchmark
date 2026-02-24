@@ -30,6 +30,8 @@ If you need to use layerwise decay:
 - Implement the functions `get_layers`, this allow to use layerwise decay
 - Implement `additional_params`, again for layerwise decay define all the parameters that are not in the layer list, they will have the smallest learning rate.
 
+Once your model is adapted for the pipeline, create all the configuration files for all the task (see next section)
+
 ### Task specific documentation
 
 Details of each task are in the following documentations:
@@ -42,7 +44,7 @@ Details of each task are in the following documentations:
 - [Exercise (R-peak detection)](docs/exercise.md)
 - [Age](docs/age.md)
 - [Blood test](docs/blood_test.md)
-- [Mortality](docs/mortality.md)
+- [Survival](docs/survival.md)
 
 ## Call for feedbacks
 

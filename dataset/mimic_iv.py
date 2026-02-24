@@ -53,8 +53,8 @@ class ECGMIMICDataset(PretrainDataset):
             self.load_age_labels()
         elif self.downstream_task == 'lab':
             self.load_lab_labels(split=self.split)
-        elif self.downstream_task == 'mortality':
-            self.load_mortality_labels()
+        elif self.downstream_task == 'survival':
+            self.load_survival_labels()
 
         # print the unique number of stratified folds
         # print(f'MIMIC-IV: number of unique folds {self.tab_data["fold"].nunique()}')
@@ -70,7 +70,7 @@ class ECGMIMICDataset(PretrainDataset):
         self.tab_data = self.tab_data[self.tab_data['age'] <= 120]
         print(f'MIMIC-IV: filtered age records from {initial_count} to {self.tab_data.shape[0]}')
 
-    def load_mortality_labels(self):
+    def load_survival_labels(self):
         machine_measurement_path = os.path.join(self.data_folder, 'machine_measurements.csv')
         if not os.path.exists(machine_measurement_path):
             raise FileNotFoundError(f"MIMIC-IV: machine measurements file not found at {machine_measurement_path}")
@@ -265,9 +265,9 @@ class ECGMIMICDataset(PretrainDataset):
         elif self.downstream_task == 'lab':
             # for lab events prediction, we return the number of records
             return self.get_item_lab(idx)
-        elif self.downstream_task == 'mortality':
-            # for mortality prediction, we return the number of records
-            return self.get_item_mortality(idx)
+        elif self.downstream_task == 'survival':
+            # for survival prediction, we return the number of records
+            return self.get_item_survival(idx)
         else:
             raise ValueError(f"Unknown downstream task: {self.downstream_task}")
         
@@ -322,7 +322,7 @@ class ECGMIMICDataset(PretrainDataset):
             'labels': torch.tensor(flattened_values, dtype=torch.float32),
         }
     
-    def get_item_mortality(self, idx):
+    def get_item_survival(self, idx):
         signal = self.get_signal(idx)
 
         timey = self.tab_data.iloc[idx]['timey']
