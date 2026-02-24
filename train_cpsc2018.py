@@ -51,6 +51,7 @@ def train(config, run=None, wandb=False):
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
 
 
+
 # if main
 if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
