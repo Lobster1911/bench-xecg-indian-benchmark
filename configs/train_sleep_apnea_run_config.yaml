@@ -60,4 +60,4 @@ shuffle_baseline_wander_in_batch: false
 drop_path_prob:  0. #0.5
 layerwise_lr_decay:  0. #0.75
 
-data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/
+# data_folder_sleep_apnea:  /home/datasets/sleep_apnea/physionet_apnea/

@@ -9,6 +9,7 @@ import utils.utils as utils
 from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
+from config import parse_config
 
 
 import argparse
@@ -28,8 +29,7 @@ def train(config, run=None, wandb=False):
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct, key='labels')
 
     if config.use_class_weights:
-        # weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
-        weights = torch.tensor([1.2444, 1.1167, 1.0653, 0.8114, 3.1714, 0.6416, 3.4688, 0.4102, 0.8866]).to('cuda')
+        weights = get_training_class_weights_multilabel(train_dataset, label_key='labels').to('cuda')
         print(f'Class weights: {weights}')
     else:
         weights = None
@@ -56,6 +56,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_cpsc2018_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_cpsc2018_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

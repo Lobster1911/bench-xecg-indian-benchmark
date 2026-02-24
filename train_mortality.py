@@ -12,9 +12,8 @@ import utils.utils as utils
 from torch.utils.data import DataLoader, ConcatDataset
 from dataset.generic_utils import get_transforms
 from trainers.mortality_trainer import TrainerMortality
+from config import parse_config
 
-
-# os.environ['XLSTM_EXTRA_INCLUDE_PATHS']='/usr/local/include/cuda/:/usr/include/cuda/'
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -60,6 +59,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_mortality_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_mortality_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

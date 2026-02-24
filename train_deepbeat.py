@@ -13,6 +13,7 @@ import utils.utils as utils
 from torch.utils.data import DataLoader, Subset
 from dataset.generic_utils import get_transforms
 from torch.utils.data import WeightedRandomSampler
+from config import parse_config
 
 
 import argparse
@@ -66,7 +67,7 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_deepbeat_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_deepbeat_defaults.yaml')
     print(f"Using config: {args.config_file}")
 
     train(config, wandb=config.wandb_log)

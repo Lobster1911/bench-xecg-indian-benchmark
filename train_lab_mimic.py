@@ -9,7 +9,7 @@ import utils.utils as utils
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms, make_collate_fn_task
 from trainers.mimic_lab_trainer import TrainingMIMIC_LAB
-
+from config import parse_config
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -52,6 +52,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_blood_test_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_blood_test_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

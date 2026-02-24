@@ -1,16 +1,13 @@
 
-from prettytable import PrettyTable  # Import PrettyTable for table formatting
 import torch
 import numpy as np
-import random
 from collections import Counter
-import yaml
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from torch.utils.data import Subset
 import numpy as np
 from models.classification import xLSTMClassification, xLSTMFeatureClassification, xLSTMSleepApnea
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.loggers import WandbLogger, CSVLogger
 import lightning as pl
 import os
 import torch.nn as nn
@@ -37,78 +34,6 @@ except ImportError:
     pass
 
 
-def parse_config(config_file, default_config_file):
-    """
-    This function parses a YAML configuration file and merges it with default configuration values.
-    Where values of default_config_file are overwritten by those in config_file.
-
-    Args:
-        config_file (str): Path to the YAML configuration file.
-        default_config_file (str): Path to the default configuration YAML file.
-    Returns:
-        ConfigDict: A dictionary-like object containing the merged configuration.
-    """
-    with open(default_config_file, 'r') as file:
-        default_config = yaml.safe_load(file)
-
-    with open(config_file, 'r') as file:
-        config = yaml.safe_load(file)
-
-    # loop all the properties and if they are dict with a value key use that value
-    for k, v in config.items():
-        if isinstance(v, dict) and 'value' in v:
-            config[k] = v['value']
-
-    merged_config = ConfigDict(default_config)
-    merged_config.update(config)
-
-    # Is more convenient to hardcode the frequency, patch size or orther important parameter for your model here,
-    # so for each model we do not have to set in the config file, making it cleaner
-    if merged_config.use_ecg_jepa:
-        merged_config.sampling_freq = 250
-        merged_config.patch_size = 50
-        # merged_config.max_length_signal = 2500
-        # merged_config.win_len = 1250
-        # jepa uses 8 leads
-        merged_config.leads = ['I', 'II', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-    elif merged_config.use_st_mem:
-        merged_config.sampling_freq = 250
-        merged_config.patch_size = 75
-        # merged_config.max_length_signal = 2325
-        # merged_config.win_len = 1125
-        merged_config.low_pass_filter = 40
-        merged_config.high_pass_filter = 0.67
-        merged_config.standardize = True
-        # merged_config.window_size_train = 1000
-        # merged_config.window_size_val = 1000
-    elif merged_config.use_ecg_founder:
-        # merged_config.win_len = 2500
-        merged_config.sampling_freq = 500
-        merged_config.low_pass_filter = 50
-        merged_config.high_pass_filter = 0.5
-        # merged_config.max_length_signal = 5000
-        # merged_config.window_size_train = 1000
-        # merged_config.window_size_val = 1000
-        merged_config.layerwise_lr_decay = 1.
-        merged_config.drop_path_prob = 0.
-        merged_config.normalize = True
-    elif merged_config.use_ecg_cpc:
-        merged_config.sampling_freq = 240
-        merged_config.layerwise_lr_decay = 1.
-        merged_config.drop_path_prob = 0.
-        # merged_config.low_pass_filter = 50
-        # merged_config.high_pass_filter = 0.5
-        merged_config.discriminative_lr_factor = 0.1
-        merged_config.patch_size = 2
-
-    if merged_config.linear_probing:
-        merged_config.layerwise_lr_decay = 0.
-        merged_config.drop_path_prob = False
-
-    if merged_config.r_peaks_detection:
-        merged_config.num_classes = merged_config.patch_size
-    
-    return merged_config
 
 def get_base_model(config, feature_classification=False, sleep_apnea=False, compile_model=True):
     """
@@ -191,7 +116,6 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False, comp
 
     return base_model
 
-
 def change_positional_embedding_if_needed(model, config):
     """
     Change the positional embedding of the model to match the new sequence length.
@@ -269,7 +193,6 @@ def change_positional_embedding_if_needed(model, config):
 
     return model
 
-
 def split_dataset_preserve_labels(dataset, split_ratio=0.1, key='class_label'):
     """
     Splits the dataset into a training set while preserving the label distribution using multilabel stratified shuffle split.
@@ -300,28 +223,6 @@ def format_keys(key):
         
     return key
 
-class ConfigDict(dict):
-    """ 
-    A dictionary that allows access to its keys as attributes where unset elements return None instead of raising errors.
-    """
-    def __getitem__(self, key):
-        return self.get(key, None)
-
-    def __getattr__(self, key):
-        return self.get(key, None)
-
-    def __setattr__(self, key, value):
-        self[key] = value
-
-    # merge the two configs, if the key is not in the config file, use the default value
-    def update(self, u):
-        for k, v in u.items():
-            if isinstance(v, dict) and isinstance(self.get(k), dict):
-                self[k].update(v)
-            else:
-                self[k] = v
-
-
 def get_trainer(config, model, prj_string, wandb=False, run=None):
     """
     Define all the callbacks and loggers for the trainer.
@@ -335,6 +236,8 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
             nan_stop = EarlyStopping(monitor='val_loss', check_finite=True, patience=config.epochs, mode='min')
             callbacks.append(nan_stop)
 
+    csv_logger = CSVLogger(save_dir='logs_lightning', name=prj_string, version=run)
+
     if wandb:
         print(f"Using WandbLogger for project {prj_string} and run {run}")
         if config.monitor_metric is not None:
@@ -347,13 +250,13 @@ def get_trainer(config, model, prj_string, wandb=False, run=None):
         print(f"Using GPU tag: {gpu_tag}")
         
         # Adding the tag to the logger
-        wand_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group, tags=gpu_tag)
+        wandb_logger = WandbLogger(project=prj_string, experiment=run, config=config, group=config.wandb_group, tags=gpu_tag)
         #  wand_logger.watch(model, log=None)
-        trainer = pl.Trainer(max_epochs=config.epochs, logger=wand_logger, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
+        trainer = pl.Trainer(max_epochs=config.epochs, logger=[wandb_logger, csv_logger], callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
         # need to save the config file to a new file in the wandb directory
     else:
         print(f"Using default logger for project {prj_string} and run {run}")
-        trainer = pl.Trainer(logger=False, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
+        trainer = pl.Trainer(logger=csv_logger, max_epochs=config.epochs, callbacks=callbacks, gradient_clip_val=config.grad_clip, precision=config.precision)
     return trainer
 
 def get_training_class_weights(train_dataset, do_not_consider_classes=[], label_key='label', n_jobs=-1):

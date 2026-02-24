@@ -15,7 +15,7 @@ lr_head: 0.001
 lr_core: 0.00001
 batch_size: 64
 num_workers: 32
-epochs: 30
+epochs: 20
 linear_probing: false
 precision: 16-mixed  
 

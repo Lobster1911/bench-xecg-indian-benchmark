@@ -10,7 +10,7 @@ import dataset.intense_exercise as intense_exercise
 import utils.utils as utils
 from torch.utils.data import DataLoader
 from dataset.generic_utils import get_transforms
-
+from config import parse_config
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -61,6 +61,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_high_intensity_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_high_intensity_defaults.yaml')
 
     train(config, wandb=config.wandb_log)

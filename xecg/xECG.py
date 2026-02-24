@@ -110,10 +110,6 @@ class xECG(
         checkpoint = torch.load(checkpoint_path, weights_only=False)
         new_state_dict = {self.format_keys(k): v for k, v in checkpoint['state_dict'].items()}
 
-        # for k, v in new_state_dict.items():
-        #    if "slstm_cell._recurrent_kernel_" in k:
-        #        new_state_dict[k] = v.permute(0, 2, 1)
-
         # remove the fc layer
         new_state_dict = {k: v for k, v in new_state_dict.items() if 'fc' not in k}
         message = self.load_state_dict(new_state_dict, strict=False)

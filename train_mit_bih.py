@@ -10,6 +10,7 @@ import dataset.mit_bih as mit_bih
 from trainers.mit_bih_trainer import TrainingMIT_BIH
 from trainers.r_peaks_trainer import TrainingRPeak
 from utils.utils import get_training_class_weights
+from config import parse_config
 
 
 import argparse
@@ -44,19 +45,9 @@ def train(config, run=None, wandb=False):
             param = config.sampling_freq if config.patch_size < 5 else config.patch_size
             weights = torch.tensor([1/param, (param-1)/param]).to('cuda')
             print(f'Using class weights for r-peaks detection: {weights}')
-        elif config.num_classes == 5:
-            if config.win_len == 1600:
-                weights = torch.tensor([2.2425e-01, 8.3814e+00, 2.7265e+00, 1.8476e+01, 2.4445e+03]).to('cuda')
-            elif config.win_len == 500:
-                weights = torch.tensor([2.2468e-01, 7.8135e+00, 2.7218e+00, 1.8698e+01, 2.5163e+03]).to('cuda')
-            else:
-                weights = get_training_class_weights(train_dataset, label_key='label', do_not_consider_classes=[-1]).to('cuda')
-            print('Using class weights for 5 classes:', weights)
-            
-            # weights = torch.tensor([0.2781, 13.5098,  3.3668, 30.7307, 0]).to('cuda')
-        elif config.num_classes == 3: 
-            print('Using class weights for 3 classes')
-            weights = torch.tensor([0.367, 17.866, 4.452]).to('cuda')
+        else:
+            weights = get_training_class_weights(train_dataset, label_key='label', do_not_consider_classes=[-1]).to('cuda')
+            print('Using class weights:', weights)
     else:
         weights = None
 
@@ -91,6 +82,6 @@ if __name__ == '__main__':
     torch.set_float32_matmul_precision('medium')
 
     args = parser.parse_args()
-    config = utils.parse_config(args.config_file, 'config_defaults/train_mit_bih_defaults.yaml')
+    config = parse_config(args.config_file, 'config_defaults/train_mit_bih_defaults.yaml')
 
     train(config, wandb=config.wandb_log)
