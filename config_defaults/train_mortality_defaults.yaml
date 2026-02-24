@@ -31,6 +31,7 @@ use_ecg_founder: false
 use_st_mem: false
 use_ecg_jepa: false
 use_batch_norm_jepa: false
+training_dataset: ['code15']
 
 patch_size: 25
 sampling_freq: 100

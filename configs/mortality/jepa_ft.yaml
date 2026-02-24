@@ -14,6 +14,9 @@ use_ecg_jepa: true
 
 linear_probing: false
 deterministic: false
+training_dataset: ['code15']
+compile_model: false
+max_length_signal: 2500
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'

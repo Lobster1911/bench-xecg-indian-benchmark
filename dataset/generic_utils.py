@@ -121,10 +121,10 @@ def make_collate_fn_task(config, key_label='age'):
         if 'signal' in batch[0]:
             # If 'signal' is present, use it
             signals = [item['signal'] for item in batch]
-            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
+            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig.copy()) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
         else:
             signals = [item['global_signals'][0] for item in batch]
-            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
+            signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig.copy()) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
 
         if isinstance(key_label, list):
             return {

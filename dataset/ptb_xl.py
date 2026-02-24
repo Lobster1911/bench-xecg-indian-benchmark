@@ -132,7 +132,7 @@ def make_collate_fn(config, downstream=False, split='train'):
         superclass_labels = [item['class_label'] for item in batch]
         subclass_labels = [item['subclass_label'] for item in batch]
 
-        signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
+        signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig.copy()) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
             
         tortn = {
             'signals': signals,

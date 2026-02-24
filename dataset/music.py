@@ -153,7 +153,7 @@ def make_collate_fn(config):
         deaths = torch.tensor([item['death'] for item in batch], dtype=torch.float32)
         cardiac_deaths = torch.tensor([item['cardiac_death'] for item in batch], dtype=torch.float32)
 
-        signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
+        signals = pad(torch.nn.utils.rnn.pad_sequence([torch.from_numpy(sig.copy()) for sig in signals], batch_first=True).float(), patch_size=config.patch_size)
             
         return {
             'signals': signals,

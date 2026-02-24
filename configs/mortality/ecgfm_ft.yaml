@@ -16,6 +16,7 @@ training_dataset: ['code15']
 
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
+normalize: true
 
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
 labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv

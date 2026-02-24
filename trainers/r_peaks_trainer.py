@@ -126,6 +126,8 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.log('val_f1_20', avg_distance_20['f1'], prog_bar=True)
         self.val_distance_20.reset()
 
+        self.plot_samples_if_needed(self.trainer.val_dataloaders, step='val')
+
     def test_step(self, batch, _):
         loss_r_peak_pos, r_peak_pos, r_peaks, r_peaks_orig = self.predict_batch(batch)
 
@@ -170,25 +172,30 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.test_distance_150.reset()
 
         avg_distance_20 = self.test_distance_20.compute()
-        # self.log('test_avg_distance_20', avg_distance_20['avg_distance'])
-        # self.log('test_avg_distance_rp_20', avg_distance_20['avg_distance_rp'])
-        # self.log('test_avg_total_distance_20', avg_distance_20['avg_total_distance'])
         self.log('test_ppv_20', avg_distance_20['ppv'])
         self.log('test_tpr_20', avg_distance_20['tpr'])
         self.log('test_f1_20', avg_distance_20['f1'])   
         self.test_distance_20.reset()
 
+        self.plot_samples_if_needed(self.trainer.test_dataloaders, step='test')
+
+
+    def plot_samples_if_needed(self, dataloader, step='train'):
         if self.plot_predictions:
             try:
-                sample_1 = self.trainer.test_dataloaders.dataset[0]
-                sample_2 = self.trainer.test_dataloaders.dataset[1]
+                # sample_1 = self.trainer.test_dataloaders.dataset[0]
+                sample_1 = dataloader.dataset[0]
+                sample_2 = dataloader.dataset[1]
                 log_dir = self.logger.log_dir if self.logger is not None and self.logger.log_dir is not None else 'figs/'
-                img_1 = plot_r_peaks(sample_1, self.model, self.device, log_dir, self.current_epoch, 'r_peaks_1')
-                img_2 = plot_r_peaks(sample_2, self.model, self.device, log_dir, self.current_epoch, 'r_peaks_2')
+                img_1 = plot_r_peaks(sample_1, self.model, self.sampling_freq, self.device, log_dir, self.current_epoch, 'r_peaks_1', step=step)
+                img_2 = plot_r_peaks(sample_2, self.model, self.sampling_freq, self.device, log_dir, self.current_epoch, 'r_peaks_2', step=step)
 
                 if isinstance(self.logger, pl.loggers.WandbLogger):
-                    self.logger.log_image(key="reconstructions_train", images=[img_1, img_2])
+                    self.logger.log_image(key=f"reconstructions_{step}", images=[img_1, img_2])
             except Exception as e:
+                # print stack trace
+                import traceback
+                traceback.print_exc()
                 print(f"Error plotting R-peaks: {e}")
 
     def predict_batch(self, batch):
@@ -392,10 +399,10 @@ class RPeakDistanceMetric(Metric):
 
 
 
-def plot_r_peaks(sample, model, device, logdir, epoch, name):
+def plot_r_peaks(sample, model, sampling_freq, device, logdir, epoch, name, step='train'):
     with torch.no_grad():
-        signal = torch.from_numpy(sample['signal']).to(device).unsqueeze(0)
-        r_peaks = torch.from_numpy(sample['r_peak']).to(device).unsqueeze(0)
+        signal = sample['signals'].to(device).unsqueeze(0)
+        r_peaks = sample['r_peak'].to(device).unsqueeze(0)
         # print(f"Signal shape: {signal.shape}")
 
         # Get the original R-peaks
@@ -407,36 +414,41 @@ def plot_r_peaks(sample, model, device, logdir, epoch, name):
         r_peak_pos = torch.sigmoid(r_peak_pos) > 0.5
 
         # consider max 2000 time samples for plotting
-        if signal.shape[1] > 2000:
-            signal = signal[:, :2000, :]
-            r_peak_pos = r_peak_pos[:, :2000]
-            r_peaks = r_peaks[:, :2000]
+        if signal.shape[1] > 10 * sampling_freq:
+            signal = signal[:, :10 * sampling_freq, :]
+            r_peak_pos = r_peak_pos[:, :10 * sampling_freq]
+            r_peaks = r_peaks[:, :10 * sampling_freq]
 
         # print(f"Predicted R-peaks shape: {r_peak_pos.shape}")
 
         # Plot the original and predicted R-peaks
-        fig, ax = plt.subplots(figsize=(20, 5))
+        fig, ax = plt.subplots(figsize=(25, 5))
         to_plot = signal[:, :, 1].cpu().squeeze().numpy() if signal.ndim > 2 else signal.cpu().squeeze().numpy()
 
-        ax.plot(to_plot, label='Original Signal')
+        ax.plot(to_plot)
         # Plot vertical lines for predicted R-peaks
         pred_peaks = np.where(r_peak_pos.cpu().squeeze().numpy())[0]
         for peak in pred_peaks:
-            ax.axvline(peak, color='orange', linestyle='--', label='Predicted R-peak' if peak == pred_peaks[0] else "", alpha=0.3)
+            ax.axvline(peak, color='darkorange', linestyle='solid', linewidth=1.5, label='Predicted R-peak' if peak == pred_peaks[0] else "", alpha=0.5)
         
         gts = np.where(r_peaks.cpu().squeeze().numpy())[0]
         for gt in gts:
-            ax.axvline(gt, color='green', linestyle='--', label='Ground Truth R-peak' if gt == gts[0] else "", alpha=0.3)
+            ax.axvline(gt, color='darkgreen', linestyle='--', linewidth=1.5, label='Ground Truth R-peak' if gt == gts[0] else "", alpha=0.8)
 
-        ax.set_title(f'R-peaks Prediction - {name}')
-        ax.set_xlabel('Time (samples)')
-        ax.set_ylabel('Amplitude')
-        ax.legend()
+        # ax.set_title(f'R-peaks Prediction - {name}')
+        ax.set_xlabel('Timepoints', fontdict={'size': 24})
+        ax.set_ylabel('Amplitude', fontdict={'size': 24})
+
+        ax.tick_params(axis='x', labelsize=20)
+        ax.tick_params(axis='y', labelsize=20)
+
+        ax.legend(fontsize=24)
+        plt.tight_layout()
 
         # mkdir if it does not exist
-        os.makedirs(f'{logdir}/epoch_{epoch}', exist_ok=True)
+        os.makedirs(f'{logdir}/epoch_{epoch}/{step}', exist_ok=True)
 
-        path = f'{logdir}/epoch_{epoch}/r_peaks_{name}.png'
-        plt.savefig(path)
+        path = f'{logdir}/epoch_{epoch}/{step}/r_peaks_{name}.png'
+        plt.savefig(path, dpi=300)
         plt.close()
         return path
