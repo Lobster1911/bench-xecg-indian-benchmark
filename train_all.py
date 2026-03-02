@@ -2,15 +2,15 @@ import torch
 import yaml
 
 from config import parse_config
-from train_ptb_xl import train as train_ptb_xl
-from train_cpsc2018 import train as train_cpsc2018
-from train_survival import train as train_survival
-from train_age import train as train_age
-from train_sleep_apnea import train as train_sleep_apnea
-from train_lab_mimic import train as train_lab_mimic
-from train_mit_bih import train as train_mit_bih
-from train_r_peak_intense import train as train_r_peak_intense
-from train_ppg_af import train as train_ppg_af
+from run_scripts.train_ptb_xl import train as train_ptb_xl
+from run_scripts.train_cpsc2018 import train as train_cpsc2018
+from run_scripts.train_survival import train as train_survival
+from run_scripts.train_age import train as train_age
+from run_scripts.train_sleep_apnea import train as train_sleep_apnea
+from run_scripts.train_lab_mimic import train as train_lab_mimic
+from run_scripts.train_mit_bih import train as train_mit_bih
+from run_scripts.train_r_peak_intense import train as train_r_peak_intense
+from run_scripts.train_ppg_af import train as train_ppg_af
 
 
 import argparse
