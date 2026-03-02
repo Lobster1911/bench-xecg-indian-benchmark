@@ -3,7 +3,6 @@ import os
 import wfdb
 import numpy as np
 import h5py
-
 from torch.utils.data import Subset, ConcatDataset
 
 from .generic_utils import get_transforms
@@ -202,7 +201,7 @@ def save_record_hdf5_to_wfdb(record_path, exam_id, output_file_path):
                 units=['mV']*12, 
                 sig_name=lead_names, 
                 p_signal=signal, 
-                fmt=['16']*len(lead_names), 
+                fmt=['32']*len(lead_names), 
                 adc_gain=[1000]*12, 
                 baseline=[0]*12,
                 write_dir=output_file_path, # output here

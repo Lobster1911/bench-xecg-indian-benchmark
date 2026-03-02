@@ -21,6 +21,7 @@ dependencies = [
     "timm>=1.0.25",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
+    "typer>=0.24.1",
     "wandb>=0.25.0",
     "wfdb>=4.3.1",
     "xlstm>=2.0.5",

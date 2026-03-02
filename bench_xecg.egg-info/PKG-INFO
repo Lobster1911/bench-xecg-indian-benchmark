@@ -21,6 +21,7 @@ Requires-Dist: setuptools>=82.0.0
 Requires-Dist: timm>=1.0.25
 Requires-Dist: torch>=2.10.0
 Requires-Dist: torchvision>=0.25.0
+Requires-Dist: typer>=0.24.1
 Requires-Dist: wandb>=0.25.0
 Requires-Dist: wfdb>=4.3.1
 Requires-Dist: xlstm>=2.0.5
@@ -73,14 +74,6 @@ Details of each task are in the following documentations:
 - [Age](docs/age.md)
 - [Blood test](docs/blood_test.md)
 - [Survival](docs/survival.md)
-
-### CPC setup
-ECG CPC needs to install the cauchy extension to work:
-
-```shell
-cd bench_xecg/models/cpc/extensions/cauchy
-python setup.py install
-```
 
 ## Call for feedbacks
 

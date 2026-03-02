@@ -1,13 +1,11 @@
 import os
-import json
-from glob import glob
-from typing import Optional
 
+from glob import glob
 import pandas as pd
 import typer
 from pandarallel import pandarallel
 
-from dataset.dataset_preparation_utils import *
+from bench_xecg.dataset.dataset_preparation_utils import *
 
 app = typer.Typer(help="Clean and prepare ECG datasets")
 
@@ -100,12 +98,31 @@ def main(
         exams = pd.DataFrame({"file_name": paths})
 
     elif dataset == "code15":
-        hea_files = glob(
-            os.path.join(data_folder, "**", "*.hea"),
-            recursive=True,
-        )
-        exams = pd.DataFrame({"file_name": [file.removesuffix(".hea") for file in hea_files]})
+        # if code15 first transforem hdf5 to wfdb and save in a temp folder, then read the hea files
+        exams = pd.read_csv(os.path.join(data_folder, 'raw', "exams.csv"))
 
+        # check if processed folder exists, if not create it and process the files
+        if not os.path.exists(os.path.join(data_folder, "processed")):
+            os.makedirs(os.path.join(data_folder, 'processed'), exist_ok=True)
+
+            exams.parallel_apply(
+                lambda row: save_record_hdf5_to_wfdb(
+                    os.path.join(data_folder, 'raw', row['trace_file']),
+                    row['exam_id'],
+                    os.path.join(data_folder, 'processed')
+                ),
+                axis=1,
+            )
+
+        # add header filenames to exams
+        exams["file_name"] = exams.parallel_apply(
+            lambda row: os.path.join("processed", str(row['exam_id'])),
+            axis=1,
+        )
+
+        print("DF CODE15% head:")
+        print(exams.head())
+        
     elif dataset == "heedb":
         all_records = find_records(data_folder, file_extension=".hea")
         typer.echo(f"Found records: {len(all_records)}")

@@ -1,8 +1,8 @@
-# Age regression
+# Survival analysis
 
-Here is the documentation on how to test your model on Age regression.
+Here is the documentation on how to test your model on mortality task.
 
-Create a new `yaml` configuration file, this will extend the configuration in `config_defaults/train_age_defaults.yaml`.
+Create a new `yaml` configuration file, this will extend the configuration in `config_defaults/train_mortality_defaults.yaml`.
 
 ### CODE15%
 Download the CODE15% from [zenodo](https://zenodo.org/records/4916206). 
@@ -33,23 +33,11 @@ path-to-code15-dataset/
 Once the extraction is complete, update your `config.yaml` to point to the newly created folder:
 ```yaml
 data_folder_code15: "<path-to-code15-dataset>/processed"
-```
-
-### PTBXL
-Download the PTB-XL dataset from [physionet](https://physionet.org/content/ptb-xl/1.0.3/).
-Then set `data_folder_ptbxl` in the new config file with the folder where you extracted the data (point to the `records500` folder).
-
-### CPSC
-Download the CPSC2018 dataset from [physionet](https://physionet.org/content/challenge-2020/1.0.2/training/cpsc_2018/).
-Then set `data_folder_cpsc2018` in the new config file with the folder where you extracted the data.
-
 ### MIMIC-IV
 Download the MIMIV-IV-ECG dataset from [physionet](https://physionet.org/content/mimic-iv-ecg/1.0/).
 Then set `data_folder_mimic` in the new config file with the folder where you extracted the data.
-
-You need to download the diagnostic labels for MIMIC-IV-ECG `records_w_diag_icd10.csv` from [physionet](https://physionet.org/content/mimic-iv-ecg-ext-icd-labels/1.0.1/). This needs crediential access.
-An alternative is to get the demographic information from [MIMIC-IV](https://physionet.org/content/mimiciv/3.1/), and again it requires credential access.
+From [MIMIC-IV](https://physionet.org/content/mimiciv/3.1/) download the `patients.csv.gz` and `admissions.csv.gz` files. You need credential access.
 
 ## Run the experiment
 
-Run the experiment with `uv run run_scripts/train_age.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_mortality.py --config_file <path_to_your_config>`

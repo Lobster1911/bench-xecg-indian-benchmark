@@ -30,7 +30,7 @@ If you need to use layerwise decay:
 - Implement the functions `get_layers`, this allow to use layerwise decay
 - Implement `additional_params`, again for layerwise decay define all the parameters that are not in the layer list, they will have the smallest learning rate.
 
-Once your model is adapted for the pipeline, create all the configuration files for all the task (see next section)
+Once your model is adapted for the pipeline, create all the configuration files for all the task (see next section). 
 
 ### Task specific documentation
 
