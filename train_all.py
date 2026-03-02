@@ -1,7 +1,7 @@
 import torch
 import yaml
 
-from config import parse_config
+from bench_xecg.config import parse_config
 from run_scripts.train_ptb_xl import train as train_ptb_xl
 from run_scripts.train_cpsc2018 import train as train_cpsc2018
 from run_scripts.train_survival import train as train_survival
@@ -11,7 +11,6 @@ from run_scripts.train_lab_mimic import train as train_lab_mimic
 from run_scripts.train_mit_bih import train as train_mit_bih
 from run_scripts.train_r_peak_intense import train as train_r_peak_intense
 from run_scripts.train_ppg_af import train as train_ppg_af
-
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')
@@ -27,7 +26,6 @@ if __name__ == '__main__':
     # read all config files task config list
     with open(args.config_file, 'r') as f:
         config = yaml.safe_load(f)
-
 
     # ----------- (1) train ptb-xl  -----------
     ptb_xl_config = parse_config(config['ptb_xl'], 'config_defaults/train_ptb_xl_defaults.yaml')
