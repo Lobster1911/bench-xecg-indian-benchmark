@@ -19,6 +19,6 @@ cls_normalization: null  # 'batch', 'layer', 'instance'
 normalize: true
 
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
-labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+
 data_folder_code15: /scratch/datasets/CODE15/processed/
 labels_file_code15: /scratch/datasets/CODE15/processed/exams_filtered.csv

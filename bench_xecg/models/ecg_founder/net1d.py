@@ -360,7 +360,6 @@ class Net1D(BaseModel):
         
     def forward(self, x):
         x = x.transpose(1, 2)
-        # print(f'Input feature shape: {x.shape}')
         out = x
         
         # first conv
@@ -377,8 +376,6 @@ class Net1D(BaseModel):
         if self.feature_classification:
             return self.head(out)
         
-        print(out.shape)
-
         deep_features = out.mean(-1)
         out = self.head(deep_features)
 

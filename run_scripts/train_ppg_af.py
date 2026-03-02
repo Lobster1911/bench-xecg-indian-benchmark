@@ -1,22 +1,19 @@
-import os
+import argparse
+
 from torch import utils
 import lightning as L
 import torch
 import numpy as np
-import argparse
-import os
-
-from dataset.deepbeat import DeepBeatDataset
-from trainers.deepbeat_trainer import TrainingDeepBeat
-
-import utils.utils as utils
-from torch.utils.data import DataLoader, Subset
-from dataset.generic_utils import get_transforms
 from torch.utils.data import WeightedRandomSampler
-from config import parse_config
+from torch.utils.data import DataLoader, Subset
+
+from bench_xecg.dataset.deepbeat import DeepBeatDataset
+from bench_xecg.trainers.deepbeat_trainer import TrainingDeepBeat
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
+from bench_xecg.config import parse_config
 
 
-import argparse
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_ppg_run_config.yaml', help='Path to the config file')
 

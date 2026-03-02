@@ -1,6 +1,6 @@
 # training loop hyp
 wandb_log: true
-wandb_group: lol # best_ecgcpc_ft
+wandb_group: best_ecgcpc_ft
 epochs: 30
 wd: 0.001
 batch_size: 256
@@ -16,9 +16,9 @@ deterministic: false
 use_ecg_cpc: true
 split_signal: false
 
+precision: '32'
 
-# data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
-# labels_file_ptbxl:
+data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
 
 training_pct: 1.
 normalize: false

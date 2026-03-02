@@ -1,17 +1,16 @@
+import argparse
+
 from torch import utils
 import lightning as L
-
-import dataset.mimic_iv as mimic
-
-import torch
-import argparse
-import utils.utils as utils
 from torch.utils.data import DataLoader
-from dataset.generic_utils import get_transforms, make_collate_fn_task
-from trainers.mimic_lab_trainer import TrainingMIMIC_LAB
-from config import parse_config
+import torch
 
-import argparse
+import bench_xecg.dataset.mimic_iv as mimic
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms, make_collate_fn_task
+from bench_xecg.trainers.mimic_lab_trainer import TrainingMIMIC_LAB
+from bench_xecg.config import parse_config
+
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_lab_run_config.yaml', help='Path to the config file')
 

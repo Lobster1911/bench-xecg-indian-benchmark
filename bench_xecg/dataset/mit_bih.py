@@ -9,7 +9,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 
-from dataset.generic_utils import RandomSwitchBaselineWanderBatched
+from .generic_utils import RandomSwitchBaselineWanderBatched
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 conversion = {

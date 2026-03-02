@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import pandas as pd
 
-from dataset.pretraining_dataset import PretrainDataset
+from .pretraining_dataset import PretrainDataset
 
 leads = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 

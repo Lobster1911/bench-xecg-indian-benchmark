@@ -19,7 +19,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             for _, num_classes in self.label_list.items()
         ]
         self.train_aurocs = [
-            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', ignore_index=-1).to(self.device)
             for _, num_classes in self.label_list.items()
         ]
         self.train_f1s = [
@@ -32,7 +32,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             for _, num_classes in self.label_list.items()
         ]
         self.val_aurocs = [
-            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', ignore_index=-1).to(self.device)
             for _, num_classes in self.label_list.items()
         ]
         
@@ -46,7 +46,7 @@ class TrainingMIMIC_LAB(CommonTrainerDownstream):
             for _, num_classes in self.label_list.items()
         ]
         self.test_aurocs = [
-            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', top_k=1, ignore_index=-1).to(self.device)
+            torchmetrics.AUROC(num_classes=num_classes, average='macro', task='multiclass', ignore_index=-1).to(self.device)
             for _, num_classes in self.label_list.items()
         ]
         self.test_f1s = [

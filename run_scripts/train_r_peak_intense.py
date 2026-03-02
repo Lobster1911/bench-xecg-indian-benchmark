@@ -1,18 +1,16 @@
-import os
+import argparse
+
 from torch import utils
 import lightning as pl
 import torch
-import argparse
-import os
-
-from trainers.r_peaks_trainer import TrainingRPeak
-import dataset.intense_exercise as intense_exercise
-import utils.utils as utils
 from torch.utils.data import DataLoader
-from dataset.generic_utils import get_transforms
-from config import parse_config, set_num_classes_r_peaks
 
-import argparse
+from bench_xecg.trainers.r_peaks_trainer import TrainingRPeak
+import bench_xecg.dataset.intense_exercise as intense_exercise
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
+from bench_xecg.config import parse_config, set_num_classes_r_peaks
+
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_high_intensity_run_config.yaml', help='Path to the config file')
 

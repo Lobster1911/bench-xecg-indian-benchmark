@@ -18,7 +18,6 @@ cls_normalization: 'batch'
 use_ecg_cpc: true
 
 data_folder_cpsc2018: /home/datasets/CPSC2018/
-labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
 
 training_pct: 1.
 normalize: false

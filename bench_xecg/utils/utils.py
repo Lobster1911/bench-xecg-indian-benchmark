@@ -31,7 +31,7 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False):
         nn.Module: The base model.
     """
     if config.use_st_mem:
-        base_model = encoder.__dict__['st_mem_vit_base'](
+        base_model = getattr(encoder, 'st_mem_vit_base')(
             seq_len=2250, 
             patch_size=75, 
             num_leads=12, 

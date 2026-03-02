@@ -1,18 +1,17 @@
+import argparse
+
 from torch import utils
 import lightning as L
 import torch
-
-import dataset.cpsc2018 as cpsc2018
-
-from trainers.cpsc_2018_trainer import TrainingCPSC_2018
-import utils.utils as utils
-from utils.utils import get_training_class_weights_multilabel
 from torch.utils.data import DataLoader
-from dataset.generic_utils import get_transforms
-from config import parse_config
 
+import bench_xecg.dataset.cpsc2018 as cpsc2018
+from bench_xecg.trainers.cpsc_2018_trainer import TrainingCPSC_2018
+import bench_xecg.utils.utils as utils
+from bench_xecg.utils.utils import get_training_class_weights_multilabel
+from bench_xecg.dataset.generic_utils import get_transforms
+from bench_xecg.config import parse_config
 
-import argparse
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_cpsc2018_run_config.yaml', help='Path to the config file')
 
@@ -49,7 +48,6 @@ def train(config, run=None, wandb=False):
 
     trainer.fit(model=model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
     trainer.test(model=model, dataloaders=test_dataloader, ckpt_path='best')
-
 
 
 # if main

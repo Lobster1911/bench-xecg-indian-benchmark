@@ -17,7 +17,7 @@ class PretrainDataset(torch.utils.data.Dataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):
         self.leads = config.leads if not config.use_ecg_jepa else jepa_leads
         self.leads = [l.lower() for l in self.leads] # ensure leads are lowercase
-        print('using leads :', self.leads)
+        print('Using leads :', self.leads)
         self.patch_size = config.patch_size
         self.split = split
         self.global_augmentations = global_augmentations

@@ -9,6 +9,7 @@ lr_head: 0.1
 lr_core: 0.1
 discriminative_lr_factor: 0.1
 precision: '32'
+compile_model: false
 split_signal: false
 
 linear_probing: true

@@ -28,9 +28,9 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.valid_f1 = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes, average='macro', ignore_index=-1, top_k=1)
         self.test_f1 = torchmetrics.F1Score(task='multiclass', num_classes=self.num_classes, average=None, ignore_index=-1, top_k=1)
 
-        self.train_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
-        self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
-        self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, compute_on_step=False, ignore_index=-1, task='multiclass')
+        self.train_auroc = torchmetrics.AUROC(num_classes=self.num_classes, ignore_index=-1, task='multiclass')
+        self.valid_auroc = torchmetrics.AUROC(num_classes=self.num_classes, ignore_index=-1, task='multiclass')
+        self.test_auroc = torchmetrics.AUROC(num_classes=self.num_classes, ignore_index=-1, task='multiclass')
 
         self.single_hb = config.single_hb
 
@@ -62,7 +62,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.train_f1(preds.flatten(), targets.flatten())
         self.log('train_f1', self.train_f1, prog_bar=True)
 
-        self.train_auroc(logits, targets)
+        self.train_auroc(logits, targets.long())
         self.log("train_auroc", self.train_auroc)
 
         return loss_cls 
@@ -90,7 +90,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.log_perclass_metric(ppv, 'ppv', step='val')
 
         # auroc
-        self.valid_auroc(logits, targets)
+        self.valid_auroc(logits, targets.long())
         self.log('val_auroc', self.valid_auroc, prog_bar=True)
 
         return loss_cls
@@ -118,7 +118,7 @@ class TrainingMIT_BIH(CommonTrainerDownstream):
         self.log_perclass_metric(ppv, 'ppv', step='test')
 
         # auroc  
-        self.test_auroc(logits, targets)
+        self.test_auroc(logits, targets.long())
         self.log("test_auroc", self.test_auroc)
 
         return loss_cls 

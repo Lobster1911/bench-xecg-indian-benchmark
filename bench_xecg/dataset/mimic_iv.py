@@ -124,6 +124,9 @@ class ECGMIMICDataset(PretrainDataset):
         dat["timey"] = dat['dod'].dt.date - dat["ecg_time"].dt.date
         dat['timey'] = dat['timey'].fillna(dat["max_disch_time"].dt.date - dat["ecg_time"].dt.date + timedelta(days=365))
         dat['timey'] = dat['timey'].fillna(dat["max_ecg_time"].dt.date - dat["ecg_time"].dt.date)
+        
+        # ensure timey is time delta and convert to years
+        dat['timey'] = pd.to_timedelta(dat['timey'])
         dat['timey'] = dat['timey'].dt.days / 365
 
         # fix file name to align with previous implementation

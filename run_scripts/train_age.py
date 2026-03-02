@@ -1,17 +1,18 @@
 from torch import utils
 import lightning as L
 import torch
-
-import dataset.code_dataset as code
-import dataset.ptb_xl as ptbxl
-import dataset.mimic_iv as mimic_iv
-import dataset.cpsc2018 as cpsc2018
-
-import utils.utils as utils
 from torch.utils.data import DataLoader
-from dataset.generic_utils import get_transforms, make_collate_fn_task
-from trainers.regression_trainer import RegressionTrainer
-from config import parse_config
+
+
+import bench_xecg.dataset.code_dataset as code
+import bench_xecg.dataset.ptb_xl as ptbxl
+import bench_xecg.dataset.mimic_iv as mimic_iv
+import bench_xecg.dataset.cpsc2018 as cpsc2018
+
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms, make_collate_fn_task
+from bench_xecg.trainers.regression_trainer import RegressionTrainer
+from bench_xecg.config import parse_config
 
 import argparse
 parser = argparse.ArgumentParser(description='Train a model')

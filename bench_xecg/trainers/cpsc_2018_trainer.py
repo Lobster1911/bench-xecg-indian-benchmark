@@ -43,13 +43,13 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.train_f1(preds, targets)
         self.log('train_f1', self.train_f1, prog_bar=True)
 
-        self.train_auroc(logits, targets)
+        self.train_auroc(logits, targets.long())
         self.log("train_auroc", self.train_auroc)
 
-        self.train_auprc(logits, targets)
+        self.train_auprc(logits, targets.long())
         self.log("train_auprc", self.train_auprc, prog_bar=True)
 
-        auroc_scores = self.train_auroc_per_class(logits, targets)
+        auroc_scores = self.train_auroc_per_class(logits, targets.long())
         self.log_dict({f"AUC/train_class_{i}": score for i, score in enumerate(auroc_scores)})
 
         return loss
@@ -64,13 +64,13 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.valid_f1(preds, targets)
         self.log('val_f1', self.valid_f1, prog_bar=True)
 
-        self.valid_auroc(logits, targets)
+        self.valid_auroc(logits, targets.long())
         self.log('val_auroc', self.valid_auroc, prog_bar=True)
 
-        self.valid_auprc(logits, targets)
+        self.valid_auprc(logits, targets.long())
         self.log('val_auprc', self.valid_auprc, prog_bar=True)
 
-        auroc_scores = self.valid_auroc_per_class(logits, targets)
+        auroc_scores = self.valid_auroc_per_class(logits, targets.long())
         self.log_dict({f"AUC/val_class_{i}": score for i, score in enumerate(auroc_scores)})
 
         return loss
@@ -85,13 +85,13 @@ class TrainingCPSC_2018(CommonTrainerDownstream):
         self.test_f1(preds, targets)
         self.log("test_f1", self.test_f1)
 
-        self.test_auroc(logits, targets)
+        self.test_auroc(logits, targets.long())
         self.log("test_auroc", self.test_auroc)
 
-        self.test_auprc(logits, targets)
+        self.test_auprc(logits, targets.long())
         self.log("test_auprc", self.test_auprc)
 
-        auroc_scores = self.test_auroc_per_class(logits, targets)
+        auroc_scores = self.test_auroc_per_class(logits, targets.long())
         self.log_dict({f"AUC/test_class_{i}": score for i, score in enumerate(auroc_scores)})
 
         return loss

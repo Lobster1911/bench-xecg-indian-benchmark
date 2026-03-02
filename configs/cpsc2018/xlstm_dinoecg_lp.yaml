@@ -21,7 +21,7 @@ cls_normalization: null  # 'batch', 'layer', 'instance'
 cls_type: max
 
 data_folder_cpsc2018: /home/datasets/CPSC2018/
-labels_file_cpsc2018: /home/datasets/CPSC2018/exams_filtered.csv
+
 
 max_length_signal: 5000
 

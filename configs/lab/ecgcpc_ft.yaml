@@ -16,4 +16,4 @@ cls_normalization: null
 use_ecg_cpc: true
 
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
-labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+

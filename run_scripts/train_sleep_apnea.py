@@ -1,15 +1,14 @@
 import lightning as L
 import torch
 import argparse
-import utils.utils as utils
 from torch.utils.data import DataLoader
 
-from utils.utils import get_training_class_weights
-from dataset.generic_utils import get_transforms
-from trainers.sleep_apnea_trainer import TrainingSleepApnea
-from config import parse_config
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
+from bench_xecg.trainers.sleep_apnea_trainer import TrainingSleepApnea
+from bench_xecg.config import parse_config
 
-import dataset.sleep_apnea as sleep_apnea
+import bench_xecg.dataset.sleep_apnea as sleep_apnea
 
 def check_window_size(config):
     assert config.window_size > 0, "Window size must be greater than 0"
@@ -37,7 +36,7 @@ def train(config, run=None, wandb=False):
     print(f"Val dataset size: {len(val_dataset)}")
 
     if config.use_class_weights:
-        weights = get_training_class_weights(train_dataset, label_key='annotation').to('cuda')
+        weights = utils.get_training_class_weights(train_dataset, label_key='annotation').to('cuda')
         print(f"Using class weights: {weights}")
     else:
         weights = None

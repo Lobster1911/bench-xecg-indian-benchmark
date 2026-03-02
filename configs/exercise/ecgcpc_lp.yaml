@@ -17,7 +17,7 @@ deterministic: false
 use_ecg_cpc: true
 use_class_weights: true
 
-max_length_signal: 1200
+max_length_signal: 2400
 
 data_folder_high_intensity: /home/datasets/ECG_high_intensity_exercise
 r_peaks_detection: true

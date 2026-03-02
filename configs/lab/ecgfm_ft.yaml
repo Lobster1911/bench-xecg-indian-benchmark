@@ -14,6 +14,6 @@ linear_probing: false
 deterministic: false
 
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
-labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+
 
 training_pct: 1.

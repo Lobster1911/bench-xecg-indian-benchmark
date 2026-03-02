@@ -80,7 +80,7 @@ data_folder_mit: /media/Volume/data/MIT-BHI/data/
 data_folder_code15: /scratch/datasets/CODE15/processed/
 labels_file_code15: /scratch/datasets/CODE15/processed/exams_filtered.csv
 data_folder_mimic: /scratch/datasets/mimic-iv-ecg/raw/
-labels_file_mimic: /scratch/datasets/mimic-iv-ecg/raw/exams_filtered.csv
+
 data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
 
 data_folder_chapman: /home/datasets/ChapmanNingbo/1.0.0/

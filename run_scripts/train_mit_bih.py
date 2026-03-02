@@ -1,19 +1,18 @@
+import argparse
+
 from torch import utils
 import lightning as pl
 import torch
-import argparse
 from torch.utils.data import DataLoader
 
-import utils.utils as utils
-from dataset.generic_utils import get_transforms
-import dataset.mit_bih as mit_bih
-from trainers.mit_bih_trainer import TrainingMIT_BIH
-from trainers.r_peaks_trainer import TrainingRPeak
-from utils.utils import get_training_class_weights
-from config import parse_config, set_num_classes_r_peaks
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
+import bench_xecg.dataset.mit_bih as mit_bih
+from bench_xecg.trainers.mit_bih_trainer import TrainingMIT_BIH
+from bench_xecg.trainers.r_peaks_trainer import TrainingRPeak
+from bench_xecg.utils.utils import get_training_class_weights
+from bench_xecg.config import parse_config, set_num_classes_r_peaks
 
-
-import argparse
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_mit_bih_run_config.yaml', help='Path to the config file')
 

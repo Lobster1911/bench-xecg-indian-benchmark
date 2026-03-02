@@ -44,12 +44,12 @@ class TrainingDeepBeat(CommonTrainerDownstream):
         # auroc
         # self.train_auroc = self.train_auroc.cpu()
         self.train_auroc = self.train_auroc.to(logits.device)
-        self.train_auroc(logits, targets)
+        self.train_auroc(logits, targets.long())
         self.log("train_auroc", self.train_auroc)
 
         # auprc
         self.train_auprc = self.train_auprc.to(logits.device)
-        self.train_auprc(logits, targets)
+        self.train_auprc(logits, targets.long())
         self.log("train_auprc", self.train_auprc, prog_bar=True)
 
         return loss
@@ -69,12 +69,12 @@ class TrainingDeepBeat(CommonTrainerDownstream):
 
         # auroc
         self.valid_auroc = self.valid_auroc.to(logits.device)
-        self.valid_auroc(logits, targets)
+        self.valid_auroc(logits, targets.long())
         self.log('val_auroc', self.valid_auroc, prog_bar=True)
 
         # auprc
         self.valid_auprc = self.valid_auprc.to(logits.device)
-        self.valid_auprc(logits, targets)
+        self.valid_auprc(logits, targets.long())
         self.log('val_auprc', self.valid_auprc, prog_bar=True)
 
         return loss
@@ -94,12 +94,12 @@ class TrainingDeepBeat(CommonTrainerDownstream):
 
         # auroc  
         self.test_auroc = self.test_auroc.to(logits.device)
-        self.test_auroc(logits, targets)
+        self.test_auroc(logits, targets.long())
         self.log("test_auroc", self.test_auroc)
 
         # auprc
         self.test_auprc = self.test_auprc.to(logits.device)
-        self.test_auprc(logits, targets)
+        self.test_auprc(logits, targets.long())
         self.log("test_auprc", self.test_auprc)
 
 

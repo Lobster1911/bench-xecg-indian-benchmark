@@ -1,21 +1,21 @@
+import argparse
+
 from torch import utils
 import lightning as L
 import torch
-import argparse
-
-import dataset.mimic_iv as mimic
-import dataset.code_dataset as code
-import dataset.heedb as heedb
-import dataset.generic_utils as generic_utils
-
-import utils.utils as utils
 from torch.utils.data import DataLoader, ConcatDataset
-from dataset.generic_utils import get_transforms
-from trainers.survival_trainer import TrainerSurvival
-from config import parse_config
 
 
-import argparse
+import bench_xecg.dataset.mimic_iv as mimic
+import bench_xecg.dataset.code_dataset as code
+import bench_xecg.dataset.heedb as heedb
+import bench_xecg.dataset.generic_utils as generic_utils
+
+import bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
+from bench_xecg.trainers.survival_trainer import TrainerSurvival
+from bench_xecg.config import parse_config
+
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_mortality_run_config.yaml', help='Path to the config file')
 

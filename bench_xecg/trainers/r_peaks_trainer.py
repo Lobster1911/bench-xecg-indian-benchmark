@@ -64,20 +64,12 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.plot_predictions = config.plot_predictions
 
     def training_step(self, batch, _):
-        loss_r_peak_pos, r_peak_pos, r_peaks, r_peaks_orig = self.predict_batch(batch)
+        loss_r_peak_pos, r_peak_pos, r_peaks, _ = self.predict_batch(batch)
 
-        self.train_rec = self.train_rec.to(r_peak_pos.device)
         self.train_rec(r_peak_pos, r_peaks)
-
-        self.train_f1 = self.train_f1.to(r_peak_pos.device)
         self.train_f1(r_peak_pos, r_peaks)
-
-        self.train_acc = self.train_acc.to(r_peak_pos.device)
         self.train_acc(r_peak_pos, r_peaks)
-
-        self.train_auprc = self.train_auprc.to(r_peak_pos.device)
-        self.train_auprc(r_peak_pos, r_peaks)
-
+        self.train_auprc(r_peak_pos, r_peaks.long())
 
         self.log('train_loss', loss_r_peak_pos.detach().item(), prog_bar=True)
         self.log('train_rec', self.train_rec, prog_bar=True)
@@ -93,7 +85,7 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.valid_rec(r_peak_pos, r_peaks)
         self.valid_f1(r_peak_pos, r_peaks)
         self.valid_acc(r_peak_pos, r_peaks)
-        self.valid_auprc(r_peak_pos, r_peaks)
+        self.valid_auprc(r_peak_pos, r_peaks.long())
         self.val_distance_150.update(r_peak_pos, r_peaks_orig)
         self.val_distance_20.update(r_peak_pos, r_peaks_orig)
 
@@ -140,7 +132,7 @@ class TrainingRPeak(CommonTrainerDownstream):
         self.test_acc(r_peak_pos, r_peaks)
 
         self.test_auprc = self.test_auprc.to(r_peak_pos.device)
-        self.test_auprc(r_peak_pos, r_peaks)
+        self.test_auprc(r_peak_pos, r_peaks.long())
 
         self.test_distance_150 = self.test_distance_150.to(r_peak_pos.device)
         self.test_distance_150.update(r_peak_pos, r_peaks_orig)
