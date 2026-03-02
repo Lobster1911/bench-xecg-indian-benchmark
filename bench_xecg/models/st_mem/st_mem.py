@@ -9,8 +9,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-from models.st_mem.encoder.st_mem_vit import ST_MEM_ViT, TransformerBlock
-
+from .encoder.st_mem_vit import ST_MEM_ViT, TransformerBlock
 
 __all__ = ['ST_MEM', 'st_mem_vit_small_dec256d4b', 'st_mem_vit_base_dec256d4b']
 

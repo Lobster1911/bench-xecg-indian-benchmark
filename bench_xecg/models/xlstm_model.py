@@ -1,10 +1,11 @@
+import copy
+
 import torch
 from torch import nn
 
-from models.utils import get_normalization_layer, get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head,  get_transformer
-import copy
-from models.pooling import AttentionPooling, LinearAttentionPooling
-from models.base_model import BaseModel
+from .pooling import AttentionPooling, LinearAttentionPooling
+from .base_model import BaseModel
+from .utils import get_normalization_layer, get_xlstm, get_large_xlstm, get_patch_embedding, get_reconstruction_head,  get_transformer
 
 class pretrainedxLSTM(BaseModel):
     def __init__(

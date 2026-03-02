@@ -1,10 +1,8 @@
-from torch import optim, nn
+from torch import optim
 import lightning as pl
-import torchmetrics
 import numpy as np
-import torch
+
 from bench_xecg.schedulers import get_cosine_schedule_with_warmup
-from utils.loss_utils import focal_loss
 
 
 class CommonTrainerDownstream(pl.LightningModule):

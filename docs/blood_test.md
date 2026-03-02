@@ -12,4 +12,4 @@ From [MIMIC-IV](https://physionet.org/content/mimiciv/3.1/) download the `labeve
 
 ## Run the experiment
 
-Run the experiment with `python3 train_lab_mimic.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_lab_mimic.py --config_file <path_to_your_config>`

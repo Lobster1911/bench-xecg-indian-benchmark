@@ -1,24 +1,17 @@
 import lightning as L
-from utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, masked_cosine_loss, SimDINOv2Loss
-from lejepa.epps_pulley import EppsPulley, SIGReg
-# from lejepa.slicing import SlicingUnivariateTest, 
-from torch.nn import functional as F
-from utils.plot_utils import plot_reconstruction, plot_generation, plot_local_views, plot_latent_space
 import numpy as np
 import torch
 import lightning
-import trainers.common as common
-from threadpoolctl import threadpool_limits
+
 from sklearn.metrics import f1_score
-import matplotlib.pyplot as plt
-import seaborn as sns
-import io
-from PIL import Image
-
-
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import Perceptron, LogisticRegression
+
+from .common import configure_optimizer_teacher_student, configure_optimizers
+from ..utils.loss_utils import masked_mse_loss, masked_mae_loss, gradient_loss, masked_min_max_loss, masked_cosine_loss, SimDINOv2Loss
+from ..utils.lejepa.epps_pulley import SIGReg
+from ..utils.plot_utils import plot_reconstruction, plot_local_views, plot_latent_space
+
 
 # define the LightningModule
 class PretrainedNetwork(L.LightningModule):
@@ -620,6 +613,6 @@ class PretrainedNetwork(L.LightningModule):
 
     def configure_optimizers(self):
         if self.automatic_optimization == False:
-            return common.configure_optimizer_teacher_student(self)
+            return configure_optimizer_teacher_student(self)
         else:
-            return common.configure_optimizers(self)
+            return configure_optimizers(self)

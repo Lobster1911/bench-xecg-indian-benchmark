@@ -9,8 +9,8 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 
-from models.st_mem.encoder.vit import TransformerBlock
-from models.base_model import BaseModel
+from ..encoder.vit import TransformerBlock
+from ...base_model import BaseModel
 
 
 __all__ = ['ST_MEM_ViT', 'st_mem_vit_small', 'st_mem_vit_base']

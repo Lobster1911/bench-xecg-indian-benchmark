@@ -23,7 +23,7 @@ cls_normalization: 'batch'  # 'batch', 'layer', 'instance'
 cls_type: avg
 
 data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
-labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
+
 
 random_paper_layout: 0.9
 random_paper_6x2_prob: 0.8

@@ -1,20 +1,18 @@
+import argparse
+
 import lightning as L
 import torch
-import argparse
-
 from torch.utils.data import DataLoader
-from dataset.generic_utils import get_transforms
 from torch import utils
-from config import parse_config
 
 
-import dataset.ptb_xl as ptbxl
-from trainers.ptb_xl_trainer import TrainingPTB_XL
-from utils.utils import get_training_class_weights_multilabel
-import utils.utils as utils
+from  bench_xecg.config import parse_config
+import  bench_xecg.dataset.ptb_xl as ptbxl
+from  bench_xecg.trainers.ptb_xl_trainer import TrainingPTB_XL
+from  bench_xecg.utils.utils import get_training_class_weights_multilabel
+import  bench_xecg.utils.utils as utils
+from bench_xecg.dataset.generic_utils import get_transforms
 
-
-import argparse
 parser = argparse.ArgumentParser(description='Train a model')
 parser.add_argument('--config_file', type=str, default='configs/train_ptb_xl_run_config.yaml', help='Path to the config file')
 
@@ -31,12 +29,9 @@ def train(config, run=None, wandb=False):
         train_dataset = utils.split_dataset_preserve_labels(train_dataset, split_ratio=config.training_pct)
 
     if config.use_class_weights and config.num_classes == 5:
-        # weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
-        # hardcode for faster initialization
-        weights = torch.tensor([0.8323, 0.4587, 0.7954, 1.6445, 0.8915]).to('cuda')
+        weights = get_training_class_weights_multilabel(train_dataset, label_key='class_label').to('cuda')
     else:
         weights = None
-
 
     train_dataloader = DataLoader(train_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='train'), pin_memory=True, drop_last=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=ptbxl.make_collate_fn(config, downstream=True, split='val'), pin_memory=True, drop_last=False)

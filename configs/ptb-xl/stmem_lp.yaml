@@ -16,6 +16,6 @@ use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
 
 data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
-labels_file_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/exams_filtered.csv
+
 
 training_pct: 1.

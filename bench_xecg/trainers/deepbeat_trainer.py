@@ -1,15 +1,9 @@
-from torch import optim, nn
-import lightning as pl
+from torch import nn
 import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
-import numpy as np
 import torch
-import trainers.common as common
-from trainers.common_trainer import CommonTrainerDownstream
-from utils.loss_utils import focal_loss
+
+from .common_trainer import CommonTrainerDownstream
+from ..utils.loss_utils import focal_loss
 
 
 class TrainingDeepBeat(CommonTrainerDownstream):

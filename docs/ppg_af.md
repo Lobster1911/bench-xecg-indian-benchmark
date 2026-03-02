@@ -15,4 +15,4 @@ Because the training set of this dataset comes in a pre-augmented version making
 
 ## Run the experiment
 
-Run the experiment with `python3 train_deepbeat.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_deepbeat.py --config_file <path_to_your_config>`

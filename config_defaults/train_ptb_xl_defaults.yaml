@@ -63,7 +63,7 @@ random_paper_layout: 0.
 # dataset
 leads: ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
 max_length_signal: 5000
-data_folder_ptbxl: /media/Volume/data/PTB-XL/
+data_folder_ptbxl: /media/Volume/data/PTB-XL/records500/
 checkpoint: null
 classification_task: 'diagnosis_superclass'
 num_classes: 5

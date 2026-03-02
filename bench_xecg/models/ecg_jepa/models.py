@@ -1,7 +1,7 @@
 # Code obtained from <https://github.com/sehunfromdaegu/ECG_JEPA>
 
 import torch
-from models.ecg_jepa.ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier, ECGJepaSleepApnea
+from .ecg_jepa import ecg_jepa, ECGJepaClassifier, ECGJepaFeatureClassifier, ECGJepaSleepApnea
 
 def load_encoder(ckpt_dir, config, feature_classification=False, sleep_apnea=False):
 

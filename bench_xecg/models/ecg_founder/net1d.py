@@ -7,16 +7,10 @@ a modularized deep neural network for 1-d signal data, pytorch version
 Shenda Hong, Mar 2020
 """
 
-import numpy as np
-from collections import Counter
-from matplotlib import pyplot as plt
-
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import Dataset
-from models.base_model import BaseModel
+from ..base_model import BaseModel
 
 class MyConv1dPadSame(nn.Module):
     """

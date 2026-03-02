@@ -13,4 +13,4 @@ This is a standard 10 second 12 leads dataset and thus it do not require any spe
 
 ## Run the experiment
 
-Run the experiment with `python3 train_ptb_xl.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_ptb_xl.py --config_file <path_to_your_config>`

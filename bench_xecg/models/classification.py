@@ -1,7 +1,8 @@
-from models.xLSTM import pretrainedxLSTM
 import torch
 import torch.nn as nn
-from models.utils import get_normalization_layer
+
+from .xlstm_model import pretrainedxLSTM
+from .utils import get_normalization_layer
 
 class xLSTMClassification(pretrainedxLSTM):
     def __init__(

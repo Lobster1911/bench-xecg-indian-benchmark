@@ -1,15 +1,12 @@
 
-
-from itertools import chain
+import yaml
 
 import torch
-import yaml
-import numpy as np
-from models.base_model import BaseModel
 
-from models.cpc.ts.s4_modules.s4_model import S4Model
-from models.cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
-from models.utils import get_normalization_layer
+from ..base_model import BaseModel
+from .ts.s4_modules.s4_model import S4Model
+from .ts.encoder import RNNEncoder, RNNEncoderConfig
+from ..utils import get_normalization_layer
 
 class CPCWrapper(BaseModel):
     def __init__(self, config, config_path=None, chunk_size=600,  feature_classification=False, sleep_apnea=False):

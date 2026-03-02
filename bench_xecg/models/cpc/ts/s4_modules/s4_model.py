@@ -3,8 +3,8 @@ __all__ = ['S4Model']
 
 import torch.nn as nn
 
-from models.cpc.ts.s4_modules.s42 import S4 as S42
-from models.cpc.ts.s4_modules.s4_utils import DropoutNd
+from .s42 import S4 as S42
+from .s4_utils import DropoutNd
 
 
 class S4Model(nn.Module):

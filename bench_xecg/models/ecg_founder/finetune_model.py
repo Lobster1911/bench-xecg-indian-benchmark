@@ -1,15 +1,8 @@
 # Code obtained from <https://github.com/PKUDigitalHealth/ECGFounder>
-
-import numpy as np
-import pandas as pd
-import torch.nn as nn
-import torch.nn.functional as F
-import json
-from models.ecg_founder.net1d import Net1D
-
 import torch.nn as nn
 import torch
 
+from .net1d import Net1D
 
 def ft_12lead_ECGFounder(device, pth, n_classes, linear_prob=False, feature_classification=False):
     model = Net1D(

@@ -20,4 +20,4 @@ This variable sets the second of context each sample is given. Half of the conte
 
 ## Run the experiment
 
-Run the experiment with `python3 train_sleep_apnea.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_sleep_apnea.py --config_file <path_to_your_config>`

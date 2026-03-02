@@ -16,4 +16,4 @@ From [MIMIC-IV](https://physionet.org/content/mimiciv/3.1/) download the `patien
 
 ## Run the experiment
 
-Run the experiment with `python3 train_mortality.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_mortality.py --config_file <path_to_your_config>`

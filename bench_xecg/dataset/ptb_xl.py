@@ -2,11 +2,10 @@ import os
 
 import torch
 import pandas as pd
-import wfdb
 import ast
 
-from dataset.pretraining_dataset import PretrainDataset
-from dataset.generic_utils import pad
+from .pretraining_dataset import PretrainDataset
+from .generic_utils import pad
 
 class ECGPTBXLDataset(PretrainDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):

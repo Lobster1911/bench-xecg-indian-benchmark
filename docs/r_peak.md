@@ -30,4 +30,4 @@ If you want to see the prediction of the model on a signal set `plot_predictions
 
 ## Run the experiment
 
-Run the experiment with `python3 train_mit_bih.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_mit_bih.py --config_file <path_to_your_config>`

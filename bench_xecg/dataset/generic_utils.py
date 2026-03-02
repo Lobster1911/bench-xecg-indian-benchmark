@@ -3,7 +3,7 @@ from joblib import Parallel, delayed
 
 import torch
 from torchvision import transforms
-from bench_ecg.augmentations import *
+from ..augmentations import *
 
 def get_transforms(config, split='train', type=None):
     """

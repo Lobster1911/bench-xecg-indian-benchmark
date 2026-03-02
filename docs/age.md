@@ -25,4 +25,4 @@ An alternative is to get the demographic information from [MIMIC-IV](https://phy
 
 ## Run the experiment
 
-Run the experiment with `python3 train_age.py --config_file <path_to_your_config>`
+Run the experiment with `uv run run_scripts/train_age.py --config_file <path_to_your_config>`

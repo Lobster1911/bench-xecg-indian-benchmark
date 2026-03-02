@@ -1,13 +1,10 @@
-import torch
-import numpy as np
-import random
 from torch import nn
 from xlstm import FeedForwardConfig, mLSTMLayerConfig, mLSTMBlockConfig, sLSTMLayerConfig, sLSTMBlockConfig, xLSTMBlockStackConfig, xLSTMBlockStack
 from xlstm.xlstm_large import xLSTMLargeConfig
 from xlstm.xlstm_large.model import xLSTMLargeBlockStack
-from models.modules import *
-import os
-from transformer import encoder
+
+from .modules import *
+import bench_xecg.models.transformer.encoder as encoder
 
 class Permute(nn.Module):
     def __init__(self, *dims):

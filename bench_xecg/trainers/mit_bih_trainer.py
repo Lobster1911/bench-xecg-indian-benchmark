@@ -1,16 +1,14 @@
-from torch import optim, nn
+import os
+
+from torch import nn
 import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
 import numpy as np
 import torch
-import trainers.common as common
-from trainers.common_trainer import CommonTrainerDownstream
-import os
 import matplotlib.pyplot as plt
 import lightning.pytorch as pl
+
+from .common_trainer import CommonTrainerDownstream
+
 
 class TrainingMIT_BIH(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):

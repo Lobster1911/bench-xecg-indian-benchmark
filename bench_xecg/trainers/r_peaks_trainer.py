@@ -1,9 +1,9 @@
 import os
+from typing import Optional
+
 import torch
 import numpy as np
 from torch import nn
-from typing import Optional
-
 import torchmetrics
 import torchmetrics.classification
 import torchmetrics.classification.precision_recall
@@ -11,8 +11,7 @@ from torchmetrics import Metric
 import lightning.pytorch as pl
 import matplotlib.pyplot as plt
 
-from trainers.common_trainer import CommonTrainerDownstream
-
+from .common_trainer import CommonTrainerDownstream
 
 
 class TrainingRPeak(CommonTrainerDownstream):

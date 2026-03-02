@@ -1,13 +1,12 @@
 
 
-import dataclasses
 from dataclasses import dataclass, field
-from collections import namedtuple
 from typing import List
 
 import torch
 import numpy as np
-from models.cpc.ts.basic_conv1d_modules.basic_conv1d import _conv1d
+
+from .basic_conv1d_modules.basic_conv1d import _conv1d
 
 @dataclass
 class RNNEncoderConfig:

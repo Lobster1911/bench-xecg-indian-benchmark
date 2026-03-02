@@ -1,15 +1,13 @@
+from collections import defaultdict
+
 from torch import nn
 import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
 import torch
 from torchmetrics import Metric
 from sklearn.metrics import roc_auc_score, f1_score, accuracy_score
-from collections import defaultdict
 import numpy as np
 
-from trainers.common_trainer import CommonTrainerDownstream
-
+from .common_trainer import CommonTrainerDownstream
 
 class TrainingSleepApnea(CommonTrainerDownstream):
     def __init__(self, model, config,  len_train_dataset, weights=None):

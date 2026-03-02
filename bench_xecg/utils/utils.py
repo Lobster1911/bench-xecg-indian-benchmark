@@ -1,38 +1,22 @@
+import os
+from collections import Counter
+from joblib import Parallel, delayed
 
 import torch
 import numpy as np
-from collections import Counter
 from iterstrat.ml_stratifiers import MultilabelStratifiedShuffleSplit
 from torch.utils.data import Subset
 import numpy as np
-from models.classification import xLSTMClassification, xLSTMFeatureClassification, xLSTMSleepApnea
 from lightning.pytorch.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from lightning.pytorch.loggers import WandbLogger, CSVLogger
 import lightning as pl
-import os
 import torch.nn as nn
-from joblib import Parallel, delayed
 
-try:
-    from models.ecg_jepa.models import load_encoder
-except ImportError:
-    pass
-
-try:
-    import models.st_mem.encoder as encoder
-except ImportError:
-    pass
-
-try:
-    from models.ecg_founder.finetune_model import ft_1lead_ECGFounder, ft_12lead_ECGFounder
-except ImportError:
-    pass
-
-try:
-    from models.cpc.model import CPCWrapper
-except ImportError:
-    pass
-
+from bench_xecg.models.classification import xLSTMClassification, xLSTMFeatureClassification, xLSTMSleepApnea
+from ..models.ecg_jepa.models import load_encoder
+import bench_xecg.models.st_mem.encoder as encoder
+from ..models.ecg_founder.finetune_model import ft_1lead_ECGFounder, ft_12lead_ECGFounder
+from ..models.cpc.model import CPCWrapper
 
 
 def get_base_model(config, feature_classification=False, sleep_apnea=False):

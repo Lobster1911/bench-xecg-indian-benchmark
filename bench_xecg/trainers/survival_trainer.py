@@ -1,18 +1,10 @@
-from torch import optim, nn
-import lightning as L
-import torchmetrics
-import torchmetrics.classification
-import torchmetrics.classification.accuracy
-import torchmetrics.classification.precision_recall
-import torchmetrics.classification.specificity
+from torch import nn
 import numpy as np
 import torch
-import trainers.common as common
-from trainers.common_trainer import CommonTrainerDownstream
-from utils.loss_utils import focal_loss
 from lifelines.utils import concordance_index
 from torchmetrics import Metric
 
+from .common_trainer import CommonTrainerDownstream
 
 
 class TrainerSurvival(CommonTrainerDownstream):
