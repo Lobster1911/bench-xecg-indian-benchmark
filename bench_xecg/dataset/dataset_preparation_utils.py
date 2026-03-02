@@ -1,21 +1,18 @@
-import wfdb
-import neurokit2 as nk
-import numpy as np
 import os
-import shutil
+
+import wfdb
+import numpy as np
 import h5py
-import json
-import simple_icd_10
-import dataset.mit_bih as mit_bih
-import dataset.code_dataset as code
-import dataset.mimic_iv as mimic
-import dataset.ptb_xl as ptb_xl
-import dataset.chapman as chapman
-import dataset.incart as incart
-import dataset.heedb as heedb
+
 from torch.utils.data import Subset, ConcatDataset
-from dataset.generic_utils import get_transforms
-import torch
+
+from .generic_utils import get_transforms
+from .code_dataset import ECGCODE15Dataset, ECGCODEDataset
+from .ptb_xl import ECGPTBXLDataset
+from .mimic_iv import ECGMIMICDataset
+from .chapman import ECGChapmanDataset
+from .incart import ECGIncartDataset
+from .heedb import ECGHEEDBDataset
 
 def load_datasets(config):
 
@@ -24,7 +21,7 @@ def load_datasets(config):
 
     for dataset in config.pretrain_datasets:
         if dataset == 'heedb':
-            _heedb = heedb.ECGHEEDBDataset(
+            _heedb = ECGHEEDBDataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
@@ -35,20 +32,20 @@ def load_datasets(config):
             datasets_pretrain.append(train_heedb)
             val_datasets.append(val_heedb)
         elif dataset == 'mimic':
-            datasets_pretrain.append(mimic.ECGMIMICDataset(
+            datasets_pretrain.append(ECGMIMICDataset(
                 config, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
-            val_datasets.append(mimic.ECGMIMICDataset(
+            val_datasets.append(ECGMIMICDataset(
                 config, 
                 split='val', 
                 global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'incart':
-            _incart = incart.ECGIncartDataset(
+            _incart = ECGIncartDataset(
                 config, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
@@ -60,7 +57,7 @@ def load_datasets(config):
             val_datasets.append(val_incart)
             
         elif dataset == 'code15':
-            code15 = code.ECGCODE15Dataset(
+            code15 = ECGCODE15Dataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
@@ -71,7 +68,7 @@ def load_datasets(config):
             datasets_pretrain.append(train_code15)
             val_datasets.append(val_code15)
         elif dataset == 'code':
-            _code = code.ECGCODEDataset(
+            _code = ECGCODEDataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
@@ -82,20 +79,20 @@ def load_datasets(config):
             datasets_pretrain.append(train_code)
             val_datasets.append(val_code)
         elif dataset == 'ptbxl':
-            datasets_pretrain.append(ptb_xl.ECGPTBXLDataset(
+            datasets_pretrain.append(ECGPTBXLDataset(
                 config, 
                 split='train', 
                 global_augmentations=get_transforms(config, split='train', type='global'), 
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
-            val_datasets.append(ptb_xl.ECGPTBXLDataset(
+            val_datasets.append(ECGPTBXLDataset(
                 config, 
                 split='val', 
                 global_augmentations=get_transforms(config, split='train', type='global'), # I want the training augmentation in this case
                 local_augmentations=get_transforms(config, split='train', type='local')
             ))
         elif dataset == 'chapman':
-            chapman_dataset = chapman.ECGChapmanDataset(
+            chapman_dataset = ECGChapmanDataset(
                 config, 
                 global_augmentations=get_transforms(config, split='train', type='global'),
                 local_augmentations=get_transforms(config, split='train', type='local')

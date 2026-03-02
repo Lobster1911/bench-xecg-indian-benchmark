@@ -1,9 +1,10 @@
 import os
+
 import wfdb
 import neurokit2 as nk
 import numpy as np
-from pandarallel import pandarallel
 import torch
+from pandarallel import pandarallel
 
 pandarallel.initialize(progress_bar=False, verbose=0)
 

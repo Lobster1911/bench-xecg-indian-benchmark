@@ -1,11 +1,12 @@
+import os
 
 import torch
 import numpy as np
 import wfdb
-import os
 import pandas as pd
-from dataset.pretraining_dataset import PretrainDataset
 from pandarallel import pandarallel
+
+from .pretraining_dataset import PretrainDataset
 
 pandarallel.initialize(progress_bar=False, verbose=0)
 

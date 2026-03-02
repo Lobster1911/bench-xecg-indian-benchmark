@@ -1,12 +1,13 @@
+import os
 
 import torch
-import os
 import pandas as pd
 import wfdb
 import neurokit2 as nk
 import numpy as np
 from tqdm import tqdm
-from dataset.generic_utils import pad, RandomSwitchBaselineWanderBatched
+
+from .generic_utils import RandomSwitchBaselineWanderBatched
 
 
 class ECGSleepApneaDataset(torch.utils.data.Dataset):
