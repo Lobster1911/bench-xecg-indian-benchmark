@@ -9,7 +9,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Rearrange
 
-from st_mem.encoder.vit import TransformerBlock
+from models.st_mem.encoder.vit import TransformerBlock
 from models.base_model import BaseModel
 
 

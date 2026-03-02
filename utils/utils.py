@@ -14,22 +14,22 @@ import torch.nn as nn
 from joblib import Parallel, delayed
 
 try:
-    from ecg_jepa.models import load_encoder
+    from models.ecg_jepa.models import load_encoder
 except ImportError:
     pass
 
 try:
-    import st_mem.encoder as encoder
+    import models.st_mem.encoder as encoder
 except ImportError:
     pass
 
 try:
-    from ecg_founder.finetune_model import ft_1lead_ECGFounder, ft_12lead_ECGFounder
+    from models.ecg_founder.finetune_model import ft_1lead_ECGFounder, ft_12lead_ECGFounder
 except ImportError:
     pass
 
 try:
-    from cpc.model import CPCWrapper
+    from models.cpc.model import CPCWrapper
 except ImportError:
     pass
 

@@ -7,8 +7,8 @@ import yaml
 import numpy as np
 from models.base_model import BaseModel
 
-from cpc.ts.s4_modules.s4_model import S4Model
-from cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
+from models.cpc.ts.s4_modules.s4_model import S4Model
+from models.cpc.ts.encoder import RNNEncoder, RNNEncoderConfig
 from models.utils import get_normalization_layer
 
 class CPCWrapper(BaseModel):

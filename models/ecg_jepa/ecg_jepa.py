@@ -5,7 +5,7 @@ import math
 import torch
 import torch.nn as nn
 from timm.models.layers import DropPath, trunc_normal_
-from ecg_jepa.pos_encoding import get_2d_sincos_pos_embed
+from models.ecg_jepa.pos_encoding import get_2d_sincos_pos_embed
 from models.base_model import BaseModel
 def union_masks(masks_list):
     return torch.stack(masks_list).any(dim=0)

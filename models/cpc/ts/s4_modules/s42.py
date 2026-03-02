@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from pytorch_lightning.utilities import rank_zero_only
 from einops import rearrange, repeat
 import opt_einsum as oe
-from cpc.ts.s4_modules.s4_utils import DropoutNd
+from models.cpc.ts.s4_modules.s4_utils import DropoutNd
 
 contract = oe.contract
 contract_expression = oe.contract_expression
