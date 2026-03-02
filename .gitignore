@@ -21,3 +21,4 @@ dist/
 cpc/extensions/cauchy/dist
 cauchy_mult.egg-info/top_level.txt
 cpc/extensions/cauchy/dist/cauchy_mult-0.0.0-py3.11.egg
+logs_lightning

@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
 
     # ----------- (4) train mit bih r-peak detection -----------
-    r_peak_config = parse_config(config['r_peaks'], 'config_defaults/train_high_intensity_defaults.yaml')
+    r_peak_config = parse_config(config['r_peaks'], 'config_defaults/train_mit_bih_defaults.yaml')
     r_peak_config.deterministic = False
     r_peak_config.r_peaks_detection = True
 
