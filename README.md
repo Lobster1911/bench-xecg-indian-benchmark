@@ -62,6 +62,14 @@ To launch the experiments, run:
 uv run train_all.py --config_file configs/<your-config-list>.yaml --num_runs 5
 ```
 
+### Get the bench ecg score
+
+After all the experiemnts ended successfully run the following to get the final *BenchECG Score*:
+
+```shell
+uv run benchscore.py logs_lightning <your-experiment-name>
+```
+
 ## Call for feedbacks
 
 We really appreciate any issue / suggestion / feedback to improve our repository!
