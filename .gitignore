@@ -27,3 +27,4 @@ cpc/extensions/cauchy/dist/cauchy_mult-0.0.0-py3.11.egg
 bench_xecg.egg-info
 cauchy_mult.egg-info
 logs_lightning
+.vscode
