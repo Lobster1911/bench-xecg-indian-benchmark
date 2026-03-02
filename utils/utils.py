@@ -60,7 +60,7 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False):
             window_size=config.window_size,
             context_size=config.context_size
         )
-        checkpoint = torch.load('pretrained_models/st_mem_vit_base_encoder.pth', weights_only=False)
+        checkpoint = torch.load('pretrained_models/st_mem/st_mem_vit_base_encoder.pth', weights_only=False)
         checkpoint_model = checkpoint['model']
         state_dict = base_model.state_dict()
         for k in ['head.weight', 'head.bias']:
@@ -70,7 +70,7 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False):
         msg = base_model.load_state_dict(checkpoint_model, strict=False)
         print(msg)
     elif config.use_ecg_jepa:
-        ckpt_dir = 'pretrained_models/multiblock_epoch100.pth'
+        ckpt_dir = 'pretrained_models/ecg_jepa/multiblock_epoch100.pth'
         base_model = load_encoder(
             ckpt_dir=ckpt_dir, 
             config=config, 
@@ -79,14 +79,14 @@ def get_base_model(config, feature_classification=False, sleep_apnea=False):
         ) # dim is the dimension of the latent space
     elif config.use_ecg_founder:
         if len(config.leads) == 1:
-            path = './checkpoint/1_lead_ECGFounder.pth'
+            path = './pretrained_models/ecg_founder/1_lead_ECGFounder.pth'
             base_model = ft_1lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
         else:
-            path = './checkpoint/12_lead_ECGFounder.pth'
+            path = './pretrained_models/ecg_founder/12_lead_ECGFounder.pth'
             base_model = ft_12lead_ECGFounder('cuda', path, config.num_classes, linear_prob=config.linear_probing)
     elif config.use_ecg_cpc:
-        base_model = CPCWrapper(config, './checkpoint/init_dict.yaml', feature_classification=feature_classification, sleep_apnea=sleep_apnea)
-        base_model.load_weights_from_checkpoint('./checkpoint/last_11597276_state_dict.ckpt')
+        base_model = CPCWrapper(config, './pretrained_models/ecg_cpc/init_dict.yaml', feature_classification=feature_classification, sleep_apnea=sleep_apnea)
+        base_model.load_weights_from_checkpoint('./pretrained_models/ecg_cpc/last_11597276_state_dict.ckpt')
     else:
         if sleep_apnea:
             base_model = xLSTMSleepApnea(config=config, num_classes=config.num_classes, num_channels=len(config.leads))
