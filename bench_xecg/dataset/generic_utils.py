@@ -83,7 +83,7 @@ def find_records(folder, header_extension='.dat'):
 def make_collate_fn(config):
 
     if config.shuffle_baseline_wander_in_batch:
-        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+        baseline_shuffler = RandomSwitchBaselineWanderBatched(config.sampling_freq, 0.5)
     
     def collate_fn(batch):
         # Pad and clean global signals

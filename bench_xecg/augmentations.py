@@ -185,7 +185,7 @@ class RandomShiftBaselineWander(nn.Module):
         signal = signal - baseline_wander + baseline_shifted
         return signal
 
-class RandomSwitchtBaselineWanderBatched(nn.Module):
+class RandomSwitchBaselineWanderBatched(nn.Module):
     """
         Randomly switch the baseline wander in a batch of signals.
     """

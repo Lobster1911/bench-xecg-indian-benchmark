@@ -1,6 +1,6 @@
 import numpy as np
 from torch import optim
-from schedulers import get_cosine_schedule_with_warmup
+from bench_xecg.schedulers import get_cosine_schedule_with_warmup
 from lightning.pytorch.callbacks import ModelCheckpoint
 from typing_extensions import override
 

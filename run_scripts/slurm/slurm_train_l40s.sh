@@ -33,4 +33,4 @@ SCRIPT=$1
 CONFIG=$2
 shift 2
 
-srun ~/.conda/envs/xlstm_pretrained/bin/python "$SCRIPT" --config_file "$CONFIG" "$@"
+srun uv run "$SCRIPT" --config_file "$CONFIG" "$@"

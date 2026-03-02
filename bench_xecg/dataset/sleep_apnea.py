@@ -6,7 +6,7 @@ import wfdb
 import neurokit2 as nk
 import numpy as np
 from tqdm import tqdm
-from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
+from dataset.generic_utils import pad, RandomSwitchBaselineWanderBatched
 
 
 class ECGSleepApneaDataset(torch.utils.data.Dataset):
@@ -166,7 +166,7 @@ class ECGSleepApneaDataset(torch.utils.data.Dataset):
 def make_collate_fn(config, split='train'):
 
     if config.shuffle_baseline_wander_in_batch:
-        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+        baseline_shuffler = RandomSwitchBaselineWanderBatched(config.sampling_freq, 0.5)
     
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]

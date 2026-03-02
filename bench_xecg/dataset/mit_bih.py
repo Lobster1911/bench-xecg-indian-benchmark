@@ -7,7 +7,7 @@ import numpy as np
 from joblib import Parallel, delayed
 from tqdm import tqdm
 import neurokit2 as nk
-from dataset.generic_utils import RandomSwitchtBaselineWanderBatched
+from dataset.generic_utils import RandomSwitchBaselineWanderBatched
 from typing_extensions import override
 import random
 
@@ -347,7 +347,7 @@ class ECGMITBIHDatasetSingleHB(ECGMITBIHDataset):
 def make_collate_fn(config, split='train'):
 
     if config.shuffle_baseline_wander_in_batch:
-        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+        baseline_shuffler = RandomSwitchBaselineWanderBatched(config.sampling_freq, 0.5)
     
     def collate_fn(batch):
         signals = [torch.from_numpy(item['signal'].copy()).float() for item in batch]

@@ -4,7 +4,7 @@ import pandas as pd
 import wfdb
 import ast
 from dataset.pretraining_dataset import PretrainDataset
-from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
+from dataset.generic_utils import pad, RandomSwitchBaselineWanderBatched
 
 class ECGPTBXLDataset(PretrainDataset):
     def __init__(self, config, split='train', global_augmentations=None, local_augmentations=None):

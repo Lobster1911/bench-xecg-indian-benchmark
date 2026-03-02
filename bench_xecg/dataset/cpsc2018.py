@@ -5,7 +5,7 @@ import wfdb
 import os
 import pandas as pd
 from dataset.pretraining_dataset import PretrainDataset
-from dataset.generic_utils import pad, RandomSwitchtBaselineWanderBatched
+from dataset.generic_utils import pad, RandomSwitchBaselineWanderBatched
 from tqdm import tqdm
 
 def extract_diagnosis_code_path(file_name):
@@ -92,7 +92,7 @@ class ECGCPSC2018Dataset(PretrainDataset):
 def make_collate_fn(config, split='train'):
 
     if config.shuffle_baseline_wander_in_batch:
-        baseline_shuffler = RandomSwitchtBaselineWanderBatched(config.sampling_freq, 0.5)
+        baseline_shuffler = RandomSwitchBaselineWanderBatched(config.sampling_freq, 0.5)
 
     def collate_fn(batch):
         signals = [item['signal'] for item in batch]
