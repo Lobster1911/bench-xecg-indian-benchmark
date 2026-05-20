@@ -15,7 +15,6 @@ use_ecg_founder: true
 use_final_layer_norm: false
 cls_normalization: null  # 'batch', 'layer', 'instance'
 
-data_folder_ptbxl: /scratch/datasets/ptb-xl/raw/1.0.3/records500/
-
+data_folder_ptbxl: /home/parikshit/datasets/ptbxl/physionet.org/files/ptb-xl/1.0.3/records500/
 
 training_pct: 1.

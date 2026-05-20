@@ -1,4 +1,4 @@
-ptb_xl: configs/ptb-xl/xlstm_lp.yaml
+ptb_xl: configs/ptb-xl/ecgfm_lp.yaml
 cpsc2018: configs/cpsc2018/xlstm_lp.yaml
 mit_bih: configs/mit_bih_cls/xlstm_lp.yaml
 r_peaks: configs/mit_bih_r/xlstm_lp.yaml
@@ -8,4 +8,3 @@ sleep_apnea: configs/sleep_apnea/xlstm_lp.yaml
 lab_test: configs/lab/xlstm_lp.yaml
 exercise: configs/exercise/xlstm_lp.yaml
 ppg_af: configs/ppg_af/xlstm_lp.yaml
-
