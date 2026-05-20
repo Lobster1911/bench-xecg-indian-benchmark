@@ -27,12 +27,12 @@ if __name__ == '__main__':
     with open(args.config_file, 'r') as f:
         config = yaml.safe_load(f)
 
-    # # ----------- (1) train ptb-xl  -----------
-    # ptb_xl_config = parse_config(config['ptb_xl'], 'config_defaults/train_ptb_xl_defaults.yaml')
-    # ptb_xl_config.deterministic = False
+    # ----------- (1) train ptb-xl  -----------
+    ptb_xl_config = parse_config(config['ptb_xl'], 'config_defaults/train_ptb_xl_defaults.yaml')
+    ptb_xl_config.deterministic = False
 
-    # for i in range(args.num_runs):
-    #     train_ptb_xl(ptb_xl_config, wandb=args.wandb_log)
+    for i in range(args.num_runs):
+        train_ptb_xl(ptb_xl_config, wandb=args.wandb_log)
 
 
     # # ----------- (2) train cpsc2018 -----------
@@ -102,8 +102,8 @@ if __name__ == '__main__':
 
 
     # ------------ (10) train ppg af -----------
-    ppg_af_config = parse_config(config['ppg_af'], 'config_defaults/train_ppg_af_defaults.yaml')
-    ppg_af_config.deterministic = False
+    # ppg_af_config = parse_config(config['ppg_af'], 'config_defaults/train_ppg_af_defaults.yaml')
+    # ppg_af_config.deterministic = False
 
-    for i in range(args.num_runs):
-        train_ppg_af(ppg_af_config, wandb=args.wandb_log)
+    # for i in range(args.num_runs):
+        # train_ppg_af(ppg_af_config, wandb=args.wandb_log)
